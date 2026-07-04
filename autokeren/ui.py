@@ -134,6 +134,36 @@ class AgentUI:
         self.console.print(Panel(Group(*lines), title="[bold]todo[/bold]", border_style="blue"))
 
     # ------------------------------------------------------------------ #
+    # Context status
+    # ------------------------------------------------------------------ #
+
+    def show_context_status(self, info: dict) -> None:
+        """Tampilkan context window usage: tokens, %, prompt/completion stats."""
+        tokens = info["tokens"]
+        pct = info["pct"]
+        window = info["window"]
+        prompt_t = info.get("prompt_tokens", 0)
+        comp_t = info.get("completion_tokens", 0)
+
+        if pct < 50:
+            color = "green"
+        elif pct < 80:
+            color = "yellow"
+        else:
+            color = "red"
+
+        bar_len = 20
+        filled = int(bar_len * pct / 100)
+        bar = "█" * filled + "░" * (bar_len - filled)
+
+        self.console.print(
+            f"  [dim]Context[/dim] [{color}]{bar}[/{color}] "
+            f"[{color}]{tokens:,}[/{color}][dim]/{window:,} tokens "
+            f"({pct:.0f}%)[/dim]  "
+            f"[dim]prompt: {prompt_t:,} | completion: {comp_t:,}[/dim]"
+        )
+
+    # ------------------------------------------------------------------ #
     # Final response panel
     # ------------------------------------------------------------------ #
 

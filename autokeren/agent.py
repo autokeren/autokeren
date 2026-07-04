@@ -85,6 +85,74 @@ class Agent:
         self.context.messages.append({"role": "system", "content": self._system_prompt})
         self.plan_approved = not self.cfg.autokeren.plan_mode
 
+    def context_info(self) -> dict[str, Any]:
+        """Return info tentang context window usage buat display."""
+        tokens = self.context.estimate_tokens()
+        window = self.cfg.autokeren.context_window
+        pct = round(tokens / window * 100, 1) if window > 0 else 0.0
+        u = self.router.usage_total
+        return {
+            "tokens": tokens,
+            "window": window,
+            "pct": pct,
+            "prompt_tokens": u.prompt,
+            "completion_tokens": u.completion,
+            "total_tokens": u.total,
+        }
+
+    def should_compact(self) -> bool:
+        """Cek apakah perlu auto-compact berdasarkan threshold."""
+        if not self.cfg.autokeren.auto_compact:
+            return False
+        info = self.context_info()
+        return info["pct"] >= self.cfg.autokeren.auto_compact_threshold * 100
+
+    def compact(self) -> str:
+        """Compact context: summarize pesan lama, keep system prompt + N pesan terakhir."""
+        tail = self.cfg.autokeren.compact_tail_turns
+        if len(self.context.messages) <= tail + 1:
+            return "Context sudah cukup singkat, tidak perlu compact."
+
+        system_msg = self.context.messages[0]
+        recent = self.context.messages[-tail:]
+        to_summarize = self.context.messages[1:-tail]
+
+        before_tokens = self.context.estimate_tokens()
+
+        summary_parts: list[str] = []
+        for msg in to_summarize:
+            role = msg.get("role", "?")
+            content = str(msg.get("content", ""))[:800]
+            summary_parts.append(f"[{role}] {content}")
+        summary_text = "\n".join(summary_parts)
+
+        summary_prompt = (
+            "Ringkas percakapan berikut secara singkat dan padat. "
+            "Pertahankan: keputusan penting, perubahan file, error yang ditemukan, "
+            "dan konteks yang perlu diingat untuk percakapan selanjutnya.\n\n"
+            f"{summary_text}"
+        )
+
+        resp = self.router.complete(
+            [{"role": "user", "content": summary_prompt}],
+            max_tokens=1024,
+            temperature=0.0,
+        )
+
+        self.context.messages = [
+            system_msg,
+            {"role": "user", "content": f"Ringkasan percakapan sebelumnya:\n{resp.content}"},
+            {"role": "assistant", "content": "Baik, saya ingat ringkasan ini. Lanjutkan."},
+            *recent,
+        ]
+
+        after_tokens = self.context.estimate_tokens()
+        saved = before_tokens - after_tokens
+        return (
+            f"Context di-compact: {len(to_summarize)} pesan diringkas. "
+            f"Token {before_tokens:,} → {after_tokens:,} (hemat {saved:,})."
+        )
+
     def status(self) -> dict[str, Any]:
         return {
             "project_root": self.project_root,

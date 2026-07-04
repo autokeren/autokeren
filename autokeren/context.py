@@ -49,9 +49,20 @@ class SessionContext:
         self.messages = []
         self.usage_total = TokenUsage()
 
+    def estimate_tokens(self) -> int:
+        """Estimasi token count untuk semua messages (heuristic: chars/4)."""
+        total = 0
+        for msg in self.messages:
+            content = str(msg.get("content", ""))
+            total += len(content) // 4
+            if msg.get("tool_calls"):
+                total += len(json.dumps(msg["tool_calls"], default=str)) // 4
+        return total
+
     def summary(self) -> dict[str, Any]:
         return {
             "messages": len(self.messages),
+            "tokens_estimated": self.estimate_tokens(),
             "usage": {
                 "prompt": self.usage_total.prompt,
                 "completion": self.usage_total.completion,

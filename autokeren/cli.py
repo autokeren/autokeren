@@ -73,10 +73,20 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
         if user_input in ("/quit", "/q"):
             break
         if user_input == "/help":
-            console.print("Perintah: /q (keluar), /status, /reset, /models")
+            console.print("Perintah: /q (keluar), /status, /compact, /reset")
             continue
         if user_input == "/status":
             console.print_json(json.dumps(agent.status()))
+            ui.show_context_status(agent.context_info())
+            continue
+        if user_input == "/compact":
+            console.print("[dim]mengompak context…[/dim]")
+            try:
+                msg = agent.compact()
+                console.print(f"[green]{msg}[/green]")
+                ui.show_context_status(agent.context_info())
+            except Exception as e:
+                console.print(f"[red]Compact gagal:[/red] {e}")
             continue
         if user_input == "/reset":
             agent.reset()
@@ -98,6 +108,14 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
                     agent.context.add_user("User menolak rencana. Tanya apa yang perlu diubah.")
                     resp = agent.run("")
                     ui.show_response(resp)
+
+            # Context status after each response
+            info = agent.context_info()
+            ui.show_context_status(info)
+
+            # Auto-compact suggestion
+            if info["pct"] >= cfg.autokeren.auto_compact_threshold * 100:
+                console.print(f"[yellow]⚠ Context sudah {info['pct']:.0f}%. Ketik /compact untuk meringkas.[/yellow]")
         except Exception as e:
             console.print(f"[red]Error:[/red] {e}")
         finally:

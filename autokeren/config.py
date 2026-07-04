@@ -40,6 +40,10 @@ class AutokerenConfig(BaseModel):
     shell_timeout: int = 180
     shell_allowlist: list[str] = Field(default_factory=lambda: ["node", "npm", "pnpm", "npx", "git", "wrangler", "python3", "pytest"])
     project_root: str = "."
+    context_window: int = 262144
+    compact_tail_turns: int = 6
+    auto_compact: bool = False
+    auto_compact_threshold: float = 0.8
 
 
 class CamofoxConfig(BaseModel):
