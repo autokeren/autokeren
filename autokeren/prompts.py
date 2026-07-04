@@ -17,7 +17,12 @@ def _load_agents_md(project_root: str) -> str:
     return ""
 
 
-def build_system_prompt(project_root: str, tools: ToolRegistry, plan_mode: bool = False) -> str:
+def build_system_prompt(
+    project_root: str,
+    tools: ToolRegistry,
+    plan_mode: bool = False,
+    memory: str = "",
+) -> str:
     tool_names = ", ".join(tools.names())
     plan_instruction = (
         "Untuk respons pertama, buat rencana eksekusi bernomor. Tunggu user approve sebelum pakai tool."
@@ -26,6 +31,8 @@ def build_system_prompt(project_root: str, tools: ToolRegistry, plan_mode: bool 
 
     agents_md = _load_agents_md(project_root)
     agents_section = f"\n\n## instruksi project (AGENTS.md)\n{agents_md}" if agents_md else ""
+
+    memory_section = f"\n\n## memory (dari session sebelumnya)\n{memory}" if memory else ""
 
     return f"""Kamu autokeren v{_VERSION}, agent coding otonom yang berjalan di {project_root}.
 Tugas kamu: bantu build, debug, dan deploy kode. Kamu punya akses tool: {tool_names}.
@@ -39,5 +46,6 @@ Aturan:
 - Jawab singkat dan to the point.
 - Gunakan bahasa Indonesia yang santai tapi profesional.
 - Kalau mau pakai tool, gunakan mechanism tool_calls native. System akan jalankan dan beri hasilnya kembali.
-{plan_instruction}{agents_section}
+- Kalau nemu info penting (build command, debug pattern, preferensi user), simpan ke memory pakai tool remember.
+{plan_instruction}{agents_section}{memory_section}
 """

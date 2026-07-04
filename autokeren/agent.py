@@ -6,9 +6,11 @@ from typing import Any, Callable
 
 from autokeren.config import Config
 from autokeren.context import SessionContext
+from autokeren.memory import MemoryManager
 from autokeren.models.base import ModelResponse
 from autokeren.models.router import ModelRouter
 from autokeren.prompts import build_system_prompt
+from autokeren.session import SessionManager
 from autokeren.tools import ToolRegistry, ToolResult
 
 
@@ -19,7 +21,9 @@ class Agent:
         self.project_root = project_root
         self.router = ModelRouter(cfg)
         self.context = SessionContext(project_root=Path(project_root))
-        self._system_prompt = build_system_prompt(project_root, tools, plan_mode=cfg.autokeren.plan_mode)
+        self.memory = MemoryManager(project_root)
+        self.sessions = SessionManager(project_root)
+        self._build_system_prompt()
         self.context.messages.append({"role": "system", "content": self._system_prompt})
         self.plan_approved = not cfg.autokeren.plan_mode
 
@@ -30,6 +34,16 @@ class Agent:
         self.on_tool_end: Callable[[str, ToolResult], None] | None = None
         self.on_chunk: Callable[[str], None] | None = None
         self.permission_callback: Callable[[str, str, dict[str, Any]], bool] | None = None
+
+    def _build_system_prompt(self) -> None:
+        """Build system prompt dengan memory + AGENTS.md."""
+        mem = self.memory.load() if self.cfg.autokeren.memory_enabled else ""
+        self._system_prompt = build_system_prompt(
+            self.project_root,
+            self.tools,
+            plan_mode=self.cfg.autokeren.plan_mode,
+            memory=mem,
+        )
 
     def run(self, user_input: str) -> ModelResponse:
         self.context.add_user(user_input)
@@ -80,10 +94,38 @@ class Agent:
         self.context.add_user("User approved the plan. Execute it now.")
 
     def reset(self) -> None:
-        """Reset session context, re-adding the system prompt."""
+        """Reset session context, reload memory + system prompt."""
         self.context.reset()
+        self._build_system_prompt()
         self.context.messages.append({"role": "system", "content": self._system_prompt})
         self.plan_approved = not self.cfg.autokeren.plan_mode
+
+    def save_session(self, name: str) -> str:
+        """Save session ke disk. Return session_id."""
+        usage = {
+            "prompt": self.router.usage_total.prompt,
+            "completion": self.router.usage_total.completion,
+            "total": self.router.usage_total.total,
+        }
+        return self.sessions.save(name, self.context.messages, usage)
+
+    def resume_session(self, identifier: str) -> str:
+        """Resume session dari disk. Return status message."""
+        data = self.sessions.load(identifier)
+        if not data:
+            return f"Session '{identifier}' tidak ditemukan."
+        messages = data.get("messages", [])
+        if not messages:
+            return "Session kosong."
+        # Reload system prompt dengan memory terbaru, keep rest
+        self._build_system_prompt()
+        messages[0] = {"role": "system", "content": self._system_prompt}
+        self.context.messages = messages
+        self.plan_approved = not self.cfg.autokeren.plan_mode
+        name = data.get("name", "unknown")
+        ts = data.get("timestamp", "")
+        n = len(messages)
+        return f"Session '{name}' di-resume ({n} pesan, saved {ts})."
 
     def context_info(self) -> dict[str, Any]:
         """Return info tentang context window usage buat display."""

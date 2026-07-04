@@ -44,6 +44,8 @@ class AutokerenConfig(BaseModel):
     compact_tail_turns: int = 6
     auto_compact: bool = False
     auto_compact_threshold: float = 0.8
+    memory_enabled: bool = True
+    auto_save_session: bool = False
 
 
 class CamofoxConfig(BaseModel):

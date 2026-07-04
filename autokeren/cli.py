@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from rich.console import Console
+from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 
 from autokeren import __version__
@@ -23,6 +24,7 @@ from autokeren.tools import (
     ListFilesTool,
     PatchFileTool,
     ReadFileTool,
+    RememberTool,
     SearchCodeTool,
     ShellTool,
     TodoTool,
@@ -59,6 +61,11 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
     ui.show_banner(__version__)
     if not cfg.cloudflare.account_id or not cfg.cloudflare.api_token:
         console.print("[yellow]Warning: Cloudflare account_id/api_token belum diisi. Jalankan autokeren --init.[/yellow]")
+    if agent.memory.exists():
+        console.print(f"[dim]Memory: {agent.memory.line_count()} baris[/dim]")
+    sessions = agent.sessions.list()
+    if sessions:
+        console.print(f"[dim]Saved sessions: {len(sessions)} (ketik /sessions untuk lihat)[/dim]")
     console.print("[dim]Ketik /help untuk bantuan, atau langsung tanya apa saja.[/dim]\n")
 
     while True:
@@ -73,7 +80,7 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
         if user_input in ("/quit", "/q"):
             break
         if user_input == "/help":
-            console.print("Perintah: /q (keluar), /status, /compact, /reset")
+            console.print("Perintah: /q /status /compact /reset /memory /save /resume /sessions")
             continue
         if user_input == "/status":
             console.print_json(json.dumps(agent.status()))
@@ -91,6 +98,45 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
         if user_input == "/reset":
             agent.reset()
             console.print("Sesi direset.")
+            continue
+        if user_input == "/memory":
+            mem = agent.memory.load()
+            if mem:
+                console.print(Panel(mem, title=f"[bold]memory[/bold] ({agent.memory.line_count()} baris)", border_style="magenta"))
+                console.print(f"[dim]File: {agent.memory.get_path()}[/dim]")
+            else:
+                console.print("[dim]Memory kosong. Agent akan simpan otomatis via tool remember.[/dim]")
+            continue
+        if user_input.startswith("/save"):
+            name = user_input[5:].strip() or f"session-{len(agent.sessions.list()) + 1}"
+            try:
+                sid = agent.save_session(name)
+                console.print(f"[green]Session '{name}' disimpan. ID: {sid}[/green]")
+            except Exception as e:
+                console.print(f"[red]Save gagal:[/red] {e}")
+            continue
+        if user_input.startswith("/resume"):
+            identifier = user_input[7:].strip()
+            if not identifier:
+                console.print("[yellow]Pakai: /resume <nama|id>[/yellow]")
+                continue
+            try:
+                msg = agent.resume_session(identifier)
+                console.print(f"[green]{msg}[/green]")
+                ui.show_context_status(agent.context_info())
+            except Exception as e:
+                console.print(f"[red]Resume gagal:[/red] {e}")
+            continue
+        if user_input == "/sessions":
+            sessions = agent.sessions.list()
+            if not sessions:
+                console.print("[dim]Belum ada saved session.[/dim]")
+            else:
+                lines = []
+                for s in sessions:
+                    lines.append(f"  [cyan]{s['id']}[/cyan]  [bold]{s['name']}[/bold]  [dim]{s['timestamp'][:19]}  {s['messages']} pesan[/dim]")
+                console.print(Panel("\n".join(lines), title=f"[bold]sessions[/bold] ({len(sessions)})", border_style="cyan"))
+                console.print("[dim]Ketik /resume <nama|id> untuk resume[/dim]")
             continue
 
         try:
@@ -150,6 +196,7 @@ def main() -> int:
     project_root = Path(args.project_root).expanduser().resolve()
     reg = build_registry(cfg, project_root)
     agent = Agent(cfg, reg, str(project_root))
+    reg.register(RememberTool(agent.memory))
 
     ui = AgentUI(console)
     agent.on_model_start = ui.on_model_start

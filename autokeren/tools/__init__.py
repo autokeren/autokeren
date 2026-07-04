@@ -4,6 +4,7 @@ from autokeren.tools.camofox import CamofoxTool
 from autokeren.tools.cloudflare import CloudflareBuildTool, CloudflareDeployTool
 from autokeren.tools.file import ListFilesTool, PatchFileTool, ReadFileTool, WriteFileTool
 from autokeren.tools.git import GitCommitTool, GitDiffTool, GitStatusTool
+from autokeren.tools.remember import RememberTool
 from autokeren.tools.search import SearchCodeTool
 from autokeren.tools.shell import ShellTool
 from autokeren.tools.tmux import TmuxTool
@@ -29,4 +30,5 @@ __all__ = [
     "CloudflareBuildTool",
     "TmuxTool",
     "TodoTool",
+    "RememberTool",
 ]
