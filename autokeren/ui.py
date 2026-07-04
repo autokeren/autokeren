@@ -73,20 +73,23 @@ class AgentUI:
         self._status.start()
 
     def on_chunk(self, text: str) -> None:
-        """Called untuk setiap text chunk dari streaming. Switch spinner → Live."""
+        """Called untuk setiap text chunk dari streaming. Switch spinner → Live dengan Panel."""
         if self._status is not None:
             self._stop_status()
-            self._live = Live("", console=self.console, refresh_per_second=12, vertical_overflow="visible")
+            self._live = Live(
+                Panel("", title="autokeren"),
+                console=self.console,
+                refresh_per_second=12,
+                vertical_overflow="visible",
+            )
             self._live.start()
         self._did_stream = True
         self._stream_text += text
         if self._live is not None:
-            self._live.update(self._stream_text)
+            self._live.update(Panel(self._stream_text, title="autokeren"))
 
     def on_model_end(self, resp: "ModelResponse") -> None:
         self._stop_all()
-        if self._did_stream:
-            self.console.print()  # newline setelah streaming text
         self._stream_text = ""
 
     # ------------------------------------------------------------------ #
