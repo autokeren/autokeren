@@ -40,6 +40,7 @@ class AgentUI:
         self._live: Live | None = None
         self._tool_label: str = ""
         self._stream_text: str = ""
+        self._did_stream: bool = False
 
     # ------------------------------------------------------------------ #
     # Banner startup
@@ -67,6 +68,7 @@ class AgentUI:
     def on_model_start(self) -> None:
         self._stop_all()
         self._stream_text = ""
+        self._did_stream = False
         self._status = self.console.status("[dim]mikir…[/dim]", spinner="dots")
         self._status.start()
 
@@ -76,12 +78,15 @@ class AgentUI:
             self._stop_status()
             self._live = Live("", console=self.console, refresh_per_second=12, vertical_overflow="visible")
             self._live.start()
+        self._did_stream = True
         self._stream_text += text
         if self._live is not None:
             self._live.update(self._stream_text)
 
     def on_model_end(self, resp: "ModelResponse") -> None:
         self._stop_all()
+        if self._did_stream:
+            self.console.print()  # newline setelah streaming text
         self._stream_text = ""
 
     # ------------------------------------------------------------------ #
@@ -170,6 +175,8 @@ class AgentUI:
     def show_response(self, resp: "ModelResponse") -> None:
         if not resp.content:
             return
+        if self._did_stream:
+            return  # text udah tampil via streaming Live, jangan double
         title = f"autokeren [{resp.model_id}]" if resp.model_id else "autokeren"
         self.console.print(Panel(resp.content, title=title))
 
