@@ -22,11 +22,13 @@ class ModelRouter:
         if not self.models:
             base = CloudflareModel.from_config(self.cfg)
             primary = base
+            from autokeren.models.cloudflare import resolve_model_id
+            secondary_model_id = resolve_model_id(self.cfg.cloudflare.secondary_model, base.auth_mode)
             secondary = CloudflareModel(
                 account_id=base.account_id,
                 api_token=base.api_token,
                 api_key=base.api_key,
-                model_id=self.cfg.cloudflare.secondary_model,
+                model_id=secondary_model_id,
                 base_url=base.base_url,
                 timeout=base.timeout,
                 retry_policy=base.retry_policy,

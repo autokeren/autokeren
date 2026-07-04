@@ -23,8 +23,8 @@ class AuthConfig(BaseModel):
 class CloudflareConfig(BaseModel):
     account_id: str = ""
     api_token: str = ""
-    primary_model: str = "@cf/moonshotai/kimi-k2.7-code"
-    secondary_model: str = "@cf/zai-org/glm-5.2"
+    primary_model: str = "kimi-2.6"
+    secondary_model: str = "llama-3.3-70b"
     max_tokens: int = 4096
     temperature: float = 0.3
     timeout: float = 120.0

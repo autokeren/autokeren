@@ -10,6 +10,27 @@ import httpx
 from autokeren.models.base import Message, ModelResponse, TokenUsage, ToolCall
 from autokeren.models.retry import RetryPolicy, retry_call
 
+_PLATFORM_MODEL_MAP: dict[str, str] = {
+    "@cf/moonshotai/kimi-k2.7-code": "kimi-2.6",
+    "@cf/moonshotai/kimi-k2.6": "kimi-2.6",
+    "@cf/zai-org/glm-5.2": "llama-3.3-70b",
+    "@cf/meta/llama-3.3-70b-instruct-fp8-fast": "llama-3.3-70b",
+    "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b": "deepseek-r1",
+    "@cf/meta/llama-3.2-3b-instruct": "llama-3-8b",
+    "@cf/google/gemma-4-26b-a4b-it": "gemma-2-27b",
+    "@cf/qwen/qwq-32b": "qwen-2.5-72b",
+    "@cf/qwen/qwen2.5-coder-32b-instruct": "qwen-2.5-72b",
+}
+
+
+def resolve_model_id(model_id: str, auth_mode: str) -> str:
+    """Map @cf/... model IDs to platform aliases when in platform mode."""
+    if auth_mode != "platform":
+        return model_id
+    if not model_id.startswith("@cf/"):
+        return model_id
+    return _PLATFORM_MODEL_MAP.get(model_id, "kimi-2.6")
+
 
 class CloudflareAIError(Exception):
     def __init__(self, message: str, status: int | None = None, response: dict | None = None):
@@ -51,7 +72,7 @@ class CloudflareModel:
                 account_id="",
                 api_token="",
                 api_key=cfg.auth.api_key,
-                model_id=cfg.cloudflare.primary_model,
+                model_id=resolve_model_id(cfg.cloudflare.primary_model, "platform"),
                 base_url=cfg.auth.base_url,
                 timeout=cfg.cloudflare.timeout,
                 auth_mode="platform",

@@ -286,10 +286,10 @@ def main() -> int:
     cfg = load_config(Path(args.config)) if args.config else ensure_config()
     if args.plan:
         cfg.autokeren.plan_mode = True
-    if args.model == "glm":
-        cfg.cloudflare.primary_model = "@cf/zai-org/glm-5.2"
-    elif args.model == "kimi":
-        cfg.cloudflare.primary_model = "@cf/moonshotai/kimi-k2.7-code"
+    if args.model == "kimi":
+        cfg.cloudflare.primary_model = "kimi-2.6" if cfg.auth.mode == "platform" else "@cf/moonshotai/kimi-k2.7-code"
+    elif args.model == "glm":
+        cfg.cloudflare.primary_model = "llama-3.3-70b" if cfg.auth.mode == "platform" else "@cf/zai-org/glm-5.2"
 
     project_root = Path(args.project_root).expanduser().resolve()
     memory = MemoryManager(str(project_root))
