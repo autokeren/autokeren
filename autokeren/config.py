@@ -83,7 +83,7 @@ def save_config(cfg: Config, path: Path | None = None) -> Path:
 def init_config(interactive: bool = False) -> Config:
     cfg = Config()
     if interactive:
-        print("Let's configure autokeren.")
+        print("Yuk setup autokeren.")
         cfg.cloudflare.account_id = input("Cloudflare account id: ").strip()
         cfg.cloudflare.api_token = input("Cloudflare API token: ").strip()
     save_config(cfg)

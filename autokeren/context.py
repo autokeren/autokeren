@@ -8,6 +8,8 @@ from typing import Any
 
 from autokeren.models.base import Message, ModelResponse, TokenUsage
 
+_MAX_TOOL_RESULT_CHARS = 8000
+
 
 @dataclass
 class SessionContext:
@@ -33,7 +35,9 @@ class SessionContext:
         self.usage_total = self.usage_total + response.usage
 
     def add_tool_result(self, tool_call_id: str, name: str, result: Any, ok: bool) -> None:
-        content = json.dumps({"ok": ok, "result": result})
+        content = json.dumps({"ok": ok, "result": result}, default=str)
+        if len(content) > _MAX_TOOL_RESULT_CHARS:
+            content = content[:_MAX_TOOL_RESULT_CHARS] + f'\n... dipotong dari {len(content)} chars'
         self.messages.append({
             "role": "tool",
             "tool_call_id": tool_call_id,

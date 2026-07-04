@@ -31,6 +31,15 @@ class Tool(ABC):
     name: str = ""
     description: str = ""
     parameters: dict[str, Any] = {}
+    requires_permission: bool = False
+
+    def needs_permission(self, *args: Any, **kwargs: Any) -> bool:
+        """Override untuk dynamic permission check berdasarkan arguments."""
+        return self.requires_permission
+
+    def permission_desc(self, *args: Any, **kwargs: Any) -> str:
+        """Deskripsi human-readable untuk dialog konfirmasi."""
+        return self.description
 
     @abstractmethod
     def run(self, *args: Any, **kwargs: Any) -> ToolResult:
@@ -64,10 +73,17 @@ class ToolRegistry:
     def names(self) -> list[str]:
         return list(self.tools.keys())
 
+    def check_permission(self, name: str, arguments: dict[str, Any]) -> tuple[bool, str]:
+        """Return (needs_permission, description)."""
+        tool = self.get(name)
+        if tool and tool.needs_permission(**arguments):
+            return True, tool.permission_desc(**arguments)
+        return False, ""
+
     def run(self, name: str, arguments: dict[str, Any]) -> ToolResult:
         tool = self.get(name)
         if not tool:
-            return ToolResult(error=f"tool not found: {name}", ok=False)
+            return ToolResult(error=f"tool tidak ditemukan: {name}", ok=False)
         try:
             return tool.run(**arguments)
         except Exception as e:

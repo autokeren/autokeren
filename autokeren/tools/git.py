@@ -66,6 +66,7 @@ class GitDiffTool(Tool):
 class GitCommitTool(Tool):
     name = "git_commit"
     description = "Stage and commit all changes with a message."
+    requires_permission = True
     parameters = {
         "type": "object",
         "properties": {
@@ -80,6 +81,9 @@ class GitCommitTool(Tool):
     def run(self, message: str, **_) -> ToolResult:
         self._git(["add", "-A"])
         return self._git(["commit", "-m", message])
+
+    def permission_desc(self, message: str, **_) -> str:
+        return f"git commit: {message[:60]}"
 
     def _git(self, args: list[str]) -> ToolResult:
         try:

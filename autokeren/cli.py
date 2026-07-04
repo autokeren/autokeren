@@ -7,13 +7,11 @@ import sys
 from pathlib import Path
 
 from rich.console import Console
-from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 
 from autokeren import __version__
 from autokeren.agent import Agent
 from autokeren.config import ensure_config, init_config, load_config, save_config
-from autokeren.models.base import ModelResponse
 from autokeren.tools import (
     CamofoxTool,
     CloudflareBuildTool,
@@ -27,10 +25,12 @@ from autokeren.tools import (
     ReadFileTool,
     SearchCodeTool,
     ShellTool,
+    TodoTool,
     ToolRegistry,
     TmuxTool,
     WriteFileTool,
 )
+from autokeren.ui import AgentUI
 
 console = Console()
 
@@ -51,27 +51,21 @@ def build_registry(cfg, project_root: Path) -> ToolRegistry:
     reg.register(CloudflareDeployTool(project_root))
     reg.register(CloudflareBuildTool(project_root))
     reg.register(TmuxTool(project_root))
+    reg.register(TodoTool())
     return reg
 
 
-def print_response(resp: ModelResponse):
-    if resp.content:
-        console.print(Panel(resp.content, title=f"autokeren [{resp.model_id}]" if resp.model_id else "autokeren"))
-    if resp.tool_calls:
-        for tc in resp.tool_calls:
-            console.print(f"[dim]→ tool:[/dim] {tc.name}({json.dumps(tc.arguments)})")
-
-
-def chat_loop(agent: Agent, cfg):
-    console.print("[bold green]autokeren[/bold green] ready. Type /help for commands or ask anything.")
+def chat_loop(agent: Agent, cfg, ui: AgentUI):
+    ui.show_banner(__version__)
     if not cfg.cloudflare.account_id or not cfg.cloudflare.api_token:
-        console.print("[yellow]Warning: Cloudflare account_id/api_token not configured. Run autokeren --init.[/yellow]")
+        console.print("[yellow]Warning: Cloudflare account_id/api_token belum diisi. Jalankan autokeren --init.[/yellow]")
+    console.print("[dim]Ketik /help untuk bantuan, atau langsung tanya apa saja.[/dim]\n")
 
     while True:
         try:
-            user_input = Prompt.ask("\n[bold blue]you[/bold blue]").strip()
+            user_input = Prompt.ask("\n[bold blue]kamu[/bold blue]").strip()
         except (EOFError, KeyboardInterrupt):
-            console.print("\nBYE")
+            console.print("\nSampai jumpa!")
             break
 
         if not user_input:
@@ -79,33 +73,35 @@ def chat_loop(agent: Agent, cfg):
         if user_input in ("/quit", "/q"):
             break
         if user_input == "/help":
-            console.print("Commands: /q, /status, /models, /reset")
+            console.print("Perintah: /q (keluar), /status, /reset, /models")
             continue
         if user_input == "/status":
             console.print_json(json.dumps(agent.status()))
             continue
         if user_input == "/reset":
             agent.reset()
-            console.print("Session reset.")
+            console.print("Sesi direset.")
             continue
 
         try:
             resp = agent.run(user_input)
-            print_response(resp)
+            ui.show_response(resp)
 
             # Plan mode loop
             while cfg.autokeren.plan_mode and not agent.plan_approved:
-                approved = Confirm.ask("Approve this plan?")
+                approved = Confirm.ask("Setujui rencana ini?")
                 if approved:
                     agent.approve_plan()
                     resp = agent.run("")
-                    print_response(resp)
+                    ui.show_response(resp)
                 else:
-                    agent.context.add_user("User rejected the plan. Ask what to change.")
+                    agent.context.add_user("User menolak rencana. Tanya apa yang perlu diubah.")
                     resp = agent.run("")
-                    print_response(resp)
+                    ui.show_response(resp)
         except Exception as e:
             console.print(f"[red]Error:[/red] {e}")
+        finally:
+            ui.cleanup()
 
 
 def main() -> int:
@@ -137,12 +133,26 @@ def main() -> int:
     reg = build_registry(cfg, project_root)
     agent = Agent(cfg, reg, str(project_root))
 
+    ui = AgentUI(console)
+    agent.on_model_start = ui.on_model_start
+    agent.on_model_end = ui.on_model_end
+    agent.on_tool_start = ui.on_tool_start
+    agent.on_tool_end = ui.on_tool_end
+    agent.on_chunk = ui.on_chunk
+    agent.permission_callback = ui.confirm_permission
+
     if args.prompt:
-        resp = agent.run(args.prompt)
-        print_response(resp)
+        ui.show_banner(__version__)
+        try:
+            resp = agent.run(args.prompt)
+            ui.show_response(resp)
+        except Exception as e:
+            console.print(f"[red]Error:[/red] {e}")
+        finally:
+            ui.cleanup()
         return 0
 
-    chat_loop(agent, cfg)
+    chat_loop(agent, cfg, ui)
     return 0
 
 

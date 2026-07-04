@@ -47,6 +47,7 @@ class ReadFileTool(Tool):
 class WriteFileTool(Tool):
     name = "write_file"
     description = "Write or overwrite a file. Creates backups automatically."
+    requires_permission = True
     parameters = {
         "type": "object",
         "properties": {
@@ -69,6 +70,9 @@ class WriteFileTool(Tool):
         except Exception as e:
             return ToolResult(error=str(e), ok=False)
 
+    def permission_desc(self, path: str, content: str, **_) -> str:
+        return f"menulis/timpa file {path} ({len(content)} chars)"
+
     def _resolve(self, path: str) -> Path:
         p = Path(path)
         return p if p.is_absolute() else self.project_root / p
@@ -77,6 +81,7 @@ class WriteFileTool(Tool):
 class PatchFileTool(Tool):
     name = "patch_file"
     description = "Replace a unique string inside a file with a new string."
+    requires_permission = True
     parameters = {
         "type": "object",
         "properties": {
@@ -107,14 +112,30 @@ class PatchFileTool(Tool):
         except Exception as e:
             return ToolResult(error=str(e), ok=False)
 
+    def permission_desc(self, path: str, old_string: str, new_string: str, **_) -> str:
+        return f"edit file {path}"
+
     def _resolve(self, path: str) -> Path:
         p = Path(path)
         return p if p.is_absolute() else self.project_root / p
 
 
+_IGNORED_DIRS = frozenset({
+    ".git", ".svn", ".hg",
+    ".venv", "venv", "env", ".env",
+    "__pycache__", ".mypy_cache", ".ruff_cache", ".pytest_cache",
+    "node_modules", ".next", ".nuxt", ".turbo",
+    "build", "dist", ".eggs", "*.egg-info",
+    ".tox", "htmlcov", ".coverage",
+    ".idea", ".vscode",
+})
+
+_MAX_LIST_FILES = 500
+
+
 class ListFilesTool(Tool):
     name = "list_files"
-    description = "List files in a directory."
+    description = "List files in a directory. Auto-excludes .git, .venv, node_modules, __pycache__, dll."
     parameters = {
         "type": "object",
         "properties": {
@@ -130,13 +151,21 @@ class ListFilesTool(Tool):
     def run(self, path: str = ".", recursive: bool = False, **_) -> ToolResult:
         target = self._resolve(path)
         try:
-            out = []
+            out: list[str] = []
             if recursive:
                 for p in sorted(target.rglob("*")):
+                    rel = p.relative_to(self.project_root)
+                    if any(part in _IGNORED_DIRS for part in rel.parts):
+                        continue
                     suffix = " [dir]" if p.is_dir() else ""
-                    out.append(f"{p.relative_to(self.project_root)}{suffix}")
+                    out.append(f"{rel}{suffix}")
+                    if len(out) >= _MAX_LIST_FILES:
+                        out.append(f"... dipotong di {_MAX_LIST_FILES} file. Gunakan path lebih spesifik.")
+                        break
             else:
                 for p in sorted(target.iterdir()):
+                    if p.name in _IGNORED_DIRS:
+                        continue
                     suffix = " [dir]" if p.is_dir() else ""
                     out.append(f"{p.relative_to(self.project_root)}{suffix}")
             return ToolResult(output="\n".join(out))

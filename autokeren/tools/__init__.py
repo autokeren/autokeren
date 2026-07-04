@@ -7,6 +7,7 @@ from autokeren.tools.git import GitCommitTool, GitDiffTool, GitStatusTool
 from autokeren.tools.search import SearchCodeTool
 from autokeren.tools.shell import ShellTool
 from autokeren.tools.tmux import TmuxTool
+from autokeren.tools.todo import TodoTool
 from autokeren.tools.web import FetchURLTool
 
 __all__ = [
@@ -27,4 +28,5 @@ __all__ = [
     "CloudflareDeployTool",
     "CloudflareBuildTool",
     "TmuxTool",
+    "TodoTool",
 ]

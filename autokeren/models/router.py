@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from autokeren.config import Config
 from autokeren.models.base import Message, ModelResponse, TokenUsage
@@ -40,14 +40,20 @@ class ModelRouter:
     def healthy_models(self) -> list[CloudflareModel]:
         return [m for m in self.models if self.breakers[m.model_id].allow()]
 
-    def complete(self, messages: list[Message], tools: list[dict] | None = None, **params) -> ModelResponse:
+    def complete(
+        self,
+        messages: list[Message],
+        tools: list[dict] | None = None,
+        on_chunk: Callable[[str], None] | None = None,
+        **params,
+    ) -> ModelResponse:
         candidates = self.healthy_models()
         if not candidates:
             raise RuntimeError("all model circuit breakers are open")
         last_error: Exception | None = None
         for model in candidates:
             try:
-                resp = model.complete(messages, tools=tools, **params)
+                resp = model.complete(messages, tools=tools, on_chunk=on_chunk, **params)
                 self.breakers[model.model_id].record_success()
                 self.usage_total = self.usage_total + resp.usage
                 resp.model_id = model.model_id

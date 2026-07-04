@@ -37,6 +37,12 @@ class CamofoxTool(Tool):
     def __init__(self, cfg: Any):
         self.cfg = cfg
 
+    def needs_permission(self, action: str = "", **_) -> bool:
+        return action in ("click", "type", "eval")
+
+    def permission_desc(self, action: str = "", **_) -> str:
+        return f"camofox {action}"
+
     def run(self, action: str, **kwargs) -> ToolResult:
         profile = kwargs.get("profile") or self.cfg.camofox.default_profile
         user_id = self.cfg.camofox.user_id

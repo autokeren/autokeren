@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator
+from typing import Any, Callable
 
 import httpx
 
@@ -29,6 +29,9 @@ class CloudflareModel:
 
     def _endpoint(self) -> str:
         return f"{self.base_url}/accounts/{self.account_id}/ai/run/{self.model_id}"
+
+    def _openai_endpoint(self) -> str:
+        return f"{self.base_url}/accounts/{self.account_id}/ai/v1/chat/completions"
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -120,13 +123,118 @@ class CloudflareModel:
             raw=result,
         )
 
-    def complete(self, messages: list[Message], tools: list[dict] | None = None, **params) -> ModelResponse:
+    def complete(
+        self,
+        messages: list[Message],
+        tools: list[dict] | None = None,
+        on_chunk: Callable[[str], None] | None = None,
+        **params,
+    ) -> ModelResponse:
         policy = self.retry_policy or RetryPolicy()
 
         def _call():
+            if on_chunk is not None:
+                try:
+                    return self._stream_once(messages, tools=tools, on_chunk=on_chunk, **params)
+                except CloudflareAIError:
+                    raise
             return self._call_once(messages, tools=tools, **params)
 
         return retry_call(_call, policy)
 
-    async def stream(self, messages: list[Message], **params) -> AsyncIterator[str]:
-        raise NotImplementedError("streaming not yet implemented")
+    def _stream_once(
+        self,
+        messages: list[Message],
+        tools: list[dict] | None = None,
+        on_chunk: Callable[[str], None] | None = None,
+        **params,
+    ) -> ModelResponse:
+        """Streaming via OpenAI-compatible endpoint. Supports text + tool_calls SSE."""
+        payload: dict[str, Any] = {
+            "model": self.model_id,
+            "messages": messages,
+            "max_tokens": params.get("max_tokens", 4096),
+            "temperature": params.get("temperature", 0.3),
+            "stream": True,
+        }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+
+        full_text = ""
+        tc_acc: dict[int, dict[str, str]] = {}
+        usage = TokenUsage()
+
+        try:
+            with httpx.stream(
+                "POST",
+                self._openai_endpoint(),
+                headers=self._headers(),
+                json=payload,
+                timeout=self.timeout,
+            ) as r:
+                if r.status_code != 200:
+                    body = r.read().decode("utf-8", errors="replace")[:500]
+                    raise CloudflareAIError(f"stream error: {body}", status=r.status_code)
+
+                for line in r.iter_lines():
+                    if not line or not line.startswith("data: "):
+                        continue
+                    raw = line[6:]
+                    if raw.strip() == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+
+                    choices = chunk.get("choices", [])
+                    if not choices:
+                        continue
+                    delta = choices[0].get("delta", {})
+
+                    text = delta.get("content", "")
+                    if text:
+                        full_text += text
+                        if on_chunk:
+                            on_chunk(text)
+
+                    for tc_delta in delta.get("tool_calls", []) or []:
+                        idx = tc_delta.get("index", 0)
+                        if idx not in tc_acc:
+                            tc_acc[idx] = {"id": "", "name": "", "arguments": ""}
+                        if tc_delta.get("id"):
+                            tc_acc[idx]["id"] = tc_delta["id"]
+                        func = tc_delta.get("function", {})
+                        if func.get("name"):
+                            tc_acc[idx]["name"] = func["name"]
+                        if func.get("arguments"):
+                            tc_acc[idx]["arguments"] += func["arguments"]
+
+                    u = chunk.get("usage")
+                    if u:
+                        usage = TokenUsage(
+                            prompt=u.get("prompt_tokens", 0),
+                            completion=u.get("completion_tokens", 0),
+                            total=u.get("total_tokens", 0),
+                        )
+        except httpx.TimeoutException as e:
+            raise CloudflareAIError("request timeout", status=None) from e
+        except httpx.ConnectError as e:
+            raise CloudflareAIError(f"connection error: {e}", status=None) from e
+
+        tool_calls: list[ToolCall] = []
+        for idx in sorted(tc_acc):
+            tc = tc_acc[idx]
+            try:
+                args = json.loads(tc["arguments"]) if tc["arguments"] else {}
+            except json.JSONDecodeError:
+                args = {}
+            tool_calls.append(ToolCall(id=tc["id"], name=tc["name"], arguments=args))
+
+        return ModelResponse(
+            content=full_text or ("" if tool_calls else None),
+            tool_calls=tool_calls,
+            usage=usage,
+            model_id=self.model_id,
+        )

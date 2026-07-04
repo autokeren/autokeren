@@ -31,6 +31,14 @@ class TmuxTool(Tool):
         self.project_root = project_root
         self.tmux = shutil.which("tmux") or "tmux"
 
+    def needs_permission(self, action: str = "", **_) -> bool:
+        return action in ("run", "kill")
+
+    def permission_desc(self, action: str = "", command: str = "", session: str = "", **_) -> str:
+        if action == "run":
+            return f"tmux run: {command[:60]}" if command else f"tmux run di session {session}"
+        return f"tmux {action} session {session}"
+
     def run(self, action: str, session: str = "autokeren", command: str | None = None, window: str | None = None, pane: str = "0", lines: int = 100, **_) -> ToolResult:
         try:
             if action == "run":

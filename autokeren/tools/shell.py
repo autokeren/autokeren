@@ -12,6 +12,7 @@ from autokeren.utils import is_dangerous_command
 class ShellTool(Tool):
     name = "run_shell"
     description = "Run a shell command. Respects an allowlist and timeout."
+    requires_permission = True
     parameters = {
         "type": "object",
         "properties": {
@@ -26,6 +27,10 @@ class ShellTool(Tool):
         self.project_root = project_root
         self.allowlist = allowlist
         self.default_timeout = default_timeout
+
+    def permission_desc(self, command: str, **_) -> str:
+        cmd_preview = command if len(command) <= 80 else command[:77] + "…"
+        return f"jalankan shell: {cmd_preview}"
 
     def run(self, command: str, timeout: int | None = None, workdir: str | None = None, **_) -> ToolResult:
         bad, reason = is_dangerous_command(command)
