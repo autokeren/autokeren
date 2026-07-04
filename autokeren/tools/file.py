@@ -70,7 +70,7 @@ class WriteFileTool(Tool):
         except Exception as e:
             return ToolResult(error=str(e), ok=False)
 
-    def permission_desc(self, path: str, content: str, **_) -> str:
+    def permission_desc(self, path: str = "", content: str = "", **_) -> str:
         return f"menulis/timpa file {path} ({len(content)} chars)"
 
     def _resolve(self, path: str) -> Path:
@@ -112,7 +112,7 @@ class PatchFileTool(Tool):
         except Exception as e:
             return ToolResult(error=str(e), ok=False)
 
-    def permission_desc(self, path: str, old_string: str, new_string: str, **_) -> str:
+    def permission_desc(self, path: str = "", old_string: str = "", new_string: str = "", **_) -> str:
         return f"edit file {path}"
 
     def _resolve(self, path: str) -> Path:

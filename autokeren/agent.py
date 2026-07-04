@@ -15,14 +15,21 @@ from autokeren.tools import ToolRegistry, ToolResult
 
 
 class Agent:
-    def __init__(self, cfg: Config, tools: ToolRegistry, project_root: str):
+    def __init__(
+        self,
+        cfg: Config,
+        tools: ToolRegistry,
+        project_root: str,
+        memory: MemoryManager | None = None,
+        sessions: SessionManager | None = None,
+    ):
         self.cfg = cfg
         self.tools = tools
         self.project_root = project_root
         self.router = ModelRouter(cfg)
         self.context = SessionContext(project_root=Path(project_root))
-        self.memory = MemoryManager(project_root)
-        self.sessions = SessionManager(project_root)
+        self.memory = memory if memory is not None else MemoryManager(project_root)
+        self.sessions = sessions if sessions is not None else SessionManager(project_root)
         self._build_system_prompt()
         self.context.messages.append({"role": "system", "content": self._system_prompt})
         self.plan_approved = not cfg.autokeren.plan_mode

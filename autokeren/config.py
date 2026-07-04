@@ -38,7 +38,7 @@ class AutokerenConfig(BaseModel):
     plan_mode: bool = False
     max_iterations: int = 25
     shell_timeout: int = 180
-    shell_allowlist: list[str] = Field(default_factory=lambda: ["node", "npm", "pnpm", "npx", "git", "wrangler", "python3", "pytest"])
+    shell_allowlist: list[str] = Field(default_factory=list)
     project_root: str = "."
     context_window: int = 262144
     compact_tail_turns: int = 6

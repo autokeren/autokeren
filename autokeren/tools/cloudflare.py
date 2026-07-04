@@ -26,7 +26,7 @@ class CloudflareDeployTool(Tool):
     def __init__(self, project_root: Path):
         self.project_root = project_root
 
-    def permission_desc(self, target: str, **_) -> str:
+    def permission_desc(self, target: str = "", **_) -> str:
         return f"deploy {target} ke Cloudflare"
 
     def run(self, target: str, path: str = ".", project_name: str | None = None, worker_name: str | None = None, **_) -> ToolResult:

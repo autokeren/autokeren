@@ -76,8 +76,14 @@ class ToolRegistry:
     def check_permission(self, name: str, arguments: dict[str, Any]) -> tuple[bool, str]:
         """Return (needs_permission, description)."""
         tool = self.get(name)
-        if tool and tool.needs_permission(**arguments):
-            return True, tool.permission_desc(**arguments)
+        if not tool:
+            return False, ""
+        try:
+            if tool.needs_permission(**arguments):
+                return True, tool.permission_desc(**arguments)
+        except Exception:
+            if tool.requires_permission:
+                return True, tool.description
         return False, ""
 
     def run(self, name: str, arguments: dict[str, Any]) -> ToolResult:

@@ -51,11 +51,11 @@ class SessionManager:
         return None
 
     def list(self) -> list[dict[str, Any]]:
-        """List semua saved sessions."""
+        """List semua saved sessions, newest first."""
         if not self.sessions_dir.exists():
             return []
         sessions: list[dict[str, Any]] = []
-        for p in sorted(self.sessions_dir.glob("*.json"), reverse=True):
+        for p in self.sessions_dir.glob("*.json"):
             try:
                 data = json.loads(p.read_text(encoding="utf-8"))
                 sessions.append({
@@ -67,7 +67,7 @@ class SessionManager:
                 })
             except Exception:
                 continue
-        return sessions
+        return sorted(sessions, key=lambda s: s["timestamp"], reverse=True)
 
     def delete(self, identifier: str) -> bool:
         """Hapus session by identifier."""

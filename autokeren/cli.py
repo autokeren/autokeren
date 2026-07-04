@@ -13,6 +13,7 @@ from rich.prompt import Confirm, Prompt
 from autokeren import __version__
 from autokeren.agent import Agent
 from autokeren.config import ensure_config, init_config, load_config, save_config
+from autokeren.memory import MemoryManager
 from autokeren.tools import (
     CamofoxTool,
     CloudflareBuildTool,
@@ -39,7 +40,7 @@ from autokeren.ui import AgentUI
 console = Console()
 
 
-def build_registry(cfg, project_root: Path) -> ToolRegistry:
+def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegistry:
     reg = ToolRegistry()
     reg.register(ReadFileTool(project_root))
     reg.register(WriteFileTool(project_root))
@@ -58,6 +59,7 @@ def build_registry(cfg, project_root: Path) -> ToolRegistry:
     reg.register(CloudflareD1Tool(cfg))
     reg.register(TmuxTool(project_root))
     reg.register(TodoTool())
+    reg.register(RememberTool(memory))
     return reg
 
 
@@ -208,9 +210,9 @@ def main() -> int:
         cfg.cloudflare.primary_model = "@cf/moonshotai/kimi-k2.7-code"
 
     project_root = Path(args.project_root).expanduser().resolve()
-    reg = build_registry(cfg, project_root)
-    agent = Agent(cfg, reg, str(project_root))
-    reg.register(RememberTool(agent.memory))
+    memory = MemoryManager(str(project_root))
+    reg = build_registry(cfg, project_root, memory)
+    agent = Agent(cfg, reg, str(project_root), memory=memory)
 
     ui = AgentUI(console)
     agent.on_model_start = ui.on_model_start

@@ -20,7 +20,7 @@ autokeren:
   plan_mode: false
   max_iterations: 25
   shell_timeout: 180
-  shell_allowlist: ["node", "npm", "pnpm", "npx", "git", "wrangler", "python3", "pytest"]
+  shell_allowlist: []          # kosong = izinkan semua (dangerous commands tetap diblokir). atau set list misal ["git","npm"]
   project_root: "."
   context_window: 262144      # max token context window model
   compact_tail_turns: 6       # pesan terakhir yang dipertahankan saat /compact

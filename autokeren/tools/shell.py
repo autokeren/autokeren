@@ -28,7 +28,7 @@ class ShellTool(Tool):
         self.allowlist = allowlist
         self.default_timeout = default_timeout
 
-    def permission_desc(self, command: str, **_) -> str:
+    def permission_desc(self, command: str = "", **_) -> str:
         cmd_preview = command if len(command) <= 80 else command[:77] + "…"
         return f"jalankan shell: {cmd_preview}"
 
