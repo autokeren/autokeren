@@ -16,7 +16,9 @@ from autokeren.config import ensure_config, init_config, load_config, save_confi
 from autokeren.tools import (
     CamofoxTool,
     CloudflareBuildTool,
+    CloudflareD1Tool,
     CloudflareDeployTool,
+    CloudflareKVTool,
     FetchURLTool,
     GitCommitTool,
     GitDiffTool,
@@ -52,6 +54,8 @@ def build_registry(cfg, project_root: Path) -> ToolRegistry:
     reg.register(CamofoxTool(cfg))
     reg.register(CloudflareDeployTool(project_root))
     reg.register(CloudflareBuildTool(project_root))
+    reg.register(CloudflareKVTool(cfg))
+    reg.register(CloudflareD1Tool(cfg))
     reg.register(TmuxTool(project_root))
     reg.register(TodoTool())
     return reg
