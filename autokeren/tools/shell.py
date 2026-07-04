@@ -1,6 +1,10 @@
-"""Shell command tool with real-time output streaming."""
+"""Shell command tool with real-time output streaming via pseudo-TTY."""
 from __future__ import annotations
 
+import os
+import pty
+import re
+import select
 import shlex
 import subprocess
 import time
@@ -9,6 +13,12 @@ from typing import Callable
 
 from autokeren.tools.base import Tool, ToolResult
 from autokeren.utils import is_dangerous_command
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07|\x1b[()][AB0]|\x1b[=>]")
+
+
+def _strip_ansi(text: str) -> str:
+    return _ANSI_RE.sub("", text)
 
 
 class ShellTool(Tool):
@@ -49,45 +59,85 @@ class ShellTool(Tool):
         cwd = Path(workdir) if workdir else self.project_root
         effective_timeout = timeout or self.default_timeout
 
+        env = os.environ.copy()
+        env["NPM_CONFIG_YES"] = "true"
+        env["TERM"] = env.get("TERM", "xterm-256color")
+
+        try:
+            return self._run_pty(command, cwd, env, effective_timeout, stdin, on_output)
+        except Exception as e:
+            return ToolResult(error=f"{type(e).__name__}: {e}", ok=False)
+
+    def _run_pty(
+        self,
+        command: str,
+        cwd: Path,
+        env: dict[str, str],
+        timeout: int,
+        stdin: str | None,
+        on_output: Callable[[str], None] | None,
+    ) -> ToolResult:
+        master_fd, slave_fd = pty.openpty()
+
         try:
             proc = subprocess.Popen(
                 command,
                 shell=True,
                 cwd=cwd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                stdin=subprocess.PIPE if stdin else None,
+                stdout=slave_fd,
+                stderr=slave_fd,
+                stdin=slave_fd,
+                env=env,
+                close_fds=True,
             )
         except Exception as e:
+            os.close(master_fd)
+            os.close(slave_fd)
             return ToolResult(error=f"{type(e).__name__}: {e}", ok=False)
+
+        os.close(slave_fd)
+
+        if stdin:
+            try:
+                os.write(master_fd, stdin.encode())
+            except OSError:
+                pass
 
         output_lines: list[str] = []
-        deadline = time.time() + effective_timeout
+        deadline = time.time() + timeout
 
-        try:
-            if stdin and proc.stdin:
-                proc.stdin.write(stdin)
-                proc.stdin.close()
+        while True:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                proc.kill()
+                self._close_fd(master_fd)
+                return ToolResult(error=f"timeout after {timeout}s", ok=False)
 
-            assert proc.stdout is not None
-            for line in proc.stdout:
-                stripped = line.rstrip()
-                output_lines.append(stripped)
-                if on_output:
-                    on_output(stripped)
-                if time.time() > deadline:
-                    proc.kill()
-                    return ToolResult(error=f"timeout after {effective_timeout}s", ok=False)
+            try:
+                rlist, _, _ = select.select([master_fd], [], [], min(remaining, 0.5))
+            except (OSError, ValueError):
+                break
 
-            remaining = max(1, int(deadline - time.time()))
-            proc.wait(timeout=remaining)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            return ToolResult(error=f"timeout after {effective_timeout}s", ok=False)
-        except Exception as e:
-            proc.kill()
-            return ToolResult(error=f"{type(e).__name__}: {e}", ok=False)
+            if rlist:
+                try:
+                    data = os.read(master_fd, 4096)
+                except OSError:
+                    break
+                if not data:
+                    break
+                text = data.decode("utf-8", errors="replace")
+                clean = _strip_ansi(text)
+                for line in clean.splitlines():
+                    line = line.rstrip("\r")
+                    if line.strip():
+                        output_lines.append(line)
+                        if on_output:
+                            on_output(line)
+            elif proc.poll() is not None:
+                break
+
+        self._close_fd(master_fd)
+        proc.wait()
 
         output = "\n".join(output_lines)
         return ToolResult(
@@ -95,3 +145,10 @@ class ShellTool(Tool):
             error=None if proc.returncode == 0 else f"exit code {proc.returncode}",
             ok=proc.returncode == 0,
         )
+
+    @staticmethod
+    def _close_fd(fd: int) -> None:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
