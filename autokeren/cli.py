@@ -84,7 +84,7 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
         if user_input in ("/quit", "/q"):
             break
         if user_input == "/help":
-            console.print("Perintah: /q /status /compact /reset /memory /save /resume /sessions")
+            console.print("Perintah: /q /status /compact /reset /memory /permissions /save /resume /sessions")
             continue
         if user_input == "/status":
             console.print_json(json.dumps(agent.status()))
@@ -101,7 +101,17 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
             continue
         if user_input == "/reset":
             agent.reset()
-            console.print("Sesi direset.")
+            ui.reset_permissions()
+            console.print("Sesi direset. Permission juga direset.")
+            continue
+        if user_input == "/permissions":
+            ps = ui.permission_status()
+            if ps["allow_all"]:
+                console.print("[green]Semua tool diizinkan untuk session ini.[/green]")
+            elif ps["allowed_tools"]:
+                console.print(f"[green]Tool diizinkan:[/green] {', '.join(ps['allowed_tools'])}")
+            else:
+                console.print("[dim]Belum ada tool yang diizinkan. Akan tanya saat tool destruktif dipanggil.[/dim]")
             continue
         if user_input == "/memory":
             mem = agent.memory.load()

@@ -2,14 +2,14 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pyfiglet
 from rich.align import Align
 from rich.console import Console, Group
 from rich.live import Live
 from rich.panel import Panel
-from rich.prompt import Confirm
+from rich.prompt import Prompt
 from rich.status import Status
 from rich.text import Text
 
@@ -41,6 +41,8 @@ class AgentUI:
         self._tool_label: str = ""
         self._stream_text: str = ""
         self._did_stream: bool = False
+        self._allow_all: bool = False
+        self._allowed_tools: set[str] = set()
 
     # ------------------------------------------------------------------ #
     # Banner startup
@@ -121,11 +123,48 @@ class AgentUI:
     # ------------------------------------------------------------------ #
 
     def confirm_permission(self, tool_name: str, description: str, arguments: dict) -> bool:
-        """Tampilkan dialog konfirmasi untuk tool destruktif. Return True kalau diizinkan."""
+        """Tampilkan dialog konfirmasi untuk tool destruktif. Return True kalau diizinkan.
+
+        Opsi:
+        - y: izinkan tool ini, ingat untuk sisa session (ga nanya lagi)
+        - a: izinkan SEMUA tool untuk sisa session
+        - n: tolak
+        """
+        if self._allow_all:
+            return True
+        if tool_name in self._allowed_tools:
+            return True
+
         self._stop_all()
         args_str = _format_args(arguments)
         self.console.print(f"  [yellow]⚡ {tool_name}[/yellow][dim]({args_str})[/dim] — {description}")
-        return Confirm.ask("  [yellow]Izinkan?[/yellow]", default=True, console=self.console)
+        choice = Prompt.ask(
+            "  [yellow]Izinkan?[/yellow]",
+            choices=["y", "a", "n"],
+            default="y",
+            console=self.console,
+        )
+        if choice == "a":
+            self._allow_all = True
+            self.console.print("  [dim]Semua tool diizinkan untuk session ini.[/dim]")
+            return True
+        if choice == "y":
+            self._allowed_tools.add(tool_name)
+            self.console.print(f"  [dim]{tool_name} diizinkan untuk session ini.[/dim]")
+            return True
+        return False
+
+    def permission_status(self) -> dict[str, Any]:
+        """Return status permission untuk display."""
+        return {
+            "allow_all": self._allow_all,
+            "allowed_tools": sorted(self._allowed_tools),
+        }
+
+    def reset_permissions(self) -> None:
+        """Reset semua permission — berguna setelah /reset."""
+        self._allow_all = False
+        self._allowed_tools.clear()
 
     # ------------------------------------------------------------------ #
     # Todo list
