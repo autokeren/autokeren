@@ -26,21 +26,43 @@ class CloudflareModel:
     base_url: str = "https://api.cloudflare.com/client/v4"
     timeout: float = 120.0
     retry_policy: RetryPolicy | None = None
+    auth_mode: str = "direct"
+    api_key: str = field(default="", repr=False)
 
     def _endpoint(self) -> str:
         return f"{self.base_url}/accounts/{self.account_id}/ai/run/{self.model_id}"
 
     def _openai_endpoint(self) -> str:
+        if self.auth_mode == "platform":
+            return f"{self.base_url}/v1/chat/completions"
         return f"{self.base_url}/accounts/{self.account_id}/ai/v1/chat/completions"
 
     def _headers(self) -> dict[str, str]:
+        token = self.api_key if self.auth_mode == "platform" else self.api_token
         return {
-            "Authorization": f"Bearer {self.api_token}",
+            "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         }
 
     @classmethod
     def from_config(cls, cfg) -> "CloudflareModel":
+        if cfg.auth.mode == "platform":
+            return cls(
+                account_id="",
+                api_token="",
+                api_key=cfg.auth.api_key,
+                model_id=cfg.cloudflare.primary_model,
+                base_url=cfg.auth.base_url,
+                timeout=cfg.cloudflare.timeout,
+                auth_mode="platform",
+                retry_policy=RetryPolicy(
+                    max_retries=cfg.retry.max_retries,
+                    base_delay=cfg.retry.base_delay,
+                    max_delay=cfg.retry.max_delay,
+                    exponential_base=cfg.retry.exponential_base,
+                    jitter=cfg.retry.jitter,
+                ),
+            )
         return cls(
             account_id=cfg.cloudflare.account_id or "",
             api_token=cfg.cloudflare.api_token or "",
@@ -56,6 +78,8 @@ class CloudflareModel:
         )
 
     def _call_once(self, messages: list[Message], tools: list[dict] | None = None, **params) -> ModelResponse:
+        if self.auth_mode == "platform":
+            return self._call_once_openai(messages, tools=tools, **params)
         payload = {
             "messages": messages,
             "max_tokens": params.get("max_tokens", 4096),
@@ -92,6 +116,40 @@ class CloudflareModel:
         result = data.get("result", {})
         return self._parse_response(result)
 
+    def _call_once_openai(self, messages: list[Message], tools: list[dict] | None = None, **params) -> ModelResponse:
+        payload: dict[str, Any] = {
+            "model": self.model_id,
+            "messages": messages,
+            "max_tokens": params.get("max_tokens", 4096),
+            "temperature": params.get("temperature", 0.3),
+            "stream": False,
+        }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+        try:
+            r = httpx.post(
+                self._openai_endpoint(),
+                headers=self._headers(),
+                json=payload,
+                timeout=self.timeout,
+            )
+        except httpx.TimeoutException as e:
+            raise CloudflareAIError("request timeout", status=None) from e
+        except httpx.ConnectError as e:
+            raise CloudflareAIError(f"connection error: {e}", status=None) from e
+
+        try:
+            data = r.json()
+        except Exception as e:
+            raise CloudflareAIError(f"invalid json: {r.text[:200]}", status=r.status_code) from e
+
+        if r.status_code != 200:
+            err_msg = data.get("error", {}).get("message", str(data)) if isinstance(data.get("error"), dict) else str(data)
+            raise CloudflareAIError(f"API error: {err_msg}", status=r.status_code, response=data)
+
+        return self._parse_openai_response(data)
+
     def _parse_response(self, result: dict[str, Any]) -> ModelResponse:
         usage = TokenUsage(
             prompt=result.get("usage", {}).get("prompt_tokens", 0),
@@ -121,6 +179,39 @@ class CloudflareModel:
             model_id=self.model_id,
             finish_reason=choice.get("finish_reason"),
             raw=result,
+        )
+
+    def _parse_openai_response(self, data: dict[str, Any]) -> ModelResponse:
+        usage_data = data.get("usage", {})
+        usage = TokenUsage(
+            prompt=usage_data.get("prompt_tokens", 0),
+            completion=usage_data.get("completion_tokens", 0),
+            total=usage_data.get("total_tokens", 0),
+        )
+        choices = data.get("choices", [])
+        choice = choices[0] if choices else {}
+        message = choice.get("message", {})
+        content = message.get("content")
+        tool_calls = []
+        for tc in message.get("tool_calls", []) or []:
+            try:
+                args = json.loads(tc.get("function", {}).get("arguments", "{}"))
+            except Exception:
+                args = {}
+            tool_calls.append(
+                ToolCall(
+                    id=tc.get("id", ""),
+                    name=tc.get("function", {}).get("name", ""),
+                    arguments=args,
+                )
+            )
+        return ModelResponse(
+            content=content or ("" if tool_calls else None),
+            tool_calls=tool_calls,
+            usage=usage,
+            model_id=data.get("model", self.model_id),
+            finish_reason=choice.get("finish_reason"),
+            raw=data,
         )
 
     def complete(

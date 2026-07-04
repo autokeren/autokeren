@@ -14,6 +14,12 @@ def _config_path() -> Path:
     return _config_dir() / "config.yaml"
 
 
+class AuthConfig(BaseModel):
+    mode: str = "platform"  # "platform" (default, pakai developers.autokeren.com) atau "direct" (pakai CF sendiri)
+    api_key: str = ""       # ak_live_... dari developers.autokeren.com
+    base_url: str = "https://api.developers.autokeren.com"
+
+
 class CloudflareConfig(BaseModel):
     account_id: str = ""
     api_token: str = ""
@@ -55,6 +61,7 @@ class CamofoxConfig(BaseModel):
 
 
 class Config(BaseModel):
+    auth: AuthConfig = Field(default_factory=AuthConfig)
     cloudflare: CloudflareConfig = Field(default_factory=CloudflareConfig)
     retry: RetryConfig = Field(default_factory=RetryConfig)
     autokeren: AutokerenConfig = Field(default_factory=AutokerenConfig)
@@ -74,6 +81,7 @@ def load_config(path: Path | None = None) -> Config:
     # env fallback
     cfg.cloudflare.account_id = cfg.cloudflare.account_id or os.environ.get("CLOUDFLARE_ACCOUNT_ID") or os.environ.get("CF_ACCOUNT_ID", "")
     cfg.cloudflare.api_token = cfg.cloudflare.api_token or os.environ.get("CLOUDFLARE_API_TOKEN") or os.environ.get("CLOUDFLARE_API_KEY") or os.environ.get("CF_API_TOKEN", "")
+    cfg.auth.api_key = cfg.auth.api_key or os.environ.get("AUTOKEREN_API_KEY") or os.environ.get("AK_API_KEY", "")
     return cfg
 
 
@@ -89,9 +97,20 @@ def save_config(cfg: Config, path: Path | None = None) -> Path:
 def init_config(interactive: bool = False) -> Config:
     cfg = Config()
     if interactive:
-        print("Yuk setup autokeren.")
-        cfg.cloudflare.account_id = input("Cloudflare account id: ").strip()
-        cfg.cloudflare.api_token = input("Cloudflare API token: ").strip()
+        print("Yuk setup autokeren.\n")
+        print("Pilih mode autentikasi:")
+        print("  1. Platform (default) — pakai API key dari developers.autokeren.com")
+        print("  2. Direct — pakai Cloudflare account_id + api_token sendiri")
+        choice = input("\nMode [1]: ").strip() or "1"
+        if choice == "2":
+            cfg.auth.mode = "direct"
+            cfg.cloudflare.account_id = input("Cloudflare account id: ").strip()
+            cfg.cloudflare.api_token = input("Cloudflare API token: ").strip()
+        else:
+            cfg.auth.mode = "platform"
+            print("\nBuka https://developers.autokeren.com/dashboard/keys buat API key.")
+            print("Format: ak_live_...")
+            cfg.auth.api_key = input("API key: ").strip()
     save_config(cfg)
     return cfg
 

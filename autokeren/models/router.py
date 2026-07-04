@@ -25,10 +25,12 @@ class ModelRouter:
             secondary = CloudflareModel(
                 account_id=base.account_id,
                 api_token=base.api_token,
+                api_key=base.api_key,
                 model_id=self.cfg.cloudflare.secondary_model,
                 base_url=base.base_url,
                 timeout=base.timeout,
                 retry_policy=base.retry_policy,
+                auth_mode=base.auth_mode,
             )
             self.models = [primary, secondary]
         for m in self.models:

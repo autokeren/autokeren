@@ -1,6 +1,11 @@
+auth:
+  mode: "platform"                    # "platform" (default, pakai developers.autokeren.com) atau "direct"
+  api_key: ""                         # ak_live_... dari developers.autokeren.com (atau set AK_API_KEY env)
+  base_url: "https://api.developers.autokeren.com"
+
 cloudflare:
-  account_id: ""          # Cloudflare account ID (or set CLOUDFLARE_ACCOUNT_ID env var)
-  api_token: ""           # Cloudflare Workers AI API token (or set CLOUDFLARE_API_TOKEN env var)
+  account_id: ""          # Hanya untuk mode "direct" (atau set CLOUDFLARE_ACCOUNT_ID env var)
+  api_token: ""           # Hanya untuk mode "direct" (atau set CLOUDFLARE_API_TOKEN env var)
   primary_model: "@cf/moonshotai/kimi-k2.7-code"
   secondary_model: "@cf/zai-org/glm-5.2"
   max_tokens: 4096

@@ -66,8 +66,13 @@ def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegist
 
 def chat_loop(agent: Agent, cfg, ui: AgentUI):
     ui.show_banner(__version__)
-    if not cfg.cloudflare.account_id or not cfg.cloudflare.api_token:
+    if cfg.auth.mode == "platform" and not cfg.auth.api_key:
+        console.print("[yellow]Warning: API key belum diisi. Jalankan autokeren --login.[/yellow]")
+    elif cfg.auth.mode == "direct" and (not cfg.cloudflare.account_id or not cfg.cloudflare.api_token):
         console.print("[yellow]Warning: Cloudflare account_id/api_token belum diisi. Jalankan autokeren --init.[/yellow]")
+    else:
+        mode_label = "platform" if cfg.auth.mode == "platform" else "direct"
+        console.print(f"[dim]Auth: {mode_label}[/dim]")
     if agent.memory.exists():
         console.print(f"[dim]Memory: {agent.memory.line_count()} baris[/dim]")
     sessions = agent.sessions.list()
@@ -231,6 +236,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(prog="autokeren", description="Cloudflare-first agentic coding CLI")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--init", action="store_true", help="Create or overwrite config interactively")
+    parser.add_argument("--login", action="store_true", help="Login dengan API key dari developers.autokeren.com")
     parser.add_argument("--config", help="Path to config YAML")
     parser.add_argument("--plan", action="store_true", help="Start in plan mode")
     parser.add_argument("--project-root", default=".", help="Project root path")
@@ -243,6 +249,39 @@ def main() -> int:
         cfg = init_config(interactive=True)
         console.print(f"Config saved to {save_config(cfg)}")
         return 0
+
+    if args.login:
+        import httpx as _httpx
+        console.print("[bold]Login AutoKeren Platform[/bold]")
+        console.print("Buka [cyan]https://developers.autokeren.com/dashboard/keys[/cyan] buat API key.")
+        console.print("Format: [dim]ak_live_...[/dim]\n")
+        api_key = Prompt.ask("API key").strip()
+        if not api_key or not api_key.startswith("ak_"):
+            console.print("[red]API key tidak valid. Harus diawali 'ak_'[/red]")
+            return 1
+        console.print("[dim]Memvalidasi API key...[/dim]")
+        try:
+            r = _httpx.get(
+                "https://api.developers.autokeren.com/v1/usage",
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=15,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                console.print(f"[green]Login berhasil![/green] Tier: {data.get('tier', '?')}")
+                cfg = load_config(Path(args.config)) if args.config else ensure_config()
+                cfg.auth.mode = "platform"
+                cfg.auth.api_key = api_key
+                save_config(cfg)
+                console.print("[dim]Config saved.[/dim]")
+                return 0
+            else:
+                err = r.json().get("error", {}).get("message", "unknown error")
+                console.print(f"[red]Validasi gagal: {err}[/red]")
+                return 1
+        except Exception as e:
+            console.print(f"[red]Connection error: {e}[/red]")
+            return 1
 
     cfg = load_config(Path(args.config)) if args.config else ensure_config()
     if args.plan:
