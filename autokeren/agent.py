@@ -39,6 +39,7 @@ class Agent:
         self.on_model_end: Callable[[ModelResponse], None] | None = None
         self.on_tool_start: Callable[[str, dict[str, Any]], None] | None = None
         self.on_tool_end: Callable[[str, ToolResult], None] | None = None
+        self.on_tool_output: Callable[[str, str], None] | None = None
         self.on_chunk: Callable[[str], None] | None = None
         self.permission_callback: Callable[[str, str, dict[str, Any]], bool] | None = None
 
@@ -95,7 +96,10 @@ class Agent:
                 if self.on_tool_start:
                     self.on_tool_start(tc.name, tc.arguments)
                 try:
-                    raw_result = self.tools.run(tc.name, tc.arguments)
+                    def _on_output(line: str, _name: str = tc.name) -> None:
+                        if self.on_tool_output:
+                            self.on_tool_output(_name, line)
+                    raw_result = self.tools.run(tc.name, tc.arguments, on_output=_on_output)
                 except KeyboardInterrupt:
                     raw_result = ToolResult(error="dibatalkan user", ok=False)
                 if self.on_tool_end:

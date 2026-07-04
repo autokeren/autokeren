@@ -262,6 +262,7 @@ def main() -> int:
     agent.on_model_end = ui.on_model_end
     agent.on_tool_start = ui.on_tool_start
     agent.on_tool_end = ui.on_tool_end
+    agent.on_tool_output = ui.on_tool_output
     agent.on_chunk = ui.on_chunk
     agent.permission_callback = ui.confirm_permission
 

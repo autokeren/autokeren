@@ -86,11 +86,11 @@ class ToolRegistry:
                 return True, tool.description
         return False, ""
 
-    def run(self, name: str, arguments: dict[str, Any]) -> ToolResult:
+    def run(self, name: str, arguments: dict[str, Any], **extra: Any) -> ToolResult:
         tool = self.get(name)
         if not tool:
             return ToolResult(error=f"tool tidak ditemukan: {name}", ok=False)
         try:
-            return tool.run(**arguments)
+            return tool.run(**arguments, **extra)
         except Exception as e:
             return ToolResult(error=f"{type(e).__name__}: {e}", ok=False)

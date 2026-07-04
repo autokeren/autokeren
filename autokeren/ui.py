@@ -112,6 +112,10 @@ class AgentUI:
             err = result.error or "gagal"
             self.console.print(f"  [red]✗[/red] [red]{err}[/red]")
 
+    def on_tool_output(self, name: str, line: str) -> None:
+        self._stop_status()
+        self.console.print(f"  [dim]│[/dim] {line}")
+
     # ------------------------------------------------------------------ #
     # Permission system
     # ------------------------------------------------------------------ #
