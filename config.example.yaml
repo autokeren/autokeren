@@ -1,0 +1,29 @@
+cloudflare:
+  account_id: ""          # Cloudflare account ID (or set CLOUDFLARE_ACCOUNT_ID env var)
+  api_token: ""           # Cloudflare Workers AI API token (or set CLOUDFLARE_API_TOKEN env var)
+  primary_model: "@cf/moonshotai/kimi-k2.7-code"
+  secondary_model: "@cf/zai-org/glm-5.2"
+  max_tokens: 4096
+  temperature: 0.3
+  timeout: 120.0
+
+retry:
+  max_retries: 5
+  base_delay: 1.0
+  max_delay: 60.0
+  exponential_base: 2.0
+  jitter: true
+  circuit_failure_threshold: 5
+  circuit_open_seconds: 30
+
+autokeren:
+  plan_mode: false
+  max_iterations: 25
+  shell_timeout: 180
+  shell_allowlist: ["node", "npm", "pnpm", "npx", "git", "wrangler", "python3", "pytest"]
+  project_root: "."
+
+camofox:
+  url: "http://localhost:9377"
+  default_profile: "pulsa"
+  user_id: "ajat"
