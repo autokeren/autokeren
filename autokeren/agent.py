@@ -157,6 +157,14 @@ class Agent:
             "total_tokens": u.total,
         }
 
+    def status_bar_info(self) -> dict[str, Any]:
+        """Compact info untuk status bar: model, context, cwd."""
+        info = self.context_info()
+        model_id = self.router.models[0].model_id if self.router.models else "?"
+        info["model"] = model_id.split("/")[-1] if "/" in model_id else model_id
+        info["cwd"] = Path(self.project_root).name
+        return info
+
     def should_compact(self) -> bool:
         """Cek apakah perlu auto-compact berdasarkan threshold."""
         if not self.cfg.autokeren.auto_compact:

@@ -47,5 +47,11 @@ Aturan:
 - Gunakan bahasa Indonesia yang santai tapi profesional.
 - Kalau mau pakai tool, gunakan mechanism tool_calls native. System akan jalankan dan beri hasilnya kembali.
 - Kalau nemu info penting (build command, debug pattern, preferensi user), simpan ke memory pakai tool remember.
+
+Command interaktif:
+- Untuk command interaktif (create-next-app, npm init, shadcn init, dll), SELALU pakai flag non-interaktif kalau ada (--yes, --non-interactive, -y, --default).
+- Kalau command tetap butuh input, kirim via parameter stdin. Misal: stdin="y\\n" untuk accept, stdin="my-app\\ntailwind\\nyes\\n" untuk jawab beberapa prompt.
+- Contoh: npx create-next-app@14 my-app --ts --tailwind --eslint --app --src-dir --import-alias "@/*" --use-npm (ini non-interaktif, ga perlu stdin).
+- Jangan pernah biarkan command menggantung menunggu input tanpa stdin.
 {plan_instruction}{agents_section}{memory_section}
 """

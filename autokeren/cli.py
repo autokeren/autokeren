@@ -78,8 +78,9 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
     _last_ctrl_c: float = 0
 
     while True:
+        ui.show_status_bar(agent.status_bar_info())
         try:
-            user_input = Prompt.ask("\n[bold blue]kamu[/bold blue]").strip()
+            user_input = Prompt.ask("[bold blue]kamu[/bold blue]").strip()
         except EOFError:
             console.print("\nSampai jumpa!")
             break

@@ -165,7 +165,36 @@ class AgentUI:
         self.console.print(Panel(Group(*lines), title="[bold]todo[/bold]", border_style="blue"))
 
     # ------------------------------------------------------------------ #
-    # Context status
+    # Status bar — compact one-liner before prompt
+    # ------------------------------------------------------------------ #
+
+    def show_status_bar(self, info: dict) -> None:
+        model = info.get("model", "?")
+        pct = info.get("pct", 0)
+        cwd = info.get("cwd", "?")
+
+        if pct < 50:
+            color = "green"
+        elif pct < 80:
+            color = "yellow"
+        else:
+            color = "red"
+
+        bar_len = 10
+        filled = int(bar_len * pct / 100)
+        bar = "█" * filled + "░" * (bar_len - filled)
+
+        from datetime import datetime
+        now = datetime.now().strftime("%H:%M")
+
+        self.console.print(
+            f"  [dim][{color}]{model}[/{color}] "
+            f"ctx [{color}]{bar}[/{color}] {pct:.0f}% "
+            f"[dim]| {cwd} | {now}[/dim]"
+        )
+
+    # ------------------------------------------------------------------ #
+    # Context status — detailed, after response
     # ------------------------------------------------------------------ #
 
     def show_context_status(self, info: dict) -> None:

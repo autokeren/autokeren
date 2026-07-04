@@ -19,6 +19,7 @@ class ShellTool(Tool):
             "command": {"type": "string", "description": "Shell command to run."},
             "timeout": {"type": "integer", "description": "Timeout in seconds.", "default": 120},
             "workdir": {"type": "string", "description": "Working directory override."},
+            "stdin": {"type": "string", "description": "Input to pipe to stdin for interactive commands. e.g. 'y\\n' to accept prompts, 'my-app\\n' to answer project name."},
         },
         "required": ["command"],
     }
@@ -32,7 +33,7 @@ class ShellTool(Tool):
         cmd_preview = command if len(command) <= 80 else command[:77] + "…"
         return f"jalankan shell: {cmd_preview}"
 
-    def run(self, command: str, timeout: int | None = None, workdir: str | None = None, **_) -> ToolResult:
+    def run(self, command: str, timeout: int | None = None, workdir: str | None = None, stdin: str | None = None, **_) -> ToolResult:
         bad, reason = is_dangerous_command(command)
         if bad:
             return ToolResult(error=f"blocked: {reason}", ok=False)
@@ -51,6 +52,7 @@ class ShellTool(Tool):
                 cwd=cwd,
                 capture_output=True,
                 text=True,
+                input=stdin,
                 timeout=timeout or self.default_timeout,
             )
             output = result.stdout
