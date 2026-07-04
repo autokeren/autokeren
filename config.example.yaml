@@ -36,6 +36,6 @@ autokeren:
   auto_compact_threshold: 0.8 # compact di 80% usage
 
 camofox:
-  url: "http://localhost:9377"
-  default_profile: "pulsa"
-  user_id: "ajat"
+  url: ""                    # Camofox bridge URL (e.g. http://localhost:9377)
+  default_profile: ""        # Camofox profile name
+  user_id: ""                # Camofox user ID

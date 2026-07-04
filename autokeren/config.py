@@ -55,9 +55,9 @@ class AutokerenConfig(BaseModel):
 
 
 class CamofoxConfig(BaseModel):
-    url: str = "http://localhost:9377"
-    default_profile: str = "pulsa"
-    user_id: str = "ajat"
+    url: str = ""
+    default_profile: str = ""
+    user_id: str = ""
 
 
 class Config(BaseModel):

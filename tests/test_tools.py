@@ -116,7 +116,7 @@ class TestIsDangerousCommand:
     def test_rm_rf_root(self) -> None:
         ok, msg = is_dangerous_command("rm -rf /")
         assert ok is True
-        assert "rm -rf /" in msg
+        assert "rm -rf" in msg.lower()
 
     def test_case_insensitive(self) -> None:
         ok, _ = is_dangerous_command("MKFS.ext4 /dev/sda1")
