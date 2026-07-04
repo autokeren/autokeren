@@ -1,4 +1,4 @@
-"""Rich-based UI untuk autokeren CLI — banner, spinner, streaming, tool panel, permission, todo."""
+"""Rich-based UI untuk autokeren CLI — banner, streaming, tool display, permission, todo."""
 from __future__ import annotations
 
 import json
@@ -26,30 +26,23 @@ _RAINBOW = [
 class AgentUI:
     """UI layer untuk autokeren. Pure presentational, no business logic.
 
-    Fitur:
-    - Spinner "mikir…" saat model generate (sebelum chunk pertama)
-    - Live streaming text saat token masuk real-time
-    - Tool execution panel dengan nama + argumen ringkas
-    - Permission confirmation untuk tool destruktif
-    - Todo list display
+    Style: opencode-inspired — inline streaming, compact tool display.
     """
 
     def __init__(self, console: Console):
         self.console = console
         self._status: Status | None = None
         self._live: Live | None = None
-        self._tool_label: str = ""
         self._stream_text: str = ""
         self._did_stream: bool = False
         self._allow_all: bool = False
         self._allowed_tools: set[str] = set()
 
     # ------------------------------------------------------------------ #
-    # Banner startup
+    # Banner
     # ------------------------------------------------------------------ #
 
     def show_banner(self, version: str = "0.1.0") -> None:
-        """Tampilkan ASCII art banner warna-warni saat startup."""
         art = pyfiglet.figlet_format("AUTOKEREN", font="slant")
         lines = art.rstrip("\n").split("\n")
         colored = Text()
@@ -64,7 +57,7 @@ class AgentUI:
         self.console.print()
 
     # ------------------------------------------------------------------ #
-    # Model thinking + streaming
+    # Model thinking + streaming (inline, no panel)
     # ------------------------------------------------------------------ #
 
     def on_model_start(self) -> None:
@@ -75,69 +68,63 @@ class AgentUI:
         self._status.start()
 
     def on_chunk(self, text: str) -> None:
-        """Called untuk setiap text chunk dari streaming. Switch spinner → Live dengan Panel."""
         if self._status is not None:
             self._stop_status()
             self._live = Live(
-                Panel("", title="autokeren"),
+                Text(""),
                 console=self.console,
                 refresh_per_second=12,
                 vertical_overflow="visible",
+                transient=True,
             )
             self._live.start()
         self._did_stream = True
         self._stream_text += text
         if self._live is not None:
-            self._live.update(Panel(self._stream_text, title="autokeren"))
+            self._live.update(Text(self._stream_text, no_wrap=False))
 
     def on_model_end(self, resp: "ModelResponse") -> None:
         self._stop_all()
+        if self._did_stream and self._stream_text.strip():
+            self.console.print(self._stream_text.rstrip())
         self._stream_text = ""
 
     # ------------------------------------------------------------------ #
-    # Tool execution — spinner while running, then result line
+    # Tool execution — opencode style: ⏺ call line, ✓ result line
     # ------------------------------------------------------------------ #
 
     def on_tool_start(self, name: str, arguments: dict) -> None:
         self._stop_all()
-        self._tool_label = f"[bold yellow]{name}[/bold yellow][dim]({_format_args(arguments)})[/dim]"
-        self._status = self.console.status(
-            f"  [bold cyan]→[/bold cyan] {self._tool_label}",
-            spinner="dots",
-        )
+        if self._stream_text.strip():
+            self.console.print(self._stream_text.rstrip())
+            self._stream_text = ""
+        label = _format_tool_call(name, arguments)
+        self.console.print(f"  [bold cyan]⏺[/bold cyan] {label}")
+        self._status = self.console.status("  [dim]…[/dim]", spinner="dots")
         self._status.start()
 
     def on_tool_end(self, name: str, result: "ToolResult") -> None:
-        self._stop_all()
-        label = self._tool_label or f"[bold yellow]{name}[/bold yellow]"
+        self._stop_status()
         if result.ok:
-            summary = _summarize_output(result.output)
-            tail = f"  [dim]{summary}[/dim]" if summary else ""
-            self.console.print(f"  [green]✓[/green] {label}{tail}")
+            summary = _summarize_tool_result(name, result.output)
+            self.console.print(f"  [green]✓[/green] [dim]{summary}[/dim]")
         else:
             err = result.error or "gagal"
-            self.console.print(f"  [red]✗[/red] {label}  [red]{err}[/red]")
+            self.console.print(f"  [red]✗[/red] [red]{err}[/red]")
 
     # ------------------------------------------------------------------ #
     # Permission system
     # ------------------------------------------------------------------ #
 
     def confirm_permission(self, tool_name: str, description: str, arguments: dict) -> bool:
-        """Tampilkan dialog konfirmasi untuk tool destruktif. Return True kalau diizinkan.
-
-        Opsi:
-        - y: izinkan tool ini, ingat untuk sisa session (ga nanya lagi)
-        - a: izinkan SEMUA tool untuk sisa session
-        - n: tolak
-        """
         if self._allow_all:
             return True
         if tool_name in self._allowed_tools:
             return True
 
         self._stop_all()
-        args_str = _format_args(arguments)
-        self.console.print(f"  [yellow]⚡ {tool_name}[/yellow][dim]({args_str})[/dim] — {description}")
+        label = _format_tool_call(tool_name, arguments)
+        self.console.print(f"  [yellow]⚡ {label}[/yellow] — {description}")
         choice = Prompt.ask(
             "  [yellow]Izinkan?[/yellow]",
             choices=["y", "a", "n"],
@@ -150,19 +137,16 @@ class AgentUI:
             return True
         if choice == "y":
             self._allowed_tools.add(tool_name)
-            self.console.print(f"  [dim]{tool_name} diizinkan untuk session ini.[/dim]")
             return True
         return False
 
     def permission_status(self) -> dict[str, Any]:
-        """Return status permission untuk display."""
         return {
             "allow_all": self._allow_all,
             "allowed_tools": sorted(self._allowed_tools),
         }
 
     def reset_permissions(self) -> None:
-        """Reset semua permission — berguna setelah /reset."""
         self._allow_all = False
         self._allowed_tools.clear()
 
@@ -185,7 +169,6 @@ class AgentUI:
     # ------------------------------------------------------------------ #
 
     def show_context_status(self, info: dict) -> None:
-        """Tampilkan context window usage: tokens, %, prompt/completion stats."""
         tokens = info["tokens"]
         pct = info["pct"]
         window = info["window"]
@@ -211,16 +194,15 @@ class AgentUI:
         )
 
     # ------------------------------------------------------------------ #
-    # Final response panel
+    # Final response (non-streamed fallback only)
     # ------------------------------------------------------------------ #
 
     def show_response(self, resp: "ModelResponse") -> None:
         if not resp.content:
             return
         if self._did_stream:
-            return  # text udah tampil via streaming Live, jangan double
-        title = f"autokeren [{resp.model_id}]" if resp.model_id else "autokeren"
-        self.console.print(Panel(resp.content, title=title))
+            return
+        self.console.print(resp.content.rstrip())
 
     # ------------------------------------------------------------------ #
     # Cleanup
@@ -249,6 +231,42 @@ class AgentUI:
 # ---------------------------------------------------------------------- #
 
 
+def _format_tool_call(name: str, arguments: dict) -> str:
+    key = _key_arg(name, arguments)
+    if key:
+        return f"[bold]{name}[/bold]  [dim]{key}[/dim]"
+    return f"[bold]{name}[/bold]"
+
+
+def _key_arg(name: str, arguments: dict) -> str:
+    if name in ("write_file", "read_file", "patch_file"):
+        return str(arguments.get("path", "?"))
+    if name == "run_shell":
+        cmd = str(arguments.get("command", ""))
+        return cmd if len(cmd) <= 70 else cmd[:67] + "…"
+    if name == "search_code":
+        return str(arguments.get("pattern", "?"))
+    if name == "list_files":
+        return str(arguments.get("path", "."))
+    if name == "git_commit":
+        msg = str(arguments.get("message", ""))
+        return msg if len(msg) <= 60 else msg[:57] + "…"
+    if name == "fetch_url":
+        return str(arguments.get("url", "?"))
+    if name in ("cf_deploy", "cf_build_next"):
+        return str(arguments.get("target", arguments.get("path", "?")))
+    if name == "cf_kv":
+        return f"{arguments.get('action', '?')} {arguments.get('namespace_id', '')}"
+    if name == "cf_d1":
+        action = arguments.get("action", "?")
+        return f"{action}" if action != "query" else f"query {arguments.get('database_id', '')[:12]}"
+    if name == "tmux":
+        return f"{arguments.get('action', '?')} {arguments.get('session', '')}".strip()
+    if name == "camofox":
+        return str(arguments.get("action", "?"))
+    return _format_args(arguments)
+
+
 def _format_args(arguments: dict) -> str:
     parts: list[str] = []
     for k, v in arguments.items():
@@ -262,20 +280,49 @@ def _format_args(arguments: dict) -> str:
     return ", ".join(parts)
 
 
-def _summarize_output(output: object) -> str:
+def _summarize_tool_result(name: str, output: object) -> str:
     if output is None:
-        return ""
+        return name
     if isinstance(output, dict):
-        if "content" in output:
-            lines = str(output["content"]).count("\n") + 1
-            return f"{lines} baris"
+        if name == "write_file":
+            path = output.get("path", "?")
+            lines = output.get("lines", 0)
+            return f"menulis {lines} baris → {path}"
+        if name == "read_file":
+            lines = output.get("total_lines", 0)
+            path = output.get("path", "?")
+            return f"membaca {lines} baris dari {path}"
+        if name == "patch_file":
+            path = output.get("path", "?")
+            return f"mengedit {path}"
+        if name == "list_files":
+            text = str(output).strip()
+            count = text.count("\n") + 1 if text else 0
+            return f"{count} file"
+        if name == "search_code":
+            text = str(output).strip()
+            count = text.count("\n") + 1 if text else 0
+            return f"{count} hasil"
+        if name == "run_shell":
+            text = str(output).strip().replace("\n", " ")
+            return text[:80] + "…" if len(text) > 80 else text or "selesai"
+        if name == "git_status":
+            text = str(output).strip().replace("\n", " ")
+            return text[:80] + "…" if len(text) > 80 else text or "clean"
+        if name == "git_diff":
+            text = str(output).strip()
+            lines = text.count("\n") + 1 if text else 0
+            return f"{lines} baris diff"
+        if name == "git_commit":
+            return "committed"
+        if name == "fetch_url":
+            text = str(output).strip()
+            return f"{len(text)} chars"
         if "path" in output:
             return str(output["path"])
-        if "backup" in output:
-            return f"tersimpan (backup: {output['backup']})"
         compact = json.dumps(output, default=str)
         return compact[:80] + "…" if len(compact) > 80 else compact
     text = str(output).strip().replace("\n", " ")
     if len(text) > 80:
         return f"{len(text)} chars"
-    return text
+    return text or name

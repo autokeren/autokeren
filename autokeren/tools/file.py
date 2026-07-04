@@ -66,7 +66,8 @@ class WriteFileTool(Tool):
         bak = make_backup(target)
         try:
             target.write_text(content, encoding="utf-8")
-            return ToolResult(output={"path": str(target), "backup": str(bak) if bak else None})
+            lines = content.count("\n") + (1 if content and not content.endswith("\n") else 0)
+            return ToolResult(output={"path": str(target), "lines": lines, "backup": str(bak) if bak else None})
         except Exception as e:
             return ToolResult(error=str(e), ok=False)
 

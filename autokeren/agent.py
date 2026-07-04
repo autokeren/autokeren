@@ -57,13 +57,18 @@ class Agent:
         for iteration in range(self.cfg.autokeren.max_iterations):
             if self.on_model_start:
                 self.on_model_start()
-            resp = self.router.complete(
-                self.context.messages,
-                tools=self.tools.schemas(),
-                max_tokens=self.cfg.cloudflare.max_tokens,
-                temperature=self.cfg.cloudflare.temperature,
-                on_chunk=self.on_chunk,
-            )
+            try:
+                resp = self.router.complete(
+                    self.context.messages,
+                    tools=self.tools.schemas(),
+                    max_tokens=self.cfg.cloudflare.max_tokens,
+                    temperature=self.cfg.cloudflare.temperature,
+                    on_chunk=self.on_chunk,
+                )
+            except KeyboardInterrupt:
+                if self.on_model_end:
+                    self.on_model_end(ModelResponse(content=""))
+                return ModelResponse(content="[dibatalkan user]")
             if self.on_model_end:
                 self.on_model_end(resp)
 
@@ -89,7 +94,10 @@ class Agent:
                         continue
                 if self.on_tool_start:
                     self.on_tool_start(tc.name, tc.arguments)
-                raw_result = self.tools.run(tc.name, tc.arguments)
+                try:
+                    raw_result = self.tools.run(tc.name, tc.arguments)
+                except KeyboardInterrupt:
+                    raw_result = ToolResult(error="dibatalkan user", ok=False)
                 if self.on_tool_end:
                     self.on_tool_end(tc.name, raw_result)
                 self.context.add_tool_result(tc.id, tc.name, raw_result.to_dict(), raw_result.ok)

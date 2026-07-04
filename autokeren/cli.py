@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 from rich.console import Console
@@ -74,12 +75,22 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
         console.print(f"[dim]Saved sessions: {len(sessions)} (ketik /sessions untuk lihat)[/dim]")
     console.print("[dim]Ketik /help untuk bantuan, atau langsung tanya apa saja.[/dim]\n")
 
+    _last_ctrl_c: float = 0
+
     while True:
         try:
             user_input = Prompt.ask("\n[bold blue]kamu[/bold blue]").strip()
-        except (EOFError, KeyboardInterrupt):
+        except EOFError:
             console.print("\nSampai jumpa!")
             break
+        except KeyboardInterrupt:
+            now = time.time()
+            if now - _last_ctrl_c < 3:
+                console.print("\n[yellow]Keluar.[/yellow]")
+                break
+            _last_ctrl_c = now
+            console.print("\n[yellow]Ctrl+C lagi dalam 3 detik untuk keluar.[/yellow]")
+            continue
 
         if not user_input:
             continue
@@ -178,6 +189,13 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
             # Auto-compact suggestion
             if info["pct"] >= cfg.autokeren.auto_compact_threshold * 100:
                 console.print(f"[yellow]⚠ Context sudah {info['pct']:.0f}%. Ketik /compact untuk meringkas.[/yellow]")
+        except KeyboardInterrupt:
+            now = time.time()
+            if now - _last_ctrl_c < 3:
+                console.print("\n[yellow]Keluar.[/yellow]")
+                break
+            _last_ctrl_c = now
+            console.print("\n[yellow]Dibatalkan. Ctrl+C lagi dalam 3 detik untuk keluar.[/yellow]")
         except Exception as e:
             console.print(f"[red]Error:[/red] {e}")
         finally:

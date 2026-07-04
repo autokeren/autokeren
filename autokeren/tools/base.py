@@ -7,7 +7,7 @@ from typing import Any
 
 class ToolResult:
     def __init__(self, output: str | dict | list | None = None, error: str | None = None, ok: bool = True):
-        self.output = output
+        self.output: str | dict | list | None = output
         self.error = error
         self.ok = ok
 
