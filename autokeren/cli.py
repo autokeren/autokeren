@@ -98,7 +98,31 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
         if user_input in ("/quit", "/q"):
             break
         if user_input == "/help":
-            console.print("Perintah: /q /status /compact /reset /memory /permissions /save /resume /sessions")
+            console.print("Perintah: /q /status /model /compact /reset /memory /permissions /save /resume /sessions")
+            continue
+        if user_input == "/model" or user_input.startswith("/model "):
+            arg = user_input[6:].strip()
+            models = agent.router.model_aliases()
+            if not arg:
+                console.print("[bold]Model tersedia:[/bold]")
+                for m in models:
+                    short = m["id"].split("/")[-1] if "/" in m["id"] else m["id"]
+                    marker = "[green]● active[/green]" if m["active"] else "[dim]○[/dim]"
+                    console.print(f"  {marker}  [cyan]{short}[/cyan]  [dim]{m['id']}[/dim]")
+                console.print("[dim]Ketik /model <nama> untuk switch[/dim]")
+            else:
+                target = None
+                for m in models:
+                    short = m["id"].split("/")[-1] if "/" in m["id"] else m["id"]
+                    if arg.lower() in short.lower() or arg.lower() in m["id"].lower():
+                        target = m["id"]
+                        break
+                if target:
+                    agent.router.set_primary(target)
+                    short = target.split("/")[-1] if "/" in target else target
+                    console.print(f"[green]Model aktif: {short}[/green]")
+                else:
+                    console.print(f"[red]Model '{arg}' tidak ditemukan.[/red]")
             continue
         if user_input == "/status":
             console.print_json(json.dumps(agent.status()))

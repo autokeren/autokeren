@@ -40,6 +40,30 @@ class ModelRouter:
     def healthy_models(self) -> list[CloudflareModel]:
         return [m for m in self.models if self.breakers[m.model_id].allow()]
 
+    def swap_models(self) -> None:
+        """Tukar primary <-> secondary."""
+        if len(self.models) >= 2:
+            self.models[0], self.models[1] = self.models[1], self.models[0]
+
+    def set_primary(self, model_id: str) -> bool:
+        """Jadikan model dengan id tertentu sebagai primary. Return True kalau sukses."""
+        for i, m in enumerate(self.models):
+            if m.model_id == model_id:
+                if i != 0:
+                    self.models.insert(0, self.models.pop(i))
+                return True
+        return False
+
+    def current_model_id(self) -> str:
+        return self.models[0].model_id if self.models else "?"
+
+    def model_aliases(self) -> list[dict[str, Any]]:
+        """Return list of model info for display."""
+        return [
+            {"id": m.model_id, "active": m.model_id == self.current_model_id()}
+            for m in self.models
+        ]
+
     def complete(
         self,
         messages: list[Message],
