@@ -108,17 +108,10 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
         if user_input == "/model" or user_input.startswith("/model "):
             arg = user_input[6:].strip()
             if arg:
-                models = agent.router.model_aliases()
-                target = None
-                for m in models:
-                    short = m["id"].split("/")[-1] if "/" in m["id"] else m["id"]
-                    if arg.lower() in short.lower() or arg.lower() in m["id"].lower():
-                        target = m["id"]
-                        break
-                if target:
-                    agent.router.set_primary(target)
-                    short = target.split("/")[-1] if "/" in target else target
-                    console.print(f"[green]Model aktif: {short}[/green]")
+                from autokeren.models.cloudflare import resolve_model_id
+                resolved = resolve_model_id(arg, agent.router.models[0].auth_mode)
+                if agent.router.switch_model(resolved):
+                    console.print(f"[green]Model aktif: {arg}[/green]")
                 else:
                     console.print(f"[red]Model '{arg}' tidak ditemukan.[/red]")
             else:
@@ -130,7 +123,7 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
                 for m in all_models:
                     m["active"] = m["id"] == current
 
-                idx = select_option(all_models, title="Pilih Model")
+                idx = select_option(all_models, title="Pilih Model", console=console)
                 if idx is not None:
                     chosen = all_models[idx]["id"]
                     from autokeren.models.cloudflare import resolve_model_id

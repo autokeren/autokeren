@@ -70,6 +70,11 @@ class Agent:
                 if self.on_model_end:
                     self.on_model_end(ModelResponse(content=""))
                 return ModelResponse(content="[dibatalkan user]")
+            except Exception as e:
+                if self.on_model_end:
+                    self.on_model_end(ModelResponse(content=""))
+                err_msg = str(e) or type(e).__name__
+                return ModelResponse(content=f"[red]⚠ Model error: {err_msg}[/red]\n\nCoba ganti model dengan /model, atau ulangi pertanyaan.")
             if self.on_model_end:
                 self.on_model_end(resp)
 

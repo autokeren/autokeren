@@ -1,96 +1,56 @@
-"""Interactive keyboard selector — arrow up/down, number keys, enter."""
+"""Simple model selector — nomor + enter."""
 from __future__ import annotations
 
-import sys
 from typing import Any
+
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
 
 def select_option(
     options: list[dict[str, Any]],
     title: str = "Pilih",
+    console: Console | None = None,
 ) -> int | None:
-    """Interactive selector. Return index atau None kalau cancel.
-
-    Navigation:
-      ↑/↓     : pindah selection
-      1-9     : pilih langsung by number
-      Enter   : konfirmasi
-      q/Esc   : cancel
-    """
+    """Tampilkan list, user ketik nomor. Return index atau None kalau batal."""
     if not options:
         return None
     if len(options) == 1:
         return 0
 
-    import tty
-    import termios
+    console = console or Console()
 
-    fd = sys.stdin.fileno()
-    old = termios.tcgetattr(fd)
-    selected = 0
-    n = len(options)
+    lines = Text()
+    lines.append(f"{title}\n\n", style="bold")
+    for i, opt in enumerate(options):
+        name = opt.get("name", opt.get("id", str(opt)))
+        desc = opt.get("desc", "")
+        tier = opt.get("tier", "")
+        icon = opt.get("icon", "")
+        tier_str = f" [{tier}]" if tier else ""
+        desc_str = f"  {desc}" if desc else ""
+        lines.append(f"  {i + 1}. ", style="bold cyan")
+        lines.append(f"{icon} {name}", style="white")
+        lines.append(f"{tier_str}{desc_str}\n", style="dim")
+    lines.append("\n  Ketik nomor (atau q untuk batal): ", style="dim")
 
-    def render_lines() -> list[str]:
-        lines = [f"\n  {title}\n"]
-        for i, opt in enumerate(options):
-            name = opt.get("name", opt.get("id", str(opt)))
-            desc = opt.get("desc", "")
-            tier = opt.get("tier", "")
-            icon = opt.get("icon", "")
-            marker = "▶" if i == selected else " "
-            tier_str = f" [{tier}]" if tier else ""
-            desc_str = f"  — {desc}" if desc else ""
-            if i == selected:
-                lines.append(f"  {marker} \033[1;36m{icon} {name}\033[0m\033[2m{tier_str}{desc_str}\033[0m")
-            else:
-                lines.append(f"  {marker} \033[37m{icon} {name}\033[0m\033[2m{tier_str}{desc_str}\033[0m")
-        lines.append("")
-        lines.append("  \033[2m↑↓ navigasi  •  1-9 pilih  •  Enter konfirmasi  •  q batal\033[0m")
-        return lines
-
-    def draw() -> None:
-        # Clear previous draw: move cursor up n+4 lines and clear each
-        clear_count = n + 4
-        sys.stdout.write(f"\033[{clear_count}A")
-        for _ in range(clear_count):
-            sys.stdout.write("\033[K\033[B")
-        sys.stdout.write(f"\033[{clear_count}A")
-        # Draw new
-        for line in render_lines():
-            sys.stdout.write(line + "\n")
-        sys.stdout.flush()
+    console.print(Panel(lines, border_style="blue"))
 
     try:
-        tty.setraw(fd)
-        # Initial draw
-        for line in render_lines():
-            sys.stdout.write(line + "\n")
-        sys.stdout.flush()
+        choice = input("> ").strip()
+    except (EOFError, KeyboardInterrupt):
+        return None
 
-        while True:
-            ch = sys.stdin.read(1)
-            if ch == "\r" or ch == "\n":
-                break
-            if ch == "\x1b":
-                ch2 = sys.stdin.read(1)
-                if ch2 == "[":
-                    ch3 = sys.stdin.read(1)
-                    if ch3 == "A":
-                        selected = (selected - 1) % n
-                        draw()
-                    elif ch3 == "B":
-                        selected = (selected + 1) % n
-                        draw()
-                else:
-                    return None
-            elif ch == "q":
-                return None
-            elif ch >= "1" and ch <= "9":
-                idx = int(ch) - 1
-                if idx < n:
-                    selected = idx
-                    draw()
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+    if choice.lower() == "q" or not choice:
+        return None
 
-    return selected
+    try:
+        idx = int(choice) - 1
+        if 0 <= idx < len(options):
+            return idx
+        console.print(f"[red]Nomor {choice} di luar range (1-{len(options)})[/red]")
+        return None
+    except ValueError:
+        console.print(f"[red]Input tidak valid: {choice}[/red]")
+        return None
