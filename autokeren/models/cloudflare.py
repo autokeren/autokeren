@@ -237,7 +237,7 @@ class CloudflareModel:
             err_msg = data.get("error", {}).get("message", str(data)) if isinstance(data.get("error"), dict) else str(data)
             raise CloudflareAIError(f"API error: {err_msg}", status=r.status_code, response=data)
 
-        return self._parse_openai_response(data)
+        return self._parse_openai_response(data, r.headers)
 
     def _parse_response(self, result: dict[str, Any]) -> ModelResponse:
         usage = TokenUsage(
@@ -270,7 +270,7 @@ class CloudflareModel:
             raw=result,
         )
 
-    def _parse_openai_response(self, data: dict[str, Any]) -> ModelResponse:
+    def _parse_openai_response(self, data: dict[str, Any], headers: Any = None) -> ModelResponse:
         usage_data = data.get("usage", {})
         usage = TokenUsage(
             prompt=usage_data.get("prompt_tokens", 0),
@@ -295,6 +295,17 @@ class CloudflareModel:
                     arguments=args,
                 )
             )
+        neurons_used = 0
+        neurons_remaining = None
+        neurons_quota = None
+        if headers:
+            try:
+                neurons_used = int(headers.get("X-Neurons-Used", 0))
+                neurons_remaining = int(headers.get("X-Neurons-Remaining")) if headers.get("X-Neurons-Remaining") else None
+                neurons_quota = int(headers.get("X-Neurons-Quota")) if headers.get("X-Neurons-Quota") else None
+            except (ValueError, TypeError):
+                pass
+
         return ModelResponse(
             content=content or ("" if tool_calls else None),
             tool_calls=tool_calls,
@@ -302,6 +313,9 @@ class CloudflareModel:
             model_id=data.get("model", self.model_id),
             finish_reason=choice.get("finish_reason"),
             raw=data,
+            neurons_used=neurons_used,
+            neurons_remaining=neurons_remaining,
+            neurons_quota=neurons_quota,
         )
 
     def complete(

@@ -68,7 +68,7 @@ class AgentUI:
     # Banner
     # ------------------------------------------------------------------ #
 
-    def show_banner(self, version: str = "0.3.1") -> None:
+    def show_banner(self, version: str = "0.3.2") -> None:
         full_art = pyfiglet.figlet_format("AUTOKEREN", font="slant").rstrip("\n").split("\n")
         auto_art = pyfiglet.figlet_format("AUTO", font="slant").rstrip("\n").split("\n")
         colored = Text()
@@ -200,6 +200,8 @@ class AgentUI:
         model = info.get("model", "?")
         pct = info.get("pct", 0)
         cwd = info.get("cwd", "?")
+        neurons_remaining = info.get("neurons_remaining")
+        neurons_quota = info.get("neurons_quota")
 
         if pct < 50:
             color = "green"
@@ -215,10 +217,20 @@ class AgentUI:
         from datetime import datetime
         now = datetime.now().strftime("%H:%M")
 
+        neuron_str = ""
+        if neurons_remaining is not None and neurons_quota:
+            if neurons_remaining < neurons_quota * 0.1:
+                n_color = "red"
+            elif neurons_remaining < neurons_quota * 0.3:
+                n_color = "yellow"
+            else:
+                n_color = "green"
+            neuron_str = f" [dim]|[/dim] [{n_color}]neurons {neurons_remaining:,}/{neurons_quota:,}[/{n_color}]"
+
         self.console.print(
             f"  [dim][{color}]{model}[/{color}] "
             f"ctx [{color}]{bar}[/{color}] {pct:.0f}% "
-            f"[dim]| {cwd} | {now}[/dim]"
+            f"[dim]| {cwd} | {now}[/dim]{neuron_str}"
         )
 
     # ------------------------------------------------------------------ #

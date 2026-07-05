@@ -35,6 +35,8 @@ class Agent:
         self.plan_approved = not cfg.autokeren.plan_mode
         self._tool_call_count = 0
         self._max_tool_calls = 50
+        self._last_neuron_remaining: int | None = None
+        self._last_neuron_quota: int | None = None
 
         # Opt-in UI callbacks (wired by CLI). Default None = no-op.
         self.on_model_start: Callable[[], None] | None = None
@@ -79,6 +81,10 @@ class Agent:
                 return ModelResponse(content=f"[red]⚠ Model error: {err_msg}[/red]\n\nCoba ganti model dengan /model, atau ulangi pertanyaan.")
             if self.on_model_end:
                 self.on_model_end(resp)
+
+            if resp.neurons_remaining is not None:
+                self._last_neuron_remaining = resp.neurons_remaining
+                self._last_neuron_quota = resp.neurons_quota
 
             # Plan mode: before approval, return the response without executing tools.
             if self.cfg.autokeren.plan_mode and not self.plan_approved:
@@ -174,11 +180,14 @@ class Agent:
         }
 
     def status_bar_info(self) -> dict[str, Any]:
-        """Compact info untuk status bar: model, context, cwd."""
+        """Compact info untuk status bar: model, context, cwd, neurons."""
         info = self.context_info()
         model_id = self.router.models[0].model_id if self.router.models else "?"
         info["model"] = model_id.split("/")[-1] if "/" in model_id else model_id
         info["cwd"] = Path(self.project_root).name
+        if self._last_neuron_remaining is not None:
+            info["neurons_remaining"] = self._last_neuron_remaining
+            info["neurons_quota"] = self._last_neuron_quota
         return info
 
     def should_compact(self) -> bool:

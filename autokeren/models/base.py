@@ -36,6 +36,9 @@ class ModelResponse:
     model_id: str = ""
     finish_reason: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
+    neurons_used: int = 0
+    neurons_remaining: int | None = None
+    neurons_quota: int | None = None
 
 
 Message = dict[str, Any]  # OpenAI-compatible message
