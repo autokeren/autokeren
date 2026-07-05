@@ -74,7 +74,7 @@ class AgentUI:
     # Banner
     # ------------------------------------------------------------------ #
 
-    def show_banner(self, version: str = "0.4.1") -> None:
+    def show_banner(self, version: str = "0.4.2") -> None:
         full_art = pyfiglet.figlet_format("AUTOKEREN", font="slant").rstrip("\n").split("\n")
         auto_art = pyfiglet.figlet_format("AUTO", font="slant").rstrip("\n").split("\n")
         colored = Text()
@@ -121,7 +121,18 @@ class AgentUI:
 
     def on_model_end(self, resp: "ModelResponse") -> None:
         self._stop_all()
-        self._stream_text = ""
+
+    def show_response(self, resp: "ModelResponse") -> None:
+        if not resp.content:
+            return
+        if self._did_stream and self._stream_text.strip():
+            self.console.print(_sep())
+            self._stream_text = ""
+            self._did_stream = False
+            return
+        self.console.print(_sep())
+        _render_markdown(resp.content, self.console, mermaid_render=self.mermaid_render, store_blocks=self)
+        self.console.print(_sep())
 
     # ------------------------------------------------------------------ #
     # Tool execution — opencode style: ⏺ call line, ✓ result line
@@ -275,15 +286,8 @@ class AgentUI:
         )
 
     # ------------------------------------------------------------------ #
-    # Final response (non-streamed fallback only)
+    # Diagram rendering
     # ------------------------------------------------------------------ #
-
-    def show_response(self, resp: "ModelResponse") -> None:
-        if not resp.content:
-            return
-        self.console.print(_sep())
-        _render_markdown(resp.content, self.console, mermaid_render=self.mermaid_render, store_blocks=self)
-        self.console.print(_sep())
 
     def render_last_diagram(self) -> None:
         """Render diagram terakhir sebagai image (dipanggil via /diagram)."""
