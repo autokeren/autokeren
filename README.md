@@ -44,10 +44,32 @@ autokeren adalah CLI agentic coding yang dirancang khusus untuk stack Cloudflare
 
 ## Instalasi
 
-### Dari PyPI
+### Via pipx (recommended)
+
+[pipx](https://pipx.pypa.io) adalah cara standar install CLI tools Python — isolated environment, auto PATH, no conflict sama system packages.
 
 ```bash
-pip install autokeren
+# Install pipx dulu kalau belum ada (Debian/Ubuntu)
+sudo apt install pipx
+pipx ensurepath
+
+# Install autokeren
+pipx install autokeren
+```
+
+### Via pip
+
+```bash
+pip install --user autokeren
+```
+
+> **Note:** Pada sistem Linux modern (PEP 668), `pip install` biasa akan ditolak. Gunakan `pipx` (recommended) atau `pip install --user`.
+
+### Update
+
+```bash
+pipx upgrade autokeren   # kalau pakai pipx
+pip install --user -U autokeren  # kalau pakai pip
 ```
 
 ### Dari source (untuk development)

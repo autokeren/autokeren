@@ -2,25 +2,49 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import TYPE_CHECKING, Any
 
 import pyfiglet
 from rich.align import Align
 from rich.console import Console, Group
 from rich.live import Live
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.status import Status
 from rich.text import Text
+from rich.theme import Theme
 
 if TYPE_CHECKING:
     from autokeren.models.base import ModelResponse
     from autokeren.tools.base import ToolResult
 
-_RAINBOW = [
-    "bold_red", "bold_yellow", "bold_green",
-    "bold_cyan", "bold_blue", "bold_magenta",
-]
+# Tema warna: ijo, merah, putih, biru telur asin (#4FC3F7)
+AK_THEME = Theme({
+    "markdown.h1": "bold green",
+    "markdown.h2": "bold green",
+    "markdown.h3": "bold #4FC3F7",
+    "markdown.h4": "#4FC3F7",
+    "markdown.h5": "dim #4FC3F7",
+    "markdown.h6": "dim #4FC3F7",
+    "markdown.bold": "bold white",
+    "markdown.italic": "italic white",
+    "markdown.code": "#4FC3F7",
+    "markdown.code_block": "on #1a1a2e",
+    "markdown.link": "underline #4FC3F7",
+    "markdown.list": "white",
+    "markdown.table.header": "bold green",
+    "markdown.table.border": "#4FC3F7",
+    "markdown.block_quote": "italic yellow",
+    "markdown.hr": "dim",
+})
+
+if TYPE_CHECKING:
+    from autokeren.models.base import ModelResponse
+    from autokeren.tools.base import ToolResult
+
+_MERMAID_RE = re.compile(r"```mermaid\s*\n.*?```", re.DOTALL)
 
 
 class AgentUI:
@@ -88,7 +112,7 @@ class AgentUI:
     def on_model_end(self, resp: "ModelResponse") -> None:
         self._stop_all()
         if self._did_stream and self._stream_text.strip():
-            self.console.print(self._stream_text.rstrip())
+            _render_markdown(self._stream_text, self.console)
         self._stream_text = ""
 
     # ------------------------------------------------------------------ #
@@ -235,13 +259,7 @@ class AgentUI:
     def show_response(self, resp: "ModelResponse") -> None:
         if not resp.content:
             return
-        if self._did_stream:
-            from autokeren.mermaid import extract_and_render
-            extract_and_render(resp.content, self.console)
-            return
-        self.console.print(resp.content.rstrip())
-        from autokeren.mermaid import extract_and_render
-        extract_and_render(resp.content, self.console)
+        _render_markdown(resp.content, self.console)
 
     # ------------------------------------------------------------------ #
     # Cleanup
@@ -268,6 +286,27 @@ class AgentUI:
 # ---------------------------------------------------------------------- #
 # Helpers
 # ---------------------------------------------------------------------- #
+
+
+def _render_markdown(text: str, console: Console) -> None:
+    """Render text sebagai rich Markdown dengan tema autokeren.
+    
+    Mermaid blocks di-strip dulu, dirender terpisah sebagai diagram.
+    """
+    from autokeren.mermaid import extract_and_render
+
+    # Strip mermaid blocks, simpan placeholder
+    mermaid_blocks = _MERMAID_RE.findall(text)
+    clean_text = _MERMAID_RE.sub("", text).strip()
+    
+    # Render markdown (tanpa mermaid)
+    if clean_text:
+        md = Markdown(clean_text, code_theme="monokai")
+        console.print(md)
+    
+    # Render mermaid blocks terpisah
+    if mermaid_blocks:
+        extract_and_render(text, console)
 
 
 def _format_tool_call(name: str, arguments: dict) -> str:

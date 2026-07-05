@@ -39,9 +39,9 @@ from autokeren.tools import (
     TmuxTool,
     WriteFileTool,
 )
-from autokeren.ui import AgentUI
+from autokeren.ui import AK_THEME, AgentUI
 
-console = Console()
+console = Console(theme=AK_THEME)
 
 
 def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegistry:

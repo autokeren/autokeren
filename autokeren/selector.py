@@ -7,6 +7,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
+from autokeren.ui import AK_THEME
+
 
 def select_option(
     options: list[dict[str, Any]],
@@ -19,7 +21,7 @@ def select_option(
     if len(options) == 1:
         return 0
 
-    console = console or Console()
+    console = console or Console(theme=AK_THEME)
 
     lines = Text()
     lines.append(f"{title}\n\n", style="bold")
