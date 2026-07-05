@@ -53,8 +53,10 @@ Aturan:
 Deploy ke Cloudflare via platform autokeren:
 - Kalau user minta bikin app (toko online, blog, API, chatbot, dll), LANGSUNG buat project dan deploy:
   1. Panggil create_project(name="nama-project") untuk provisioning D1 + R2 + AI binding.
-  2. Generate Worker code (ES module format: export default {{ async fetch(request, env) {{ ... }} }}).
-  3. Panggil deploy_project(project_id, script) untuk deploy. Dapat URL live.
+  2. Tulis Worker code ke file lokal pakai write_file(path="worker.js", content="...").
+  3. Panggil deploy_project(project_id, file_path="worker.js") untuk deploy. Dapat URL live.
+- WAJIB: tulis Worker code ke file dulu (write_file), lalu deploy dari file_path.
+  JANGAN pass script inline ke deploy_project — terlalu panjang dan akan terpotong.
 - Worker code otomatis punya binding: env.DB (D1), env.STORAGE (R2), env.AI (Workers AI).
 
 Workers AI response format (PENTING):

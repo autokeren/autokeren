@@ -43,12 +43,14 @@ class AgentUI:
     # ------------------------------------------------------------------ #
 
     def show_banner(self, version: str = "0.1.0") -> None:
-        art = pyfiglet.figlet_format("AUTOKEREN", font="slant")
-        lines = art.rstrip("\n").split("\n")
+        full_art = pyfiglet.figlet_format("AUTOKEREN", font="slant").rstrip("\n").split("\n")
+        auto_art = pyfiglet.figlet_format("AUTO", font="slant").rstrip("\n").split("\n")
         colored = Text()
-        for i, line in enumerate(lines):
-            color = _RAINBOW[i % len(_RAINBOW)]
-            colored.append(line + "\n", style=color)
+        for full_line, auto_line in zip(full_art, auto_art):
+            split_at = len(auto_line.rstrip())
+            colored.append(full_line[:split_at], style="bold #FF0000")
+            colored.append(full_line[split_at:], style="bold white")
+            colored.append("\n")
         tagline = Text("  Cloudflare-first agentic coding CLI buat developer Indonesia\n", style="dim italic")
         ver = Text(f"  v{version}\n", style="bold yellow")
         self.console.print()

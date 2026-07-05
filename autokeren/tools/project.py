@@ -71,22 +71,34 @@ class DeployProjectTool(Tool):
         "Deploy Worker code ke project autokeren. "
         "Worker script akan di-deploy dengan auto-bindings: env.DB (D1), env.STORAGE (R2), env.AI (Workers AI). "
         "Return URL live worker. "
-        "Pakai setelah create_project."
+        "Bisa pakai file_path (baca dari file) ATAU script (inline code). Pakai file_path lebih disarankan untuk code panjang."
     )
     requires_permission = True
     parameters = {
         "type": "object",
         "properties": {
             "project_id": {"type": "string", "description": "Project ID dari create_project."},
-            "script": {"type": "string", "description": "Worker JavaScript code (ES module format)."},
+            "file_path": {"type": "string", "description": "Path ke file Worker JavaScript (baca dari disk). Disarankan pakai ini untuk code panjang."},
+            "script": {"type": "string", "description": "Worker JavaScript code inline (untuk code pendek)."},
         },
-        "required": ["project_id", "script"],
+        "required": ["project_id"],
     }
 
     def __init__(self, cfg: Config):
         self.cfg = cfg
 
-    def run(self, project_id: str, script: str, **_: Any) -> ToolResult:
+    def run(self, project_id: str, script: str = "", file_path: str = "", **_: Any) -> ToolResult:
+        if file_path:
+            from pathlib import Path
+            p = Path(file_path)
+            if not p.exists():
+                return ToolResult(error=f"file not found: {file_path}", ok=False)
+            script = p.read_text(encoding="utf-8")
+        if not script:
+            return ToolResult(error="Either file_path atau script harus diisi.", ok=False)
+        from autokeren.signing import check_signed, sign_content
+        if not check_signed(file_path or "worker.js", script):
+            script = sign_content(file_path or "worker.js", script)
         try:
             r = httpx.post(
                 f"{self.cfg.auth.base_url}/v1/projects/{project_id}/deploy",

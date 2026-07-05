@@ -52,6 +52,54 @@ def fetch_available_models(cfg) -> list[dict[str, Any]]:
     ]
 
 
+def _extract_partial_args(raw: str) -> dict[str, Any]:
+    """Extract partial arguments from truncated JSON (e.g. when max_tokens cut off tool call).
+
+    Tries complete JSON parse first, then falls back to per-key extraction
+    that handles truncated string values.
+    """
+    import re
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+
+    result: dict[str, Any] = {}
+
+    _SHORT_KEYS = ("path", "project_id", "file_path", "name", "description", "message", "old_string")
+    _LONG_KEYS = ("content", "script", "command", "new_string")
+
+    for key in _SHORT_KEYS:
+        m = re.search(rf'"{key}"\s*:\s*"((?:[^"\\]|\\.)*)"', raw)
+        if m:
+            try:
+                result[key] = json.loads(f'"{m.group(1)}"')
+            except Exception:
+                result[key] = m.group(1)
+
+    for key in _LONG_KEYS:
+        m = re.search(rf'"{key}"\s*:\s*"', raw)
+        if not m:
+            continue
+        content_raw = raw[m.end():]
+        while content_raw and content_raw[-1] in ('"', "}", " ", "\n", "\r", "\t"):
+            content_raw = content_raw[:-1]
+        if content_raw.endswith("\\"):
+            content_raw = content_raw[:-1]
+        try:
+            result[key] = json.loads(f'"{content_raw}"')
+        except Exception:
+            result[key] = (
+                content_raw.replace("\\n", "\n")
+                .replace("\\t", "\t")
+                .replace('\\"', '"')
+                .replace("\\\\", "\\")
+            )
+
+    return result
+
+
 class CloudflareAIError(Exception):
     def __init__(self, message: str, status: int | None = None, response: dict | None = None):
         super().__init__(message)
@@ -161,7 +209,7 @@ class CloudflareModel:
         payload: dict[str, Any] = {
             "model": self.model_id,
             "messages": messages,
-            "max_tokens": params.get("max_tokens", 4096),
+            "max_tokens": params.get("max_tokens", 8192),
             "temperature": params.get("temperature", 0.3),
             "stream": False,
         }
@@ -235,10 +283,11 @@ class CloudflareModel:
         content = message.get("content")
         tool_calls = []
         for tc in message.get("tool_calls", []) or []:
+            raw_args = tc.get("function", {}).get("arguments", "{}")
             try:
-                args = json.loads(tc.get("function", {}).get("arguments", "{}"))
-            except Exception:
-                args = {}
+                args = json.loads(raw_args)
+            except json.JSONDecodeError:
+                args = _extract_partial_args(raw_args)
             tool_calls.append(
                 ToolCall(
                     id=tc.get("id", ""),
@@ -265,7 +314,7 @@ class CloudflareModel:
         policy = self.retry_policy or RetryPolicy()
 
         def _call():
-            if on_chunk is not None:
+            if on_chunk is not None and not tools:
                 try:
                     return self._stream_once(messages, tools=tools, on_chunk=on_chunk, **params)
                 except CloudflareAIError:
@@ -285,7 +334,7 @@ class CloudflareModel:
         payload: dict[str, Any] = {
             "model": self.model_id,
             "messages": messages,
-            "max_tokens": params.get("max_tokens", 4096),
+            "max_tokens": params.get("max_tokens", 8192),
             "temperature": params.get("temperature", 0.3),
             "stream": True,
         }
