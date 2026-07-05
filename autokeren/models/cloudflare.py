@@ -372,6 +372,8 @@ class CloudflareModel:
                     body = r.read().decode("utf-8", errors="replace")[:500]
                     raise CloudflareAIError(f"stream error: {body}", status=r.status_code)
 
+                stream_headers = r.headers
+
                 for line in r.iter_lines():
                     if not line or not line.startswith("data: "):
                         continue
@@ -427,9 +429,23 @@ class CloudflareModel:
                 args = _extract_partial_args(tc["arguments"]) if tc["arguments"] else {}
             tool_calls.append(ToolCall(id=tc["id"], name=tc["name"], arguments=args))
 
+        neurons_used = 0
+        neurons_remaining = None
+        neurons_quota = None
+        if stream_headers:
+            try:
+                neurons_used = int(stream_headers.get("X-Neurons-Used", 0))
+                neurons_remaining = int(stream_headers.get("X-Neurons-Remaining")) if stream_headers.get("X-Neurons-Remaining") else None
+                neurons_quota = int(stream_headers.get("X-Neurons-Quota")) if stream_headers.get("X-Neurons-Quota") else None
+            except (ValueError, TypeError):
+                pass
+
         return ModelResponse(
             content=full_text or ("" if tool_calls else None),
             tool_calls=tool_calls,
             usage=usage,
             model_id=self.model_id,
+            neurons_used=neurons_used,
+            neurons_remaining=neurons_remaining,
+            neurons_quota=neurons_quota,
         )
