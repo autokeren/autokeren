@@ -71,6 +71,37 @@ def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegist
     return reg
 
 
+def _read_input(console: Console) -> str:
+    """Read user input with paste detection.
+
+    Long lines (>80 chars) or multi-line paste are shown as a yellow summary block.
+    User can type more, then Enter to send.
+    """
+    PASTE_THRESHOLD = 80
+
+    line = Prompt.ask("[bold blue]kamu[/bold blue]").rstrip("\n")
+
+    if len(line) <= PASTE_THRESHOLD and "\n" not in line:
+        return line.strip()
+
+    pasted_parts = [line]
+    total_chars = len(line)
+    console.print(f"  [yellow on #1a1a00] 📋 {total_chars} chars dari clipboard [/yellow on #1a1a00] [dim]— ketik lagi atau Enter kosong untuk kirim[/dim]")
+
+    while True:
+        try:
+            more = input()
+        except (EOFError, KeyboardInterrupt):
+            break
+        if more.strip() == "":
+            break
+        pasted_parts.append(more)
+        total_chars += len(more)
+        console.print(f"  [yellow on #1a1a00] 📋 +{len(more)} chars (total {total_chars}) [/yellow on #1a1a00] [dim]— Enter kosong untuk kirim[/dim]")
+
+    return "\n".join(pasted_parts).strip()
+
+
 def chat_loop(agent: Agent, cfg, ui: AgentUI):
     ui.show_banner(__version__)
     if cfg.auth.mode == "platform" and not cfg.auth.api_key:
@@ -92,7 +123,7 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
     while True:
         ui.show_status_bar(agent.status_bar_info())
         try:
-            user_input = Prompt.ask("[bold blue]kamu[/bold blue]").strip()
+            user_input = _read_input(console)
         except EOFError:
             console.print("\nSampai jumpa!")
             break
