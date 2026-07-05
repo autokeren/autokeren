@@ -28,6 +28,8 @@ AK_THEME = Theme({
     "markdown.h4": "#4FC3F7",
     "markdown.h5": "dim #4FC3F7",
     "markdown.h6": "dim #4FC3F7",
+    "markdown.h1.bar": "dim #555555",
+    "markdown.h2.bar": "dim #555555",
     "markdown.bold": "bold white",
     "markdown.italic": "italic white",
     "markdown.code": "#4FC3F7",
@@ -37,7 +39,7 @@ AK_THEME = Theme({
     "markdown.table.header": "bold green",
     "markdown.table.border": "#4FC3F7",
     "markdown.block_quote": "italic yellow",
-    "markdown.hr": "dim",
+    "markdown.hr": "dim #555555",
 })
 
 if TYPE_CHECKING:
@@ -75,12 +77,10 @@ class AgentUI:
             colored.append(full_line[:split_at], style="bold #FF0000")
             colored.append(full_line[split_at:], style="bold white")
             colored.append("\n")
-        tagline = Text("  Cloudflare-first agentic coding CLI buat developer Indonesia\n", style="dim italic")
-        ver = Text(f"  v{version}\n", style="bold yellow")
-        self.console.print()
+        tagline = Text("Cloudflare-first agentic coding CLI buat developer Indonesia", style="dim italic")
+        ver = Text(f"v{version}", style="bold yellow")
         self.console.print(Align.center(colored))
         self.console.print(Align.center(Group(tagline, ver)))
-        self.console.print()
 
     # ------------------------------------------------------------------ #
     # Model thinking + streaming (inline, no panel)
@@ -112,7 +112,9 @@ class AgentUI:
     def on_model_end(self, resp: "ModelResponse") -> None:
         self._stop_all()
         if self._did_stream and self._stream_text.strip():
+            self.console.print(_sep())
             _render_markdown(self._stream_text, self.console)
+            self.console.print(_sep())
         self._stream_text = ""
 
     # ------------------------------------------------------------------ #
@@ -259,7 +261,9 @@ class AgentUI:
     def show_response(self, resp: "ModelResponse") -> None:
         if not resp.content:
             return
+        self.console.print(_sep())
         _render_markdown(resp.content, self.console)
+        self.console.print(_sep())
 
     # ------------------------------------------------------------------ #
     # Cleanup
@@ -286,6 +290,11 @@ class AgentUI:
 # ---------------------------------------------------------------------- #
 # Helpers
 # ---------------------------------------------------------------------- #
+
+
+def _sep() -> Text:
+    """Separator line abu-abu tipis."""
+    return Text("─" * 60, style="dim #555555")
 
 
 def _render_markdown(text: str, console: Console) -> None:
