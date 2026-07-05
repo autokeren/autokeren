@@ -234,8 +234,12 @@ class AgentUI:
         if not resp.content:
             return
         if self._did_stream:
+            from autokeren.mermaid import extract_and_render
+            extract_and_render(resp.content, self.console)
             return
         self.console.print(resp.content.rstrip())
+        from autokeren.mermaid import extract_and_render
+        extract_and_render(resp.content, self.console)
 
     # ------------------------------------------------------------------ #
     # Cleanup
