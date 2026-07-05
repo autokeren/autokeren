@@ -59,3 +59,13 @@ htmlcov/
 
 # Private docs (internal only, jangan push ke public repo)
 docs/private/
+
+# Signing module (internal only, exclude dari open source)
+autokeren/signing.py
+
+# Test artifacts / generated workers
+*.worker.js
+*-worker.js
+worker.js
+worker.js.bak-*
+toko-*/
