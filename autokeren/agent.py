@@ -155,7 +155,7 @@ class Agent:
         messages = data.get("messages", [])
         if not messages:
             return "Session kosong."
-        # Reload system prompt dengan memory terbaru, keep rest
+        messages = self._clean_orphaned_tool_calls(messages)
         self._build_system_prompt()
         messages[0] = {"role": "system", "content": self._system_prompt}
         self.context.messages = messages
@@ -164,6 +164,19 @@ class Agent:
         ts = data.get("timestamp", "")
         n = len(messages)
         return f"Session '{name}' di-resume ({n} pesan, saved {ts})."
+
+    @staticmethod
+    def _clean_orphaned_tool_calls(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Hapus tool_calls dari pesan assistant terakhir kalau ga ada tool result setelahnya."""
+        if not messages:
+            return messages
+        last = messages[-1]
+        if last.get("role") == "assistant" and last.get("tool_calls"):
+            if "content" not in last or not last.get("content"):
+                messages = messages[:-1]
+            else:
+                last.pop("tool_calls", None)
+        return messages
 
     def context_info(self) -> dict[str, Any]:
         """Return info tentang context window usage buat display."""

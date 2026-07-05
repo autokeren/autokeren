@@ -66,12 +66,13 @@ class AgentUI:
         self._did_stream: bool = False
         self._allow_all: bool = False
         self._allowed_tools: set[str] = set()
+        self._last_render_time: float = 0.0
 
     # ------------------------------------------------------------------ #
     # Banner
     # ------------------------------------------------------------------ #
 
-    def show_banner(self, version: str = "0.3.8") -> None:
+    def show_banner(self, version: str = "0.3.9") -> None:
         full_art = pyfiglet.figlet_format("AUTOKEREN", font="slant").rstrip("\n").split("\n")
         auto_art = pyfiglet.figlet_format("AUTO", font="slant").rstrip("\n").split("\n")
         colored = Text()
@@ -110,7 +111,11 @@ class AgentUI:
         self._did_stream = True
         self._stream_text += text
         if self._live is not None:
-            self._live.update(Markdown(self._stream_text, code_theme="monokai"))
+            import time
+            now = time.monotonic()
+            if now - self._last_render_time >= 0.08:
+                self._last_render_time = now
+                self._live.update(Markdown(self._stream_text, code_theme="monokai"))
 
     def on_model_end(self, resp: "ModelResponse") -> None:
         self._stop_all()
