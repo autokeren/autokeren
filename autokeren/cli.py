@@ -107,15 +107,8 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
             continue
         if user_input == "/model" or user_input.startswith("/model "):
             arg = user_input[6:].strip()
-            models = agent.router.model_aliases()
-            if not arg:
-                console.print("[bold]Model tersedia:[/bold]")
-                for m in models:
-                    short = m["id"].split("/")[-1] if "/" in m["id"] else m["id"]
-                    marker = "[green]● active[/green]" if m["active"] else "[dim]○[/dim]"
-                    console.print(f"  {marker}  [cyan]{short}[/cyan]  [dim]{m['id']}[/dim]")
-                console.print("[dim]Ketik /model <nama> untuk switch[/dim]")
-            else:
+            if arg:
+                models = agent.router.model_aliases()
                 target = None
                 for m in models:
                     short = m["id"].split("/")[-1] if "/" in m["id"] else m["id"]
@@ -128,6 +121,24 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
                     console.print(f"[green]Model aktif: {short}[/green]")
                 else:
                     console.print(f"[red]Model '{arg}' tidak ditemukan.[/red]")
+            else:
+                from autokeren.models.cloudflare import fetch_available_models
+                from autokeren.selector import select_option
+
+                all_models = fetch_available_models(cfg)
+                current = agent.router.current_model_id()
+                for m in all_models:
+                    m["active"] = m["id"] == current
+
+                idx = select_option(all_models, title="Pilih Model", console=console)
+                if idx is not None:
+                    chosen = all_models[idx]["id"]
+                    from autokeren.models.cloudflare import resolve_model_id
+                    resolved = resolve_model_id(chosen, agent.router.models[0].auth_mode)
+                    agent.router.switch_model(resolved)
+                    console.print(f"[green]Model aktif: {all_models[idx]['name']} ({chosen})[/green]")
+                else:
+                    console.print("[dim]Dibatalkan.[/dim]")
             continue
         if user_input == "/status":
             console.print_json(json.dumps(agent.status()))
@@ -241,7 +252,7 @@ def main() -> int:
     parser.add_argument("--plan", action="store_true", help="Start in plan mode")
     parser.add_argument("--project-root", default=".", help="Project root path")
     parser.add_argument("--workspace", "-w", dest="project_root", help="Alias for --project-root")
-    parser.add_argument("--model", "-m", choices=["glm", "kimi"], help="Override primary model alias for this run")
+    parser.add_argument("--model", "-m", help="Override primary model (alias atau @cf/... ID)")
     parser.add_argument("prompt", nargs="?", help="Single prompt to run non-interactively")
     args = parser.parse_args()
 
@@ -286,10 +297,12 @@ def main() -> int:
     cfg = load_config(Path(args.config)) if args.config else ensure_config()
     if args.plan:
         cfg.autokeren.plan_mode = True
-    if args.model == "kimi":
-        cfg.cloudflare.primary_model = "kimi-2.6" if cfg.auth.mode == "platform" else "@cf/moonshotai/kimi-k2.7-code"
-    elif args.model == "glm":
-        cfg.cloudflare.primary_model = "llama-3.3-70b" if cfg.auth.mode == "platform" else "@cf/zai-org/glm-5.2"
+    if args.model:
+        from autokeren.models.cloudflare import resolve_model_id
+        if cfg.auth.mode == "platform":
+            cfg.cloudflare.primary_model = resolve_model_id(args.model, "platform")
+        else:
+            cfg.cloudflare.primary_model = args.model
 
     project_root = Path(args.project_root).expanduser().resolve()
     memory = MemoryManager(str(project_root))

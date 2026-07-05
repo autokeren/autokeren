@@ -58,6 +58,33 @@ class ModelRouter:
                 return True
         return False
 
+    def switch_model(self, model_id: str) -> bool:
+        """Switch primary ke model_id. Kalau belum ada, buat instance baru."""
+        if self.set_primary(model_id):
+            return True
+
+        base = self.models[0]
+        from autokeren.models.cloudflare import resolve_model_id
+        resolved = resolve_model_id(model_id, base.auth_mode)
+        new_model = CloudflareModel(
+            account_id=base.account_id,
+            api_token=base.api_token,
+            api_key=base.api_key,
+            model_id=resolved,
+            base_url=base.base_url,
+            timeout=base.timeout,
+            retry_policy=base.retry_policy,
+            auth_mode=base.auth_mode,
+        )
+        self.models.insert(0, new_model)
+        self.breakers.setdefault(resolved, CircuitBreaker(
+            failure_threshold=self.cfg.retry.circuit_failure_threshold,
+            open_seconds=float(self.cfg.retry.circuit_open_seconds),
+        ))
+        if len(self.models) > 5:
+            self.models = self.models[:5]
+        return True
+
     def current_model_id(self) -> str:
         return self.models[0].model_id if self.models else "?"
 

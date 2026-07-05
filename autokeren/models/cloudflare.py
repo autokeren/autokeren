@@ -32,6 +32,28 @@ def resolve_model_id(model_id: str, auth_mode: str) -> str:
     return _PLATFORM_MODEL_MAP.get(model_id, "kimi-2.6")
 
 
+def fetch_available_models(cfg) -> list[dict[str, Any]]:
+    """Fetch model list dari API. Return list of {id, name, provider, tier, context, desc, icon}.
+
+    Platform mode: GET {base_url}/v1/models (public, no auth needed)
+    Direct mode: return hardcoded list dari _PLATFORM_MODEL_MAP keys
+    """
+    if cfg.auth.mode == "platform":
+        try:
+            url = f"{cfg.auth.base_url}/v1/models"
+            resp = httpx.get(url, timeout=10.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                return data.get("data", [])
+        except Exception:
+            pass
+
+    return [
+        {"id": mid, "name": alias, "provider": "Cloudflare", "tier": "direct", "context": 0, "desc": "", "icon": ""}
+        for mid, alias in _PLATFORM_MODEL_MAP.items()
+    ]
+
+
 class CloudflareAIError(Exception):
     def __init__(self, message: str, status: int | None = None, response: dict | None = None):
         super().__init__(message)
