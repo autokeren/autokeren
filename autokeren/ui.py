@@ -67,12 +67,14 @@ class AgentUI:
         self._allow_all: bool = False
         self._allowed_tools: set[str] = set()
         self._last_render_time: float = 0.0
+        self.mermaid_render: bool = False
+        self._last_mermaid_blocks: list[str] = []
 
     # ------------------------------------------------------------------ #
     # Banner
     # ------------------------------------------------------------------ #
 
-    def show_banner(self, version: str = "0.3.9") -> None:
+    def show_banner(self, version: str = "0.4.0") -> None:
         full_art = pyfiglet.figlet_format("AUTOKEREN", font="slant").rstrip("\n").split("\n")
         auto_art = pyfiglet.figlet_format("AUTO", font="slant").rstrip("\n").split("\n")
         colored = Text()
@@ -280,8 +282,21 @@ class AgentUI:
         if not resp.content:
             return
         self.console.print(_sep())
-        _render_markdown(resp.content, self.console)
+        _render_markdown(resp.content, self.console, mermaid_render=self.mermaid_render, store_blocks=self)
         self.console.print(_sep())
+
+    def render_last_diagram(self) -> None:
+        """Render diagram terakhir sebagai image (dipanggil via /diagram)."""
+        if not self._last_mermaid_blocks:
+            self.console.print("[dim]Belum ada diagram di session ini.[/dim]")
+            return
+        self.console.print()
+        for i, block in enumerate(self._last_mermaid_blocks):
+            self.console.print(f"  [bold blue]🖼️ Diagram {i + 1}[/bold blue]")
+            from autokeren.mermaid import _try_render_image, render_mermaid_text
+            if not _try_render_image(block, self.console):
+                render_mermaid_text(block, self.console)
+            self.console.print()
 
     # ------------------------------------------------------------------ #
     # Cleanup
@@ -315,24 +330,23 @@ def _sep() -> Text:
     return Text("─" * 60, style="dim #555555")
 
 
-def _render_markdown(text: str, console: Console) -> None:
+def _render_markdown(text: str, console: Console, mermaid_render: bool = False, store_blocks: "AgentUI | None" = None) -> None:
     """Render text sebagai rich Markdown dengan tema autokeren.
-    
-    Mermaid blocks di-strip dulu, dirender terpisah sebagai diagram.
-    """
-    from autokeren.mermaid import extract_and_render
 
-    # Strip mermaid blocks, simpan placeholder
+    Mermaid blocks di-strip dulu, dirender terpisah sebagai diagram (kalau mermaid_render=True).
+    """
     mermaid_blocks = _MERMAID_RE.findall(text)
     clean_text = _MERMAID_RE.sub("", text).strip()
-    
-    # Render markdown (tanpa mermaid)
+
+    if store_blocks is not None:
+        store_blocks._last_mermaid_blocks = mermaid_blocks
+
     if clean_text:
         md = Markdown(clean_text, code_theme="monokai")
         console.print(md)
-    
-    # Render mermaid blocks terpisah
-    if mermaid_blocks:
+
+    if mermaid_render and mermaid_blocks:
+        from autokeren.mermaid import extract_and_render
         extract_and_render(text, console)
 
 

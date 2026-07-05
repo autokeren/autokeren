@@ -35,3 +35,4 @@ autokeren:
   auto_compact: false         # auto-compact saat threshold tercapai
   auto_compact_threshold: 0.8 # compact di 80% usage
   max_tool_calls: 0           # 0 = unlimited (batas alami: context window + neuron quota)
+  mermaid_render: false       # render mermaid sebagai image (false = code block only, /diagram untuk manual)

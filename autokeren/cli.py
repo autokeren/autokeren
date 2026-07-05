@@ -110,7 +110,7 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
         if user_input in ("/quit", "/q"):
             break
         if user_input == "/help":
-            console.print("Perintah: /q /status /model /compact /reset /memory /permissions /save /resume /sessions")
+            console.print("Perintah: /q /status /model /compact /reset /memory /permissions /save /resume /sessions /diagram")
             continue
         if user_input == "/model" or user_input.startswith("/model "):
             arg = user_input[6:].strip()
@@ -157,6 +157,9 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
             agent.reset()
             ui.reset_permissions()
             console.print("Sesi direset. Permission juga direset.")
+            continue
+        if user_input == "/diagram":
+            ui.render_last_diagram()
             continue
         if user_input == "/permissions":
             ps = ui.permission_status()
@@ -331,7 +334,7 @@ def main() -> int:
     agent.permission_callback = ui.confirm_permission
 
     if args.prompt:
-        ui.show_banner(__version__)
+        ui.mermaid_render = cfg.autokeren.mermaid_render
         ui._allow_all = True  # auto-approve all tools in non-interactive mode
         try:
             resp = agent.run(args.prompt)

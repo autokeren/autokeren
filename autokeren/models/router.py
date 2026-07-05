@@ -116,8 +116,7 @@ class ModelRouter:
             except CloudflareAIError as e:
                 last_error = e
                 self.breakers[model.model_id].record_failure()
-                if e.status != 429:
-                    continue
+                continue
         raise last_error or RuntimeError("all models failed")
 
     def status(self) -> dict[str, Any]:

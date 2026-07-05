@@ -52,7 +52,8 @@ class AutokerenConfig(BaseModel):
     auto_compact_threshold: float = 0.8
     memory_enabled: bool = True
     auto_save_session: bool = False
-    max_tool_calls: int = 0  # 0 = unlimited, batas alami: context window + neuron quota
+    max_tool_calls: int = 0  # 0 = unlimited (batas alami: context window + neuron quota)
+    mermaid_render: bool = False  # render mermaid sebagai image (false = code block only)
 
 
 class CamofoxConfig(BaseModel):
