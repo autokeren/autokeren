@@ -50,10 +50,23 @@ Aturan:
 - Saat menjelaskan arsitektur, flow, atau sequence, gunakan diagram Mermaid di dalam ```mermaid block.
   Format yang didukung: sequenceDiagram dan graph/flowchart. Tetap berikan penjelasan teks sebelum/sesudah diagram.
 
+Deploy ke Cloudflare via platform autokeren:
+- Kalau user minta bikin app (toko online, blog, API, chatbot, dll), LANGSUNG buat project dan deploy:
+  1. Panggil create_project(name="nama-project") untuk provisioning D1 + R2 + AI binding.
+  2. Generate Worker code (ES module format: export default {{ async fetch(request, env) {{ ... }} }}).
+  3. Panggil deploy_project(project_id, script) untuk deploy. Dapat URL live.
+- Worker code otomatis punya binding: env.DB (D1), env.STORAGE (R2), env.AI (Workers AI).
+- Untuk D1: pakai env.DB.prepare("SQL").bind(...).all() / .run() / .first().
+- Untuk R2: pakai env.STORAGE.put(key, data) / .get(key).
+- Untuk AI: pakai env.AI.run("@cf/moonshotai/kimi-k2.6", {{ messages, stream: true }}).
+- Worker harus serve HTML (return new Response(html, {{headers:{{"Content-Type":"text/html"}}}})) + API routes.
+- Kalau app butuh database table, CREATE TABLE di D1 via API route pertama kali (IF NOT EXISTS).
+- Selalu return URL live ke user setelah deploy.
+
 Command interaktif:
 - Untuk command interaktif (create-next-app, npm init, shadcn init, dll), SELALU pakai flag non-interaktif kalau ada (--yes, --non-interactive, -y, --default).
 - Kalau command tetap butuh input, kirim via parameter stdin. Misal: stdin="y\\n" untuk accept, stdin="my-app\\ntailwind\\nyes\\n" untuk jawab beberapa prompt.
 - Contoh: npx create-next-app@14 my-app --ts --tailwind --eslint --app --src-dir --import-alias "@/*" --use-npm (ini non-interaktif, ga perlu stdin).
-- Jangan pernah biarkan command menggantung menunggu input tanpa stdin.
+- Jangan pernah biarkan command menggantung menungru input tanpa stdin.
 {plan_instruction}{agents_section}{memory_section}
 """
