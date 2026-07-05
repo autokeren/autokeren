@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from autokeren.security import is_sensitive_read_path, is_sensitive_write_path
 from autokeren.tools.base import Tool, ToolResult
 from autokeren.utils import make_backup
 
@@ -31,6 +32,9 @@ class ReadFileTool(Tool):
 
     def run(self, path: str, offset: int = 1, limit: int = 200, **_) -> ToolResult:
         target = self._resolve(path)
+        blocked, reason = is_sensitive_read_path(target)
+        if blocked:
+            return ToolResult(error=reason, ok=False)
         if not target.exists():
             return ToolResult(error=f"file not found: {path}", ok=False)
         try:
@@ -68,6 +72,9 @@ class WriteFileTool(Tool):
 
     def run(self, path: str, content: str, **_) -> ToolResult:
         target = self._resolve(path)
+        blocked, reason = is_sensitive_write_path(target)
+        if blocked:
+            return ToolResult(error=reason, ok=False)
         target.parent.mkdir(parents=True, exist_ok=True)
         bak = make_backup(target) if target.exists() else None
         try:
@@ -107,6 +114,9 @@ class PatchFileTool(Tool):
 
     def run(self, path: str, old_string: str, new_string: str, **_) -> ToolResult:
         target = self._resolve(path)
+        blocked, reason = is_sensitive_write_path(target)
+        if blocked:
+            return ToolResult(error=reason, ok=False)
         if not target.exists():
             return ToolResult(error=f"file not found: {path}", ok=False)
         try:

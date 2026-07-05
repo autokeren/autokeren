@@ -33,6 +33,8 @@ class Agent:
         self._build_system_prompt()
         self.context.messages.append({"role": "system", "content": self._system_prompt})
         self.plan_approved = not cfg.autokeren.plan_mode
+        self._tool_call_count = 0
+        self._max_tool_calls = 50
 
         # Opt-in UI callbacks (wired by CLI). Default None = no-op.
         self.on_model_start: Callable[[], None] | None = None
@@ -89,6 +91,11 @@ class Agent:
 
             self.context.add_assistant(resp)
             for tc in resp.tool_calls:
+                self._tool_call_count += 1
+                if self._tool_call_count > self._max_tool_calls:
+                    limit_msg = ToolResult(error=f"batas tool call tercapai ({self._max_tool_calls}). Selesaikan tanpa tool.", ok=False)
+                    self.context.add_tool_result(tc.id, tc.name, limit_msg.to_dict(), False)
+                    return ModelResponse(content=f"Batas {self._max_tool_calls} tool call tercapai. Selesaikan tugas dengan informasi yang sudah ada.")
                 needs_perm, desc = self.tools.check_permission(tc.name, tc.arguments)
                 if needs_perm:
                     allowed = self.permission_callback(tc.name, desc, tc.arguments) if self.permission_callback else True
