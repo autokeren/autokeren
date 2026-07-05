@@ -68,7 +68,7 @@ class AgentUI:
     # Banner
     # ------------------------------------------------------------------ #
 
-    def show_banner(self, version: str = "0.3.3") -> None:
+    def show_banner(self, version: str = "0.3.4") -> None:
         full_art = pyfiglet.figlet_format("AUTOKEREN", font="slant").rstrip("\n").split("\n")
         auto_art = pyfiglet.figlet_format("AUTO", font="slant").rstrip("\n").split("\n")
         colored = Text()
@@ -219,13 +219,15 @@ class AgentUI:
 
         neuron_str = ""
         if neurons_remaining is not None and neurons_quota:
-            if neurons_remaining < neurons_quota * 0.1:
+            neurons_used = neurons_quota - neurons_remaining
+            n_pct = (neurons_used / neurons_quota) * 100 if neurons_quota else 0
+            if n_pct > 80:
                 n_color = "red"
-            elif neurons_remaining < neurons_quota * 0.3:
+            elif n_pct > 50:
                 n_color = "yellow"
             else:
                 n_color = "green"
-            neuron_str = f" [dim]|[/dim] [{n_color}]neurons {neurons_remaining:,}/{neurons_quota:,}[/{n_color}]"
+            neuron_str = f" [dim]|[/dim] [{n_color}]neurons {neurons_used:,}/{neurons_quota:,} ({n_pct:.0f}%)[/{n_color}]"
 
         self.console.print(
             f"  [dim][{color}]{model}[/{color}] "
