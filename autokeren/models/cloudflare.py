@@ -11,15 +11,13 @@ from autokeren.models.base import Message, ModelResponse, TokenUsage, ToolCall
 from autokeren.models.retry import RetryPolicy, retry_call
 
 _PLATFORM_MODEL_MAP: dict[str, str] = {
-    "@cf/moonshotai/kimi-k2.7-code": "kimi-2.6",
+    "@cf/moonshotai/kimi-k2.7-code": "kimi-code",
     "@cf/moonshotai/kimi-k2.6": "kimi-2.6",
-    "@cf/zai-org/glm-5.2": "llama-3.3-70b",
-    "@cf/meta/llama-3.3-70b-instruct-fp8-fast": "llama-3.3-70b",
-    "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b": "deepseek-r1",
-    "@cf/meta/llama-3.2-3b-instruct": "llama-3-8b",
-    "@cf/google/gemma-4-26b-a4b-it": "gemma-2-27b",
-    "@cf/qwen/qwq-32b": "qwen-2.5-72b",
-    "@cf/qwen/qwen2.5-coder-32b-instruct": "qwen-2.5-72b",
+    "@cf/zai-org/glm-5.2": "glm-5.2",
+    "@cf/zai-org/glm-4.7-flash": "glm-flash",
+    "@cf/meta/llama-4-scout-17b-16e-instruct": "llama-4-scout",
+    "@cf/google/gemma-4-26b-a4b-it": "gemma-4",
+    "@cf/nvidia/nemotron-3-120b-a12b": "nemotron",
 }
 
 
