@@ -130,7 +130,7 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
                 for m in all_models:
                     m["active"] = m["id"] == current
 
-                idx = select_option(all_models, title="Pilih Model", console=console)
+                idx = select_option(all_models, title="Pilih Model")
                 if idx is not None:
                     chosen = all_models[idx]["id"]
                     from autokeren.models.cloudflare import resolve_model_id
