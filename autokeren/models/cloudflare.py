@@ -314,7 +314,7 @@ class CloudflareModel:
         policy = self.retry_policy or RetryPolicy()
 
         def _call():
-            if on_chunk is not None and not tools:
+            if on_chunk is not None:
                 try:
                     return self._stream_once(messages, tools=tools, on_chunk=on_chunk, **params)
                 except CloudflareAIError:
@@ -410,7 +410,7 @@ class CloudflareModel:
             try:
                 args = json.loads(tc["arguments"]) if tc["arguments"] else {}
             except json.JSONDecodeError:
-                args = {}
+                args = _extract_partial_args(tc["arguments"]) if tc["arguments"] else {}
             tool_calls.append(ToolCall(id=tc["id"], name=tc["name"], arguments=args))
 
         return ModelResponse(
