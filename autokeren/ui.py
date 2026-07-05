@@ -68,7 +68,7 @@ class AgentUI:
     # Banner
     # ------------------------------------------------------------------ #
 
-    def show_banner(self, version: str = "0.3.0") -> None:
+    def show_banner(self, version: str = "0.3.1") -> None:
         full_art = pyfiglet.figlet_format("AUTOKEREN", font="slant").rstrip("\n").split("\n")
         auto_art = pyfiglet.figlet_format("AUTO", font="slant").rstrip("\n").split("\n")
         colored = Text()
@@ -111,10 +111,6 @@ class AgentUI:
 
     def on_model_end(self, resp: "ModelResponse") -> None:
         self._stop_all()
-        if self._did_stream and self._stream_text.strip():
-            self.console.print(_sep())
-            _render_markdown(self._stream_text, self.console)
-            self.console.print(_sep())
         self._stream_text = ""
 
     # ------------------------------------------------------------------ #
