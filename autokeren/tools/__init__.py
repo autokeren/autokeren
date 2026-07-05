@@ -5,6 +5,7 @@ from autokeren.tools.cf_infra import CloudflareD1Tool, CloudflareKVTool
 from autokeren.tools.cloudflare import CloudflareBuildTool, CloudflareDeployTool
 from autokeren.tools.file import ListFilesTool, PatchFileTool, ReadFileTool, WriteFileTool
 from autokeren.tools.git import GitCommitTool, GitDiffTool, GitStatusTool
+from autokeren.tools.project import CreateProjectTool, DeployProjectTool, ListProjectsTool
 from autokeren.tools.remember import RememberTool
 from autokeren.tools.search import SearchCodeTool
 from autokeren.tools.shell import ShellTool
@@ -34,4 +35,7 @@ __all__ = [
     "TmuxTool",
     "TodoTool",
     "RememberTool",
+    "CreateProjectTool",
+    "DeployProjectTool",
+    "ListProjectsTool",
 ]

@@ -21,11 +21,14 @@ from autokeren.tools import (
     CloudflareD1Tool,
     CloudflareDeployTool,
     CloudflareKVTool,
+    CreateProjectTool,
+    DeployProjectTool,
     FetchURLTool,
     GitCommitTool,
     GitDiffTool,
     GitStatusTool,
     ListFilesTool,
+    ListProjectsTool,
     PatchFileTool,
     ReadFileTool,
     RememberTool,
@@ -61,6 +64,10 @@ def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegist
     reg.register(TmuxTool(project_root))
     reg.register(TodoTool())
     reg.register(RememberTool(memory))
+    if cfg.auth.mode == "platform":
+        reg.register(CreateProjectTool(cfg))
+        reg.register(DeployProjectTool(cfg))
+        reg.register(ListProjectsTool(cfg))
     return reg
 
 
