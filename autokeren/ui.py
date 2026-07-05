@@ -6,6 +6,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 import pyfiglet
+from rich._spinners import SPINNERS  # type: ignore
 from rich.align import Align
 from rich.console import Console, Group
 from rich.live import Live
@@ -15,6 +16,8 @@ from rich.prompt import Prompt
 from rich.status import Status
 from rich.text import Text
 from rich.theme import Theme
+
+SPINNERS["mikir"] = {"interval": 350, "frames": ["mikir .  ", "mikir .. ", "mikir ..."]}
 
 if TYPE_CHECKING:
     from autokeren.models.base import ModelResponse
@@ -68,7 +71,7 @@ class AgentUI:
     # Banner
     # ------------------------------------------------------------------ #
 
-    def show_banner(self, version: str = "0.3.4") -> None:
+    def show_banner(self, version: str = "0.3.8") -> None:
         full_art = pyfiglet.figlet_format("AUTOKEREN", font="slant").rstrip("\n").split("\n")
         auto_art = pyfiglet.figlet_format("AUTO", font="slant").rstrip("\n").split("\n")
         colored = Text()
@@ -90,7 +93,7 @@ class AgentUI:
         self._stop_all()
         self._stream_text = ""
         self._did_stream = False
-        self._status = self.console.status("[dim]mikir…[/dim]", spinner="dots")
+        self._status = self.console.status("[dim]mikir[/dim]", spinner="mikir")
         self._status.start()
 
     def on_chunk(self, text: str) -> None:
@@ -107,7 +110,7 @@ class AgentUI:
         self._did_stream = True
         self._stream_text += text
         if self._live is not None:
-            self._live.update(Text(self._stream_text, no_wrap=False))
+            self._live.update(Markdown(self._stream_text, code_theme="monokai"))
 
     def on_model_end(self, resp: "ModelResponse") -> None:
         self._stop_all()
@@ -120,7 +123,7 @@ class AgentUI:
     def on_tool_start(self, name: str, arguments: dict) -> None:
         self._stop_all()
         if self._stream_text.strip():
-            self.console.print(self._stream_text.rstrip())
+            self.console.print(Markdown(self._stream_text.rstrip(), code_theme="monokai"))
             self._stream_text = ""
         label = _format_tool_call(name, arguments)
         self.console.print(f"  [bold cyan]⏺[/bold cyan] {label}")
