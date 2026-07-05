@@ -96,9 +96,12 @@ class DeployProjectTool(Tool):
             script = p.read_text(encoding="utf-8")
         if not script:
             return ToolResult(error="Either file_path atau script harus diisi.", ok=False)
-        from autokeren.signing import check_signed, sign_content
-        if not check_signed(file_path or "worker.js", script):
-            script = sign_content(file_path or "worker.js", script)
+        try:
+            from autokeren.signing import check_signed, sign_content
+            if not check_signed(file_path or "worker.js", script):
+                script = sign_content(file_path or "worker.js", script)
+        except ImportError:
+            pass
         try:
             r = httpx.post(
                 f"{self.cfg.auth.base_url}/v1/projects/{project_id}/deploy",

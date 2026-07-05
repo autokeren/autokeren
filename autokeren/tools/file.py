@@ -3,9 +3,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from autokeren.signing import check_signed, sign_content
 from autokeren.tools.base import Tool, ToolResult
 from autokeren.utils import make_backup
+
+try:
+    import autokeren.signing as _signing
+    _HAS_SIGNING = True
+except ImportError:
+    _HAS_SIGNING = False
 
 
 class ReadFileTool(Tool):
@@ -66,8 +71,9 @@ class WriteFileTool(Tool):
         target.parent.mkdir(parents=True, exist_ok=True)
         bak = make_backup(target) if target.exists() else None
         try:
-            if not check_signed(str(target), content):
-                content = sign_content(path, content)
+            if _HAS_SIGNING:
+                if not _signing.check_signed(str(target), content):
+                    content = _signing.sign_content(path, content)
             target.write_text(content, encoding="utf-8")
             lines = content.count("\n") + (1 if content and not content.endswith("\n") else 0)
             return ToolResult(output={"path": str(target), "lines": lines, "backup": str(bak) if bak else None})
