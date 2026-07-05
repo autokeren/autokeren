@@ -34,4 +34,4 @@ autokeren:
   compact_tail_turns: 6       # pesan terakhir yang dipertahankan saat /compact
   auto_compact: false         # auto-compact saat threshold tercapai
   auto_compact_threshold: 0.8 # compact di 80% usage
-  max_tool_calls: 200         # maksimum tool call per sesi
+  max_tool_calls: 0           # 0 = unlimited (batas alami: context window + neuron quota)
