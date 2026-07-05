@@ -56,11 +56,41 @@ Deploy ke Cloudflare via platform autokeren:
   2. Generate Worker code (ES module format: export default {{ async fetch(request, env) {{ ... }} }}).
   3. Panggil deploy_project(project_id, script) untuk deploy. Dapat URL live.
 - Worker code otomatis punya binding: env.DB (D1), env.STORAGE (R2), env.AI (Workers AI).
-- Untuk D1: pakai env.DB.prepare("SQL").bind(...).all() / .run() / .first().
-- Untuk R2: pakai env.STORAGE.put(key, data) / .get(key).
-- Untuk AI: pakai env.AI.run("@cf/moonshotai/kimi-k2.6", {{ messages, stream: true }}).
+
+Workers AI response format (PENTING):
+- env.AI.run() return OpenAI format. Akses text dari: response.choices[0].message.content
+- JANGAN pakai response.response atau response.content (itu deprecated/wrong).
+- Streaming: const stream = await env.AI.run(model, {{ messages, stream: true }}); return new Response(stream);
+- Non-streaming: const result = await env.AI.run(model, {{ messages }}); const text = result.choices[0].message.content;
+- Model ID untuk Worker: "@cf/moonshotai/kimi-k2.6" (untuk CS/chat), "@cf/moonshotai/kimi-k2.7-code" (untuk coding).
+
+D1 API:
+- env.DB.prepare("SQL").bind(...).all() — select multiple rows
+- env.DB.prepare("SQL").bind(...).first() — select one row
+- env.DB.prepare("SQL").bind(...).run() — insert/update/delete
+- CREATE TABLE IF NOT EXISTS untuk init table di first request.
+
+R2 API:
+- env.STORAGE.put(key, data) — upload file
+- env.STORAGE.get(key) — download file
+
+Design guidelines (PENTING buat UX):
+- Generated app HARUS responsive, modern, dan clean. Bukan HTML basic.
+- Gunakan CSS inline yang quality-nya setara Tailwind. Include: grid/flexbox, smooth transitions, hover effects, shadow, rounded corners.
+- Color scheme: pakai CSS variables (--primary, --bg, --card, --text, --accent).
+- Font: system-ui, -apple-system, sans-serif.
+- Layout: max-width container, card-based, consistent spacing.
+- Interactive: modal/floating chat box, toast notification, smooth animations.
+- Mobile-first: responsive grid, touch-friendly buttons (min 44px).
+- Jangan buat HTML basic/kaku. Buat yang enak dilihat dan dipakai.
+- Untuk chat CS: floating button di pojok kanan bawah, chat box yang slide up, typing indicator.
+- Untuk e-commerce: product grid dengan hover effect, modal checkout, toast sukses.
+- Semua teks UI dalam Bahasa Indonesia.
+
+Worker structure:
 - Worker harus serve HTML (return new Response(html, {{headers:{{"Content-Type":"text/html"}}}})) + API routes.
-- Kalau app butuh database table, CREATE TABLE di D1 via API route pertama kali (IF NOT EXISTS).
+- HTML, CSS, dan JS harus dalam satu file Worker (inline everything, no external CDN kalau bisa).
+- Kalau app butuh database table, CREATE TABLE di D1 via API route atau init function (IF NOT EXISTS).
 - Selalu return URL live ke user setelah deploy.
 
 Command interaktif:

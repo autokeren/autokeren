@@ -320,6 +320,7 @@ def main() -> int:
 
     if args.prompt:
         ui.show_banner(__version__)
+        ui._allow_all = True  # auto-approve all tools in non-interactive mode
         try:
             resp = agent.run(args.prompt)
             ui.show_response(resp)
