@@ -56,3 +56,6 @@ logs/
 htmlcov/
 .pytest_cache/
 .mypy_cache/
+
+# Private docs (internal only, jangan push ke public repo)
+docs/private/

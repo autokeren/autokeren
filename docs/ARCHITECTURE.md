@@ -1,185 +1,155 @@
 # autokeren Architecture
 
-A custom agentic coding CLI built for the Cloudflare-first stack used by Dialro, AutoKeren, and CeritaSuaraIbu.
+## Overview
 
-## Goals
-- Be better than generic agents (opencode / Claude Code / aider) for our specific stack.
-- Native Cloudflare Workers AI models: GLM 5.2 and Kimi K2.7-Code.
-- Resilient inference: auto-retry, model fallback, circuit breaker, cost tracking.
-- Native e2e automation through Camofox (localhost:9377).
-- Native deployment through Wrangler / next-on-pages.
-- Native long-running supervision through tmux.
-- Transparent config: every line is human-readable YAML.
+autokeren adalah ekosistem developer platform Cloudflare-first untuk Indonesia.
 
-## Stack
-- Python 3.11+
-- `httpx` for HTTP/2 streaming
-- `rich` for terminal UI
-- `pydantic` for config + tool schemas
-- `pyyaml` for config
-- `strictyaml` optional later for validation
-- standard library only for core tools
+```
+User (CLI / Web)
+  ↓ API key
+API Gateway (Workers) ─── D1 (auth, usage, projects)
+  ↓ CF API Token          KV (rate limit)
+Cloudflare (Workers AI, D1, R2, Pages, Workers)
+```
 
-## Project Layout
+## Components
+
+### 1. CLI (`autokeren/`)
+- Bahasa: Python 3.11+
+- Entry: `autokeren` command
+- Agent loop: model call → tool dispatch → iterate
+- 20 tools: file, shell, search, git, camofox, cf_deploy, cf_kv, cf_d1, tmux, todo, remember, create_project (soon), deploy_project (soon)
+- Dual auth: platform (API key) atau direct (CF credentials)
+- UI: rich-based, inline streaming, status bar, permission system
+- Mermaid renderer: visual boxes + arrows di terminal
+- Model selector: fetch dari API, nomor + enter
+
+### 2. API Gateway (`autokeren-dev-api`)
+- Runtime: Cloudflare Workers
+- URL: `api.developers.autokeren.com`
+- Endpoints:
+  - `GET /v1/models` — list model metadata (public)
+  - `POST /v1/chat/completions` — AI inference (auth, streaming, tool calls)
+  - `GET /v1/usage` — usage stats (auth)
+  - `POST /v1/projects` — create project (soon, auth)
+  - `POST /v1/projects/:id/deploy` — deploy worker (soon, auth)
+- Bindings: D1 (DB), KV (RATE_LIMIT), AI (Workers AI)
+- Model management: D1 `system_settings` table (free_models, pro_models, model_aliases, models_metadata)
+
+### 3. Web Dashboard (`developers.autokeren.com`)
+- Runtime: Cloudflare Pages (Next.js)
+- Features: API key management, usage stats, project dashboard (soon), admin panel
+- Auth: NextAuth
+
+## Data Flow
+
+### AI Inference (with tool calls)
+```
+CLI → POST /v1/chat/completions {model, messages, tools, stream}
+  ↓
+API Gateway:
+  1. Validate API key → D1
+  2. Check rate limit → KV
+  3. Resolve alias → D1 system_settings
+  4. Check model access by tier
+  5. Forward to env.AI.run(model, {messages, tools, stream})
+  6. Return response (streaming SSE atau JSON)
+  ↓
+CLI parses response:
+  - Text: on_chunk callback → terminal
+  - Tool calls: parse tc.function.name + arguments
+  - Execute tool → append result → loop
+```
+
+### Project Deploy (planned)
+```
+CLI → POST /v1/projects {name}
+  ↓
+API Gateway:
+  1. Validate API key
+  2. Create D1 database (wrangler d1 create)
+  3. Create R2 bucket (wrangler r2 bucket create)
+  4. Insert project record → D1
+  5. Return {project_id, d1_id, r2_bucket}
+  ↓
+CLI → POST /v1/projects/:id/deploy {script}
+  ↓
+API Gateway:
+  1. Upload Worker script (CF API)
+  2. Set bindings: D1, R2, AI
+  3. Enable workers.dev subdomain
+  4. Return {url: "https://{worker}.workers.dev"}
+```
+
+## Project Layout (CLI)
 ```
 autokeren/
 ├── pyproject.toml
 ├── README.md
+├── AGENTS.md
 ├── docs/
-│   └── ARCHITECTURE.md
+│   ├── ARCHITECTURE.md     — this file
+│   ├── ECOSYSTEM.md        — vision & ecosystem
+│   ├── JOURNEY.md          — timeline & milestones
+│   ├── ROADMAP.md          — feature priorities
+│   ├── DECISIONS.md        — ADR
+│   └── RUNBOOK.md          — operations guide
 ├── autokeren/
 │   ├── __init__.py
-│   ├── __main__.py
-│   ├── cli.py            # entry point, argument parsing, chat loop
-│   ├── config.py         # YAML config load/save/defaults
+│   ├── cli.py              — entry, REPL, slash commands
+│   ├── config.py           — YAML config, pydantic
+│   ├── agent.py            — ReAct loop, tool dispatch
+│   ├── context.py          — session memory, token tracking
+│   ├── memory.py           — cross-session persistent memory
+│   ├── session.py          — save/resume session
+│   ├── prompts.py          — system prompt builder
+│   ├── ui.py               — rich UI, streaming, permissions
+│   ├── utils.py            — helpers (redact, dangerous cmd)
+│   ├── selector.py         — model selector
+│   ├── mermaid.py          — mermaid block detection
+│   ├── diagram.py          — visual box-drawing renderer
 │   ├── models/
-│   │   ├── __init__.py
-│   │   ├── base.py       # Message, TokenUsage, ModelResponse
-│   │   ├── router.py     # multi-model fallback + cost tracking
-│   │   ├── retry.py      # RetryPolicy, circuit breaker, jitter
-│   │   └── cloudflare.py # Cloudflare Workers AI client
-│   ├── agent.py          # ReAct loop, streaming, plan/execute mode
-│   ├── context.py        # project indexing, memory, cost/session state
-│   ├── tools/
-│   │   ├── __init__.py
-│   │   ├── base.py       # Tool, ToolResult, registry
-│   │   ├── file.py       # read, write, patch, list
-│   │   ├── shell.py      # execute shell commands
-│   │   ├── search.py     # grep/ripgrep wrapper
-│   │   ├── web.py        # fetch web pages
-│   │   ├── git.py        # git status, diff, commit helpers
-│   │   ├── camofox.py    # Camofox REST bridge e2e tool
-│   │   ├── cloudflare.py # wrangler/next-on-pages deploy helpers
-│   │   └── tmux.py       # tmux session/pane supervisor
-│   ├── prompts.py        # system prompt(s)
-│   └── utils.py          # small helpers
+│   │   ├── base.py         — Message, ModelResponse, ToolCall
+│   │   ├── cloudflare.py   — Workers AI client, dual auth
+│   │   ├── router.py       — multi-model fallback + circuit breaker
+│   │   └── retry.py        — exponential backoff
+│   └── tools/
+│       ├── base.py         — Tool ABC, ToolResult, ToolRegistry
+│       ├── file.py         — read, write, patch, list
+│       ├── shell.py        — pty-based shell execution
+│       ├── search.py       — ripgrep wrapper
+│       ├── web.py          — fetch URL (SSRF-safe)
+│       ├── git.py          — git status, diff, commit
+│       ├── camofox.py      — e2e browser automation
+│       ├── cloudflare.py   — wrangler deploy, build
+│       ├── cf_infra.py     — KV, D1 operations
+│       ├── tmux.py         — session supervisor
+│       ├── todo.py         — task list
+│       └── remember.py     — memory storage
 └── tests/
-    └── test_placeholder.py
+    ├── test_tools.py       — 57 tests
+    ├── test_mermaid.py     — 10 tests
+    └── test_session.py     — 8 tests
 ```
 
-## Model Abstraction
-### Message format
-OpenAI-compatible:
-```python
-{"role": "system" | "user" | "assistant" | "tool", "content": str, "name?": str, "tool_call_id?": str}
-```
+## Models
 
-### Cloudflare Workers AI client
-- Endpoint: `POST /client/v4/accounts/{account_id}/ai/run/{model_id}`
-- Streaming supported through `text/event-stream` for some models; fallback to JSON.
-- Supports `tools` array and `tool_choice: "auto"`.
-- Model IDs default to:
-  - `@cf/moonshotai/kimi-k2.7-code`
-  - `@cf/zai-org/glm-5.2`
+| Alias | CF Model ID | Provider | Context |
+|---|---|---|---|
+| `kimi-code` | `@cf/moonshotai/kimi-k2.7-code` | Moonshot AI | 262K |
+| `kimi-2.6` | `@cf/moonshotai/kimi-k2.6` | Moonshot AI | 262K |
+| `glm-5.2` | `@cf/zai-org/glm-5.2` | Zhipu AI | 131K |
+| `glm-flash` | `@cf/zai-org/glm-4.7-flash` | Zhipu AI | 131K |
+| `llama-4-scout` | `@cf/meta/llama-4-scout-17b-16e-instruct` | Meta | 131K |
+| `gemma-4` | `@cf/google/gemma-4-26b-a4b-it` | Google | 8K |
+| `nemotron` | `@cf/nvidia/nemotron-3-120b-a12b` | NVIDIA | 131K |
 
-### Retry policy
-```python
-class RetryPolicy:
-    max_retries: int = 5
-    base_delay: float = 1.0
-    max_delay: float = 60.0
-    exponential_base: float = 2.0
-    jitter: bool = True
-    retry_on: set = {408, 429, 500, 502, 503, 504}
-```
-
-### Model router
-- Primary model attempts first.
-- On 429/5xx/timeout, back off and retry within same model.
-- After local max retries, failover to secondary model.
-- Circuit breaker per model: if 5 failures in 60s, open for 30s.
-- Tracks per-call cost/usage and per-session totals.
-
-## Tool System
-Each tool is a Python class with:
-- `name`: str
-- `description`: str
-- `parameters`: JSON Schema dict
-- `run(**kwargs) -> ToolResult`
-
-Tools are registered in `ToolRegistry` and passed to the model as OpenAI function schemas.
-
-### Built-in tools
-1. **File**
-   - `read_file(path, offset, limit)`
-   - `write_file(path, content)` (with backup)
-   - `patch_file(path, old_string, new_string)`
-   - `list_files(path, recursive)`
-2. **Shell**
-   - `run_shell(command, timeout, workdir)` with allow/blocklist guards
-3. **Search**
-   - `search_code(pattern, path, file_glob)` ( ripgrep )
-4. **Web**
-   - `fetch_url(url)` markdown via local extraction or simple fetch
-5. **Git**
-   - `git_status(path)`
-   - `git_diff(path)`
-   - `git_commit(message, path)`
-6. **Camofox (e2e)**
-   - `camofox_navigate(url, profile)`
-   - `camofox_snapshot(profile)`
-   - `camofox_click(ref, selector, profile)`
-   - `camofox_type(text, ref, selector, press_enter, profile)`
-   - `camofox_eval(expression, profile)`
-   - `camofox_screenshot(profile, save_path)`
-   - `camofox_assert_visible(text_or_selector, profile)`
-7. **Cloudflare deploy**
-   - `cf_deploy_pages(path, project_name)` (wrangler pages deploy)
-   - `cf_deploy_worker(path, name)` (wrangler deploy)
-   - `cf_tailworker(name)` (wrangler tail)
-   - `cf_build_next_on_pages(path)`
-8. **Tmux supervisor**
-   - `tmux_run(command, session, window, background, notify)`
-   - `tmux_capture(session, window, pane, lines)`
-   - `tmux_kill(session)`
-   - `tmux_list()`
-
-## Agent Loop
-- ReAct with tool calls.
-- Streaming raw text deltas; tool calls delivered as artifacts.
-- Max iterations default 25.
-- Plan mode: first respond with a numbered plan, wait for user approval, then execute.
-- After each tool call, a tool result message is appended to context.
-- Context manager trims old messages when near model context limit and keeps a running summary.
-
-## Configuration
-`~/.config/autokeren/config.yaml`:
-```yaml
-cloudflare:
-  account_id: ""
-  api_token: ""   # Cloudflare Workers AI token
-  models:
-    primary: "@cf/moonshotai/kimi-k2.7-code"
-    secondary: "@cf/zai-org/glm-5.2"
-  max_tokens: 4096
-  temperature: 0.3
-
-retry:
-  max_retries: 5
-  base_delay: 1.0
-  max_delay: 60.0
-
-autokeren:
-  plan_mode: false
-  max_iterations: 25
-  shell_timeout: 120
-  shell_allowlist: ["node", "npm", "pnpm", "npx", "git", "wrangler", "python3", "pytest"]
-  project_root: "."
-
-camofox:
-  url: "http://localhost:9377"
-  default_profile: "pulsa"
-  user_id: "ajat"
-```
+Alias mapping di D1 `system_settings.model_aliases`, bisa diubah via admin panel.
 
 ## Security
-- API token stored only in YAML file (0600) and never logged in full.
-- Shell commands use allow/blocklist; dangerous commands blocked unless explicitly trusted.
-- File writes create `.bak` before overwrite.
-- Git working tree checked before auto-commit.
 
-## Roadmap
-1. v0.1: chat loop, file/shell/search/web tools, CF AI client, config.
-2. v0.2: plan mode, git tool, cost tracking, streaming.
-3. v0.3: Camofox e2e tool, Cloudflare deploy tool, tmux supervisor.
-4. v0.4: project indexing, retrieval-augmented context, multi-agent kanban.
+- API key: `ak_live_...` format, stored di D1 dengan hash
+- CF API token: stay di API gateway env, ga pernah dikirim ke CLI
+- Shell commands: hard block (rm -rf /, mkfs, dd) + soft block (sudo, git push --force) via permission system
+- fetch_url: SSRF protection (block private IPs)
+- Config file: 0600 permissions, token redacted di logs
