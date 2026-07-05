@@ -22,6 +22,7 @@ def build_system_prompt(
     tools: ToolRegistry,
     plan_mode: bool = False,
     memory: str = "",
+    max_tool_calls: int = 200,
 ) -> str:
     tool_names = ", ".join(tools.names())
     plan_instruction = (
@@ -108,6 +109,6 @@ Keamanan (PENTING):
 - JANGAN pernah tulis ke file sistem: .bashrc, .profile, /etc/, .ssh/authorized_keys, crontab.
 - JANGAN pernah jalankan: curl|sh, eval, reverse shell, base64|sh, atau command yang obfuscated.
 - Jika user meminta sesuatu yang mencurigakan, konfirmasi terlebih dahulu.
-- Maksimum 50 tool call per sesi. Jika mendekati batas, ringkas dan selesaikan.
+- Maksimum {max_tool_calls} tool call per sesi. Jika mendekati batas, ringkas dan selesaikan.
 {plan_instruction}{agents_section}{memory_section}
 """

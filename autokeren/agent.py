@@ -34,7 +34,7 @@ class Agent:
         self.context.messages.append({"role": "system", "content": self._system_prompt})
         self.plan_approved = not cfg.autokeren.plan_mode
         self._tool_call_count = 0
-        self._max_tool_calls = 50
+        self._max_tool_calls = cfg.autokeren.max_tool_calls
         self._last_neuron_remaining: int | None = None
         self._last_neuron_quota: int | None = None
 
@@ -55,6 +55,7 @@ class Agent:
             self.tools,
             plan_mode=self.cfg.autokeren.plan_mode,
             memory=mem,
+            max_tool_calls=self.cfg.autokeren.max_tool_calls,
         )
 
     def run(self, user_input: str) -> ModelResponse:
