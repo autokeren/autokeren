@@ -62,6 +62,8 @@ class ShellTool(Tool):
         env = os.environ.copy()
         env["NPM_CONFIG_YES"] = "true"
         env["TERM"] = env.get("TERM", "xterm-256color")
+        env["GIT_PAGER"] = "cat"
+        env["PAGER"] = "cat"
 
         try:
             return self._run_pty(command, cwd, env, effective_timeout, stdin, on_output)
