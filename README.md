@@ -229,3 +229,7 @@ Kontribusi sangat diterima. Lihat [CONTRIBUTING.md](CONTRIBUTING.md) untuk pandu
 ## License
 
 MIT — lihat [LICENSE](LICENSE).
+
+## Disclaimer
+
+autokeren adalah proyek independen dan **tidak berafiliasi dengan, diendorsing oleh, atau sponsori oleh Cloudflare, Inc.** "Cloudflare" serta produk terkait adalah merek dagang Cloudflare, Inc. autokeren menggunakan infrastruktur dan API publik Cloudflare (Workers AI, D1, R2, KV, Pages) sebagai layanan pihak ketiga.

@@ -246,6 +246,7 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
 def main() -> int:
     parser = argparse.ArgumentParser(prog="autokeren", description="Cloudflare-first agentic coding CLI")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    parser.add_argument("--about", action="store_true", help="Tampilkan info & disclaimer")
     parser.add_argument("--init", action="store_true", help="Create or overwrite config interactively")
     parser.add_argument("--login", action="store_true", help="Login dengan API key dari developers.autokeren.com")
     parser.add_argument("--config", help="Path to config YAML")
@@ -255,6 +256,17 @@ def main() -> int:
     parser.add_argument("--model", "-m", help="Override primary model (alias atau @cf/... ID)")
     parser.add_argument("prompt", nargs="?", help="Single prompt to run non-interactively")
     args = parser.parse_args()
+
+    if args.about:
+        console.print(f"\n[bold]autokeren[/bold] v{__version__}")
+        console.print("Cloudflare-first agentic coding CLI buat developer Indonesia\n")
+        console.print("[dim]GitHub:[/dim] https://github.com/autokeren/autokeren")
+        console.print("[dim]Platform:[/dim] https://developers.autokeren.com\n")
+        console.print("[yellow]Disclaimer:[/yellow]")
+        console.print("[dim]autokeren adalah proyek independen dan tidak berafiliasi dengan,")
+        console.print("[dim]diendorsing oleh, atau sponsori oleh Cloudflare, Inc.")
+        console.print('[dim]"Cloudflare" serta produk terkait adalah merek dagang Cloudflare, Inc.\n')
+        return 0
 
     if args.init:
         cfg = init_config(interactive=True)
