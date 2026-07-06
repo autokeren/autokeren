@@ -101,7 +101,7 @@ TRANSLATIONS = {
         "model_title": "SELECT AI MODEL",
         "lang_title": "SELECT LANGUAGE",
         "thinking_placeholder": "Thinking...",
-        "input_placeholder": "✍️ Type a message here...",
+        "input_placeholder": "Type a message here...",
         "pypi_update": "⚡ A new version of autokeren is available: [bold cyan]v{version}[/bold cyan]. Run [bold green]pipx upgrade autokeren[/bold green] to update.",
     },
     "id": {
@@ -169,7 +169,7 @@ TRANSLATIONS = {
         "model_title": "PILIH MODEL AI",
         "lang_title": "PILIH BAHASA / SELECT LANGUAGE",
         "thinking_placeholder": "Sedang berpikir...",
-        "input_placeholder": "✍️ Ketik pesan di sini...",
+        "input_placeholder": "Ketik pesan di sini...",
         "pypi_update": "⚡ Versi baru autokeren tersedia: [bold cyan]v{version}[/bold cyan]. Jalankan [bold green]pipx upgrade autokeren[/bold green] untuk memperbarui.",
     },
     "zh": {
@@ -237,7 +237,7 @@ TRANSLATIONS = {
         "model_title": "选择 AI 模型",
         "lang_title": "选择界面语言",
         "thinking_placeholder": "思考中...",
-        "input_placeholder": "✍️ 在此处输入消息...",
+        "input_placeholder": "在此处输入消息...",
     },
     "ja": {
         "user_label": "あなた",
@@ -304,7 +304,7 @@ TRANSLATIONS = {
         "model_title": "AI モデルの選択",
         "lang_title": "言語を選択してください",
         "thinking_placeholder": "考え中...",
-        "input_placeholder": "✍️ メッセージを入力...",
+        "input_placeholder": "メッセージを入力...",
     },
     "de": {
         "user_label": "du",
@@ -371,7 +371,7 @@ TRANSLATIONS = {
         "model_title": "AI-MODELL AUSWÄHLEN",
         "lang_title": "SPRACHE AUSWÄHLEN",
         "thinking_placeholder": "Nachdenken...",
-        "input_placeholder": "✍️ Nachricht hier eingeben...",
+        "input_placeholder": "Nachricht hier eingeben...",
     },
     "ar": {
         "user_label": "أنت",
@@ -438,7 +438,7 @@ TRANSLATIONS = {
         "model_title": "اختر نموذج الذكاء الاصطناعي",
         "lang_title": "اختر اللغة / SELECT LANGUAGE",
         "thinking_placeholder": "جاري التفكير...",
-        "input_placeholder": "✍️ اكتب رسالتك هنا...",
+        "input_placeholder": "اكتب رسالتك هنا...",
     },
     "es": {
         "user_label": "tú",
@@ -505,7 +505,7 @@ TRANSLATIONS = {
         "model_title": "SELECCIONAR MODELO DE IA",
         "lang_title": "SELECCIONAR IDIOMA",
         "thinking_placeholder": "Pensando...",
-        "input_placeholder": "✍️ Escriba un mensaje aquí...",
+        "input_placeholder": "Escriba un mensaje aquí...",
     },
     "pt": {
         "user_label": "você",
@@ -572,7 +572,7 @@ TRANSLATIONS = {
         "model_title": "SELECIONAR MODELO DE IA",
         "lang_title": "SELECIONAR IDIOMA",
         "thinking_placeholder": "Pensando...",
-        "input_placeholder": "✍️ Digite uma mensagem aqui...",
+        "input_placeholder": "Digite uma mensagem aqui...",
     }
 }
 
