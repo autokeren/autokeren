@@ -192,11 +192,13 @@ class MessageWidget(Static):
     def update_content(self, new_content: str) -> None:
         self.msg_content = new_content
         if self.role == "user":
-            self.update(f"[bold blue]kamu[/bold blue]: {self.msg_content}")
+            from rich.markup import escape
+            self.update(f"[bold blue]kamu[/bold blue]: {escape(self.msg_content)}")
         elif self.role == "system":
             self.update(f"[bold red]system[/bold red]: {self.msg_content}")
         else:
             self.update(Markdown(self.msg_content or "..."))
+
 
 
 class ToolWidget(Static):
@@ -220,16 +222,19 @@ class ToolWidget(Static):
         self.refresh()
 
     def render(self) -> str:
-        label = _format_tool_call(self.tool_name, self.arguments)
+        from rich.markup import escape
+        label = escape(_format_tool_call(self.tool_name, self.arguments))
+        summary = escape(self.result_summary)
         if self.status == "running":
             res = f"  [bold cyan]⏺[/bold cyan] {label}"
         elif self.status == "success":
-            res = f"  [green]✓[/green] [dim]{self.result_summary}[/dim]"
+            res = f"  [green]✓[/green] [dim]{summary}[/dim]"
         else:
-            res = f"  [red]✗[/red] [red]{self.result_summary}[/red]"
+            res = f"  [red]✗[/red] [red]{summary}[/red]"
         if self.output_lines:
-            res += "\n" + "\n".join(f"  [dim]│[/dim] {line}" for line in self.output_lines)
+            res += "\n" + "\n".join(f"  [dim]│[/dim] {escape(line)}" for line in self.output_lines)
         return res
+
 
 
 class AutokerenTUI(App):
@@ -371,16 +376,18 @@ class AutokerenTUI(App):
         # Tampilkan welcome banner
         import pyfiglet
         from autokeren import __version__
+        from rich.markup import escape
 
         full_art = pyfiglet.figlet_format("AUTOKEREN", font="slant").rstrip("\n").split("\n")
         mid = len(full_art) // 2
         colored_lines = []
         for i, line in enumerate(full_art):
+            line_esc = escape(line)
             if i < mid:
-                colored_lines.append(f"[bold red]{line}[/bold red]")
+                colored_lines.append(f"[bold red]{line_esc}[/bold red]")
             else:
                 extra = f"  [bold yellow]v{__version__}[/bold yellow]" if i == mid else ""
-                colored_lines.append(f"[bold white]{line}[/bold white]{extra}")
+                colored_lines.append(f"[bold white]{line_esc}[/bold white]{extra}")
         
         welcome = (
             "\n".join(colored_lines) + "\n\n"
@@ -388,6 +395,7 @@ class AutokerenTUI(App):
         )
         self.append_chat_message("system", welcome)
         self.update_status()
+
 
 
     # ------------------------------------------------------------------ #
@@ -463,21 +471,26 @@ class AutokerenTUI(App):
         result = [False]
 
         def _prompt():
+            from rich.markup import escape
             label = _format_tool_call(tool_name, arguments)
-            self.append_chat_message("system", f"⚡ Panggil [bold cyan]{label}[/bold cyan]? — {description}")
+            label_esc = escape(label)
+            desc_esc = escape(description)
+            self.append_chat_message("system", f"⚡ Panggil [bold cyan]{label_esc}[/bold cyan]? — {desc_esc}")
 
             def on_perm_result(choice: str | None) -> None:
+                from rich.markup import escape
                 allowed = False
+                name_esc = escape(tool_name)
                 if choice == "y":
                     allowed = True
                     self.allowed_tools.add(tool_name)
-                    self.append_chat_message("system", f"Tool [bold cyan]{tool_name}[/bold cyan] diizinkan.")
+                    self.append_chat_message("system", f"Tool [bold cyan]{name_esc}[/bold cyan] diizinkan.")
                 elif choice == "a":
                     allowed = True
                     self.allow_all = True
                     self.append_chat_message("system", "Semua tool diizinkan untuk sesi ini.")
                 else:
-                    self.append_chat_message("system", f"Tool [bold red]{tool_name}[/bold red] ditolak.")
+                    self.append_chat_message("system", f"Tool [bold red]{name_esc}[/bold red] ditolak.")
 
                 result[0] = allowed
                 evt.set()
@@ -487,6 +500,7 @@ class AutokerenTUI(App):
         self.call_from_thread(_prompt)
         evt.wait()
         return result[0]
+
 
 
     # ------------------------------------------------------------------ #
