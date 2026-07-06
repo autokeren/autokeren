@@ -1245,7 +1245,7 @@ class AutokerenTUI(App):
         commands = [
             "/help", "/reset", "/compact", "/permissions", "/memory",
             "/model", "/lang", "/export", "/mcp", "/save", "/resume", "/sessions", "/q", "/quit",
-            "/project",
+            "/project", "/tdd",
         ]
         suggester = SuggestFromList(commands, case_sensitive=False)
         yield Horizontal(
@@ -1782,6 +1782,16 @@ class AutokerenTUI(App):
                     self.append_chat_message("system", f"[red]Export gagal: {exc}[/red]")
         elif cmd == "/project":
             await self._handle_project_cmd(arg)
+        elif cmd == "/tdd":
+            if not arg or "|" not in arg:
+                self.append_chat_message(
+                    "system",
+                    "[red]Gunakan: /tdd <nama_file> | <deskripsi_fitur>[/red]\n"
+                    "Contoh: [bold]/tdd kalkulator | buat fungsi hitung_pajak yang menghitung pajak 10%[/bold]"
+                )
+            else:
+                target_name, task_desc = arg.split("|", 1)
+                self.run_worker(self._run_tdd_workflow(target_name.strip(), task_desc.strip()))
         else:
             self.append_chat_message("system", self.t("unknown_cmd", cmd=cmd))
 
@@ -1951,6 +1961,42 @@ class AutokerenTUI(App):
             if role in ("user", "assistant") and content:
                 self.query_one("#chat-area").mount(MessageWidget(role, content))
         self.scroll_chat_to_end()
+
+    async def _run_tdd_workflow(self, target_name: str, task_desc: str) -> None:
+        from autokeren.multiagent.tdd import TDDEngine
+
+        # Disable input field selama proses TDD berjalan
+        def _disable():
+            input_pane = self.query_one("#input-pane", Input)
+            input_pane.disabled = True
+            input_pane.placeholder = "🔴 TDD loop sedang berjalan..."
+        self.call_from_thread(_disable)
+
+        def _log(msg: str):
+            # Kirim output log TDD ke TUI chat window secara live
+            def _append():
+                self.append_chat_message("system", msg)
+            self.call_from_thread(_append)
+
+        try:
+            engine = TDDEngine(self.agent, str(self.agent.project_root), _log)
+            # Jalankan alur TDD secara sinkron di background thread
+            import anyio
+            success = await anyio.to_thread.run_sync(engine.execute_tdd_flow, task_desc, target_name)
+            if success:
+                _log("[bold green]✓ TDD Workflow sukses diselesaikan![/bold green]")
+            else:
+                _log("[bold red]✗ TDD Workflow gagal diselesaikan.[/bold red]")
+        except Exception as exc:
+            _log(f"[bold red]⚠ Error TDD: {exc}[/bold red]")
+        finally:
+            # Aktifkan kembali input field
+            def _enable():
+                input_pane = self.query_one("#input-pane", Input)
+                input_pane.disabled = False
+                input_pane.placeholder = self.t("input_placeholder")
+                input_pane.focus()
+            self.call_from_thread(_enable)
 
 
 def run_tui(agent: Agent, cfg: Config) -> None:
