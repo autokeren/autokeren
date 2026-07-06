@@ -24,8 +24,10 @@ from autokeren.tools import (
     CreateProjectTool,
     DeployProjectTool,
     FetchURLTool,
+    GitBranchTool,
     GitCommitTool,
     GitDiffTool,
+    GitLogTool,
     GitStatusTool,
     ListFilesTool,
     ListProjectsTool,
@@ -40,6 +42,7 @@ from autokeren.tools import (
     WriteFileTool,
 )
 from autokeren.ui import AK_THEME, AgentUI
+from autokeren.mcp import MCPClient, MCPTool
 
 console = Console(theme=AK_THEME)
 
@@ -56,6 +59,8 @@ def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegist
     reg.register(GitStatusTool(project_root))
     reg.register(GitDiffTool(project_root))
     reg.register(GitCommitTool(project_root))
+    reg.register(GitLogTool(project_root))
+    reg.register(GitBranchTool(project_root))
     reg.register(CamofoxTool(cfg))
     reg.register(CloudflareDeployTool(project_root))
     reg.register(CloudflareBuildTool(project_root))
@@ -69,6 +74,36 @@ def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegist
         reg.register(DeployProjectTool(cfg))
         reg.register(ListProjectsTool(cfg))
     return reg
+
+
+_mcp_clients: list[MCPClient] = []
+
+
+def load_mcp_servers(cfg, registry: ToolRegistry) -> None:
+    """Start semua MCP servers yang dikonfigurasi dan daftarkan tool-nya."""
+    global _mcp_clients
+    for srv_cfg in cfg.mcp_servers:
+        if not srv_cfg.enabled:
+            continue
+        try:
+            client = MCPClient(name=srv_cfg.name, command=srv_cfg.command, env=srv_cfg.env or {})
+            client.start()
+            _mcp_clients.append(client)
+            for tool_schema in client.tools():
+                registry.register(MCPTool(client, tool_schema))
+            console.print(f"[green]✓ MCP server '[bold]{srv_cfg.name}[/bold]' terhubung — {len(client.tools())} tools.[/green]")
+        except Exception as exc:
+            console.print(f"[yellow]⚠ MCP server '[bold]{srv_cfg.name}[/bold]' gagal dimulai: {exc}[/yellow]")
+
+
+def stop_mcp_servers() -> None:
+    """Hentikan semua MCP server saat program keluar."""
+    for client in _mcp_clients:
+        try:
+            client.stop()
+        except Exception:
+            pass
+    _mcp_clients.clear()
 
 
 def _read_input(console: Console) -> str:
@@ -327,6 +362,7 @@ def main() -> int:
     project_root = Path(args.project_root).expanduser().resolve()
     memory = MemoryManager(str(project_root))
     reg = build_registry(cfg, project_root, memory)
+    load_mcp_servers(cfg, reg)
     agent = Agent(cfg, reg, str(project_root), memory=memory)
 
     ui = AgentUI(console)
@@ -351,7 +387,10 @@ def main() -> int:
         return 0
 
     from autokeren.tui import run_tui
-    run_tui(agent, cfg)
+    try:
+        run_tui(agent, cfg)
+    finally:
+        stop_mcp_servers()
     return 0
 
 

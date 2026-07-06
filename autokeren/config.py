@@ -64,12 +64,20 @@ class CamofoxConfig(BaseModel):
     user_id: str = ""
 
 
+class MCPServerConfig(BaseModel):
+    name: str
+    command: list[str]
+    env: dict[str, str] = Field(default_factory=dict)
+    enabled: bool = True
+
+
 class Config(BaseModel):
     auth: AuthConfig = Field(default_factory=AuthConfig)
     cloudflare: CloudflareConfig = Field(default_factory=CloudflareConfig)
     retry: RetryConfig = Field(default_factory=RetryConfig)
     autokeren: AutokerenConfig = Field(default_factory=AutokerenConfig)
     camofox: CamofoxConfig = Field(default_factory=CamofoxConfig)
+    mcp_servers: list[MCPServerConfig] = Field(default_factory=list)
 
 
 def load_config(path: Path | None = None) -> Config:

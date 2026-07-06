@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import threading
 import queue
+from pathlib import Path
 from typing import Any
 
 from textual.app import App, ComposeResult
@@ -83,6 +84,9 @@ TRANSLATIONS = {
         "f5_desc": "Compact context window history",
         "f6_desc": "Change active UI language",
         "ctrlq_desc": "Exit autokeren cleanly",
+        "updown_desc": "Navigate input history (previous/next)",
+        "export_success": "Chat exported to: [bold cyan]{path}[/bold cyan]",
+        "export_empty": "No messages to export.",
         "last_copied": "✓ Last response successfully copied to clipboard.",
         "copy_fail": "Failed to copy to clipboard: {error}",
         "no_last_msg": "No assistant response to copy.",
@@ -146,7 +150,10 @@ TRANSLATIONS = {
         "f4_desc": "Salin respon terakhir AI ke clipboard",
         "f5_desc": "Compact Context (ringkas percakapan lama)",
         "f6_desc": "Ganti bahasa antarmuka UI",
-        "ctrlq_desc": "Keluar dari aplikasi secara bersih",
+        "ctrlq_desc": "Keluar dari autokeren dengan aman",
+        "updown_desc": "Navigasi history input (sebelumnya/selanjutnya)",
+        "export_success": "Chat diekspor ke: [bold cyan]{path}[/bold cyan]",
+        "export_empty": "Tidak ada pesan untuk diekspor.",
         "last_copied": "✓ Respon terakhir berhasil disalin ke clipboard.",
         "copy_fail": "Gagal menyalin ke clipboard: {error}",
         "no_last_msg": "Belum ada respon assistant untuk disalin.",
@@ -210,7 +217,10 @@ TRANSLATIONS = {
         "f4_desc": "将 AI 的最后一条回复复制到剪贴板",
         "f5_desc": "压缩上下文窗口历史记录",
         "f6_desc": "更改当前界面语言",
-        "ctrlq_desc": "安全退出应用程序",
+        "ctrlq_desc": "退出 autokeren",
+        "updown_desc": "导航输入历史记录（上/下）",
+        "export_success": "聊天记录已导出到: [bold cyan]{path}[/bold cyan]",
+        "export_empty": "没有可导出的消息。",
         "last_copied": "✓ 最后的回复已成功复制到剪贴板。",
         "copy_fail": "复制到剪贴板失败: {error}",
         "no_last_msg": "没有可复制的回复。",
@@ -275,6 +285,9 @@ TRANSLATIONS = {
         "f5_desc": "コンテキスト履歴を圧縮",
         "f6_desc": "UI 表示言語の変更",
         "ctrlq_desc": "アプリケーションを安全に終了",
+        "updown_desc": "入力履歴をナビゲートする（前/次）",
+        "export_success": "チャットをエクスポートしました: [bold cyan]{path}[/bold cyan]",
+        "export_empty": "エクスポートするメッセージがありません。",
         "last_copied": "✓ 最後の応答がクリップボードにコピーされました。",
         "copy_fail": "コピー失敗: {error}",
         "no_last_msg": "コピーする応答がありません。",
@@ -338,7 +351,10 @@ TRANSLATIONS = {
         "f4_desc": "Letzte AI-Antwort in die Zwischenablage kopieren",
         "f5_desc": "Kontexthistorie komprimieren",
         "f6_desc": "Aktive UI-Sprache ändern",
-        "ctrlq_desc": "Anwendung sauber beenden",
+        "ctrlq_desc": "autokeren sauber beenden",
+        "updown_desc": "Eingabeverlauf navigieren (vorher/nächste)",
+        "export_success": "Chat exportiert nach: [bold cyan]{path}[/bold cyan]",
+        "export_empty": "Keine Nachrichten zum Exportieren.",
         "last_copied": "✓ Letzte Antwort erfolgreich in die Zwischenablage kopiert.",
         "copy_fail": "Kopieren fehlgeschlagen: {error}",
         "no_last_msg": "Keine Antwort zum Kopieren vorhanden.",
@@ -403,6 +419,9 @@ TRANSLATIONS = {
         "f5_desc": "ضغط تاريخ السياق للمحادثة",
         "f6_desc": "تغيير لغة واجهة المستخدم",
         "ctrlq_desc": "الخروج الآمن من التطبيق",
+        "updown_desc": "تصفح سجل الإدخال (السابق/التالي)",
+        "export_success": "تم تصدير المحادثة إلى: [bold cyan]{path}[/bold cyan]",
+        "export_empty": "لا توجد رسائل للتصدير.",
         "last_copied": "✓ تم نسخ آخر رد بنجاح إلى الحافظة.",
         "copy_fail": "فشل النسخ إلى الحافظة: {error}",
         "no_last_msg": "لا يوجد رد للنسخ.",
@@ -467,6 +486,9 @@ TRANSLATIONS = {
         "f5_desc": "Compactar el historial de contexto",
         "f6_desc": "Cambiar el idioma de la interfaz de usuario",
         "ctrlq_desc": "Salir de la aplicación de forma limpia",
+        "updown_desc": "Navegar historial de entrada (anterior/siguiente)",
+        "export_success": "Chat exportado a: [bold cyan]{path}[/bold cyan]",
+        "export_empty": "No hay mensajes para exportar.",
         "last_copied": "✓ Última respuesta copiada al portapapeles con éxito.",
         "copy_fail": "Error al copiar al portapapeles: {error}",
         "no_last_msg": "No hay respuesta para copiar.",
@@ -531,6 +553,9 @@ TRANSLATIONS = {
         "f5_desc": "Compactar o histórico do contexto",
         "f6_desc": "Alterar o idioma da interface do usuário",
         "ctrlq_desc": "Sair do aplicativo de forma limpa",
+        "updown_desc": "Navegar histórico de entrada (anterior/próximo)",
+        "export_success": "Chat exportado para: [bold cyan]{path}[/bold cyan]",
+        "export_empty": "Não há mensagens para exportar.",
         "last_copied": "✓ Última resposta copiada para a área de transferência com sucesso.",
         "copy_fail": "Falha ao copiar para a área de transferência: {error}",
         "no_last_msg": "Nenhuma resposta para copiar.",
@@ -641,6 +666,48 @@ class LanguageSelectScreen(ModalScreen[str]):
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         chosen_code = self.lang_codes[event.option_index]
         self.dismiss(chosen_code)
+
+    def on_key(self, event: Any) -> None:
+        if event.key == "escape":
+            self.dismiss(None)
+
+
+class MCPManageScreen(ModalScreen[str]):
+    """Screen Modal untuk mengelola dan melihat status MCP servers yang terhubung."""
+
+    def __init__(self, mcp_clients: list[Any]) -> None:
+        super().__init__()
+        self._clients = mcp_clients
+
+    @property
+    def tui(self) -> AutokerenTUI:
+        return self.app  # type: ignore
+
+    def compose(self) -> ComposeResult:
+        yield Container(
+            Static("[bold green]⚡ MCP Server Manager[/bold green]", id="modal-title"),
+            Static("[dim]Kelola MCP servers yang terhubung ke autokeren[/dim]", id="modal-desc"),
+            OptionList(id="mcp-list"),
+            id="modal-dialog",
+        )
+
+    def on_mount(self) -> None:
+        option_list = self.query_one("#mcp-list", OptionList)
+        if not self._clients:
+            option_list.add_option("[dim]Tidak ada MCP server aktif.[/dim]")
+            option_list.add_option("[dim]Tambahkan ke config.yaml:[/dim]")
+            option_list.add_option("[dim]  mcp_servers:[/dim]")
+            option_list.add_option("[dim]    - name: filesystem[/dim]")
+            option_list.add_option("[dim]      command: [npx, -y, @modelcontextprotocol/server-filesystem][/dim]")
+        else:
+            for client in self._clients:
+                status = "🟢 Connected" if client.is_alive() else "🔴 Disconnected"
+                tools_count = len(client.tools())
+                label = f"{status}  [bold]{client.name}[/bold]  ({tools_count} tools)"
+                option_list.add_option(label)
+
+    def on_option_list_option_selected(self, _: OptionList.OptionSelected) -> None:
+        self.dismiss("ok")
 
     def on_key(self, event: Any) -> None:
         if event.key == "escape":
@@ -902,7 +969,7 @@ class AutokerenTUI(App):
         height: auto;
         margin: 1 0;
     }
-    ModelSelectScreen, LanguageSelectScreen, PermissionSelectScreen, ApprovalSelectScreen {
+    ModelSelectScreen, LanguageSelectScreen, MCPManageScreen, PermissionSelectScreen, ApprovalSelectScreen {
         align: center middle;
         background: rgba(0, 0, 0, 0.6);
     }
@@ -983,6 +1050,15 @@ class AutokerenTUI(App):
         self.current_assistant_widget: MessageWidget | None = None
         self.current_tool_widget: ToolWidget | None = None
 
+        # Input history untuk navigasi ↑↓
+        self.input_history: list[str] = []
+        self.history_idx: int = -1
+        self._history_draft: str = ""  # simpan draft saat navigasi history
+
+        # Multi-agent project manager
+        from autokeren.multiagent import ProjectManager
+        self.project_manager: ProjectManager = ProjectManager()
+
     def t(self, key: str, **kwargs: Any) -> str:
         """Menerjemahkan key string berdasarkan bahasa aktif saat ini."""
         translated = TRANSLATIONS.get(self.active_language, {}).get(key, TRANSLATIONS["en"].get(key, key))
@@ -1018,7 +1094,8 @@ class AutokerenTUI(App):
         from textual.suggester import SuggestFromList
         commands = [
             "/help", "/reset", "/compact", "/permissions", "/memory",
-            "/model", "/lang", "/save", "/resume", "/sessions", "/q", "/quit"
+            "/model", "/lang", "/export", "/mcp", "/save", "/resume", "/sessions", "/q", "/quit",
+            "/project",
         ]
         suggester = SuggestFromList(commands, case_sensitive=False)
         yield Horizontal(
@@ -1029,6 +1106,39 @@ class AutokerenTUI(App):
                 id="right-layout"
             )
         )
+
+    def on_key(self, event: object) -> None:
+        """Handle navigasi history input dengan tombol Up/Down."""
+        from textual.events import Key
+        if not isinstance(event, Key):
+            return
+        try:
+            input_pane = self.query_one("#input-pane", Input)
+        except Exception:
+            return
+        if input_pane.disabled:
+            return
+        if event.key == "up":
+            if not self.input_history:
+                return
+            if self.history_idx == -1:
+                self._history_draft = input_pane.value
+            next_idx = min(self.history_idx + 1, len(self.input_history) - 1)
+            if next_idx != self.history_idx:
+                self.history_idx = next_idx
+                input_pane.value = self.input_history[-(self.history_idx + 1)]
+                input_pane.cursor_position = len(input_pane.value)
+            event.prevent_default()
+        elif event.key == "down":
+            if self.history_idx == -1:
+                return
+            self.history_idx -= 1
+            if self.history_idx == -1:
+                input_pane.value = self._history_draft
+            else:
+                input_pane.value = self.input_history[-(self.history_idx + 1)]
+            input_pane.cursor_position = len(input_pane.value)
+            event.prevent_default()
 
     def on_mount(self) -> None:
         # Bind Agent callbacks ke TUI
@@ -1222,6 +1332,11 @@ class AutokerenTUI(App):
             return
 
         self.append_chat_message("user", val)
+        # Simpan ke history input (hindari duplikat berturutan)
+        if not self.input_history or self.input_history[-1] != val:
+            self.input_history.append(val)
+        self.history_idx = -1
+        self._history_draft = ""
         input_pane.disabled = True
         input_pane.placeholder = self.t("thinking_placeholder")
         
@@ -1288,19 +1403,22 @@ class AutokerenTUI(App):
             f"  - [bold]F4[/bold]   : {self.t('f4_desc')}\n"
             f"  - [bold]F5[/bold]   : {self.t('f5_desc')}\n"
             f"  - [bold]F6[/bold]   : {self.t('f6_desc')}\n"
+            f"  - [bold]↑/↓[/bold]  : {self.t('updown_desc')}\n"
             f"  - [bold]Ctrl+C[/bold]: {self.t('ctrlc_desc')}\n"
             f"  - [bold]Ctrl+Q[/bold]: {self.t('ctrlq_desc')}\n\n"
             f"{self.t('slash_commands_label')}\n"
-            "  - [bold]/model <name>[/bold]: Switch model\n"
-            "  - [bold]/lang <code2>[/bold]: Switch TUI language\n"
-            "  - [bold]/compact[/bold]      : Compact context history\n"
-            "  - [bold]/reset[/bold]        : Reset conversation session\n"
-            "  - [bold]/permissions[/bold]  : Check allowed tools\n"
-            "  - [bold]/memory[/bold]       : Display project memory\n"
-            "  - [bold]/sessions[/bold]     : List saved sessions\n"
-            "  - [bold]/save <name>[/bold]   : Save current session\n"
-            "  - [bold]/resume <id>[/bold]   : Resume saved session\n"
-            "  - [bold]/q[/bold]             : Quit autokeren"
+            "  - [bold]/model <name>[/bold]  : Switch model\n"
+            "  - [bold]/lang <code2>[/bold]  : Switch TUI language\n"
+            "  - [bold]/export [file][/bold]  : Export chat to Markdown file\n"
+            "  - [bold]/compact[/bold]       : Compact context history\n"
+            "  - [bold]/reset[/bold]         : Reset conversation session\n"
+            "  - [bold]/permissions[/bold]   : Check allowed tools\n"
+            "  - [bold]/memory[/bold]        : Display project memory\n"
+            "  - [bold]/sessions[/bold]      : List saved sessions\n"
+            "  - [bold]/save <name>[/bold]    : Save current session\n"
+            "  - [bold]/resume <id>[/bold]    : Resume saved session\n"
+            "  - [bold]/project <sub>[/bold]  : Multi-agent project management\n"
+            "  - [bold]/q[/bold]              : Quit autokeren"
         )
         self.append_chat_message("system", help_text)
 
@@ -1440,6 +1558,9 @@ class AutokerenTUI(App):
                     self.update_status()
                 else:
                     self.append_chat_message("system", f"[red]Language code '{arg}' not supported. Available: {', '.join(LANGUAGES.keys())}[/red]")
+        elif cmd == "/mcp":
+            from autokeren.cli import _mcp_clients
+            await self.push_screen(MCPManageScreen(_mcp_clients))
         elif cmd == "/save":
             name = arg or f"session-{len(self.agent.sessions.list()) + 1}"
             try:
@@ -1467,8 +1588,187 @@ class AutokerenTUI(App):
                 for s in sessions:
                     lines.append(f"  - [cyan]{s['id']}[/cyan] [bold]{s['name']}[/bold] ({s['messages']} msg)")
                 self.append_chat_message("system", "\n".join(lines))
+        elif cmd == "/export":
+            msgs = [m for m in self.agent.context.messages if m.get("role") in ("user", "assistant")]
+            if not msgs:
+                self.append_chat_message("system", self.t("export_empty"))
+            else:
+                import datetime
+                ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                fname = arg.strip() if arg.strip() else f"autokeren_export_{ts}.md"
+                if not fname.endswith(".md"):
+                    fname += ".md"
+                out_path = Path(self.agent.project_root) / fname
+                lines_md: list[str] = [f"# autokeren Chat Export\n\n*Exported: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n---\n"]
+                for m in msgs:
+                    role_label = "**User**" if m["role"] == "user" else "**Assistant**"
+                    content = m.get("content") or ""
+                    if isinstance(content, list):
+                        content = " ".join(c.get("text", "") for c in content if isinstance(c, dict))
+                    lines_md.append(f"### {role_label}\n\n{content}\n\n---\n")
+                try:
+                    out_path.write_text("\n".join(lines_md), encoding="utf-8")
+                    self.append_chat_message("system", self.t("export_success", path=str(out_path)))
+                except Exception as exc:
+                    self.append_chat_message("system", f"[red]Export gagal: {exc}[/red]")
+        elif cmd == "/project":
+            await self._handle_project_cmd(arg)
         else:
             self.append_chat_message("system", self.t("unknown_cmd", cmd=cmd))
+
+    async def _handle_project_cmd(self, arg: str) -> None:
+        """Handler untuk semua sub-command /project."""
+        from autokeren.multiagent import WorkerStatus
+        parts = arg.strip().split(maxsplit=1)
+        sub = parts[0].lower() if parts else ""
+        rest = parts[1] if len(parts) > 1 else ""
+
+        pm = self.project_manager
+
+        # /project new <nama>
+        if sub == "new":
+            if not rest:
+                self.append_chat_message("system", "[red]Gunakan: /project new <nama_project>[/red]")
+                return
+            try:
+                project = pm.new_project(rest.strip())
+                self.append_chat_message(
+                    "system",
+                    f"[green]✓ Project '[bold]{project.name}[/bold]' dibuat.[/green] "
+                    f"Tambah agent dengan [bold]/project add <nama> <task>[/bold]",
+                )
+            except ValueError as exc:
+                self.append_chat_message("system", f"[red]{exc}[/red]")
+
+        # /project add <nama_agent> <task>
+        elif sub == "add":
+            project = pm.get_active()  # type: ignore[assignment]
+            if not project:
+                self.append_chat_message("system", "[red]Belum ada project aktif. Buat dulu dengan /project new <nama>[/red]")
+                return
+            assert project is not None
+            add_parts = rest.split(maxsplit=1)
+            if len(add_parts) < 2:
+                self.append_chat_message("system", "[red]Gunakan: /project add <nama_agent> <task deskripsi>[/red]")
+                return
+            worker_name, task = add_parts[0], add_parts[1]
+            try:
+                project.add_worker(worker_name, task)
+                self.append_chat_message(
+                    "system",
+                    f"[cyan]⏳ Agent '[bold]{worker_name}[/bold]' ditambahkan ke project '[bold]{project.name}[/bold]'.[/cyan]\n"
+                    f"   Task: {task[:80]}{'...' if len(task) > 80 else ''}",
+                )
+            except ValueError as exc:
+                self.append_chat_message("system", f"[red]{exc}[/red]")
+
+        # /project run
+        elif sub == "run":
+            project = pm.get_active()  # type: ignore[assignment]
+            if not project:
+                self.append_chat_message("system", "[red]Belum ada project aktif.[/red]")
+                return
+            assert project is not None
+            if not project.workers:
+                self.append_chat_message("system", "[red]Project belum memiliki worker. Gunakan /project add terlebih dahulu.[/red]")
+                return
+            pending = [w for w in project.workers if w.status == WorkerStatus.PENDING]
+            if not pending:
+                self.append_chat_message("system", "[yellow]Semua worker sudah berjalan atau selesai.[/yellow]")
+                return
+
+            self.append_chat_message(
+                "system",
+                f"[bold green]🚀 Menjalankan {len(pending)} agent secara paralel...[/bold green]",
+            )
+
+            def _agent_factory(worker_name: str):
+                from autokeren.cli import build_registry
+                from autokeren.agent import Agent
+                from pathlib import Path as _Path
+                worker_memory = self.agent.memory
+                worker_reg = build_registry(self.cfg, _Path(self.agent.project_root), worker_memory)
+                child_agent = Agent(self.cfg, worker_reg, self.agent.project_root, memory=worker_memory)
+                return child_agent
+
+            def _on_done(worker) -> None:
+                icon = worker.status_icon()
+                elapsed = f"{worker.elapsed():.1f}s"
+                if worker.status == WorkerStatus.DONE:
+                    msg = f"{icon} Agent '[bold]{worker.name}[/bold]' selesai dalam {elapsed}."
+                else:
+                    msg = f"{icon} Agent '[bold]{worker.name}[/bold]' error ({elapsed}): {worker.error[:80]}"
+                self.call_from_thread(self.append_chat_message, "system", msg)
+
+            self.run_worker(
+                lambda: pm.run_project(project, _agent_factory, _on_done),
+                thread=True,
+            )
+
+        # /project status
+        elif sub == "status":
+            project = pm.get_active()  # type: ignore[assignment]
+            if not project:
+                self.append_chat_message("system", "[red]Belum ada project aktif.[/red]")
+                return
+            assert project is not None
+            lines = [f"[bold yellow]📊 Project: {project.name}[/bold yellow]  {project.summary()}"]
+            for w in project.workers:
+                elapsed = f"{w.elapsed():.1f}s" if w.started_at else "-"
+                lines.append(
+                    f"  {w.status_icon()} [bold]{w.name}[/bold]  [{w.status.value}]  {elapsed}"
+                    f"\n     Task: {w.task[:60]}{'...' if len(w.task) > 60 else ''}"
+                )
+            self.append_chat_message("system", "\n".join(lines))
+
+        # /project switch <nama>
+        elif sub == "switch":
+            if not rest:
+                self.append_chat_message("system", "[red]Gunakan: /project switch <nama_project>[/red]")
+                return
+            try:
+                project = pm.switch(rest.strip())
+                self.append_chat_message("system", f"[green]✓ Aktif ke project '[bold]{project.name}[/bold]'.[/green]")
+            except ValueError as exc:
+                self.append_chat_message("system", f"[red]{exc}[/red]")
+
+        # /project list
+        elif sub == "list":
+            if not pm.projects:
+                self.append_chat_message("system", "[dim]Belum ada project. Buat dengan /project new <nama>[/dim]")
+                return
+            lines = ["[bold yellow]📁 Semua Project:[/bold yellow]"]
+            for name, proj in pm.projects.items():
+                active_marker = " [green]← aktif[/green]" if name == pm.active_project else ""
+                lines.append(f"  • [bold]{name}[/bold]{active_marker}  {proj.summary()}")
+            self.append_chat_message("system", "\n".join(lines))
+
+        # /project output <nama_agent>
+        elif sub == "output":
+            project = pm.get_active()  # type: ignore[assignment]
+            if not project:
+                self.append_chat_message("system", "[red]Belum ada project aktif.[/red]")
+                return
+            assert project is not None
+            worker = project.get_worker(rest.strip())
+            if not worker:
+                self.append_chat_message("system", f"[red]Agent '{rest.strip()}' tidak ditemukan.[/red]")
+                return
+            output = worker.output or worker.error or "(belum ada output)"
+            self.append_chat_message("system", f"[bold]Output agent '{worker.name}':[/bold]\n{output}")
+
+        else:
+            self.append_chat_message(
+                "system",
+                "[bold yellow]📁 /project — Multi-Agent Mode[/bold yellow]\n\n"
+                "  [bold]/project new <nama>[/bold]           — Buat project baru\n"
+                "  [bold]/project add <agent> <task>[/bold]   — Tambah agent ke project aktif\n"
+                "  [bold]/project run[/bold]                  — Jalankan semua agent paralel\n"
+                "  [bold]/project status[/bold]               — Lihat status semua agent\n"
+                "  [bold]/project output <agent>[/bold]       — Lihat output agent tertentu\n"
+                "  [bold]/project list[/bold]                 — Lihat semua project\n"
+                "  [bold]/project switch <nama>[/bold]        — Ganti project aktif\n",
+            )
 
     def rebuild_chat_history(self) -> None:
         chat_area = self.query_one("#chat-area")
