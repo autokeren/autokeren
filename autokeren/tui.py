@@ -7,7 +7,8 @@ from typing import Any
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalScroll, Container
-from textual.widgets import Static, Input
+from textual.widgets import Static, Input, OptionList
+from textual.screen import ModalScreen
 from textual.binding import Binding
 from rich.markdown import Markdown
 
@@ -15,6 +16,59 @@ from autokeren.agent import Agent
 from autokeren.config import Config
 from autokeren.models.base import ModelResponse
 from autokeren.ui import _format_tool_call, _summarize_tool_result
+
+
+class ThinkingWidget(Static):
+    """Widget untuk animasi 'mikir...'."""
+
+    def on_mount(self) -> None:
+        self.frame = 0
+        self.frames = [
+            "🤔 [dim]mikir .  [/dim]",
+            "🤔 [dim]mikir .. [/dim]",
+            "🤔 [dim]mikir ...[/dim]",
+            "🤔 [dim]mikir  ..[/dim]",
+            "🤔 [dim]mikir   .[/dim]",
+        ]
+        self.update(self.frames[0])
+        self.timer = self.set_interval(0.3, self.next_frame)
+
+    def next_frame(self) -> None:
+        self.frame = (self.frame + 1) % len(self.frames)
+        self.update(self.frames[self.frame])
+
+
+class ModelSelectScreen(ModalScreen[str]):
+    """Screen Modal untuk memilih model AI secara interaktif."""
+
+    def __init__(self, models: list[dict[str, Any]], current_model: str) -> None:
+        super().__init__()
+        self.models = models
+        self.current_model = current_model
+
+    def compose(self) -> ComposeResult:
+        yield Container(
+            Static("[bold green]PILIH MODEL AI[/bold green]", id="modal-title"),
+            OptionList(id="model-list"),
+            id="modal-dialog",
+        )
+
+    def on_mount(self) -> None:
+        option_list = self.query_one("#model-list", OptionList)
+        for m in self.models:
+            label = m.get("name", m["id"])
+            if m["id"] == self.current_model:
+                label = f"✨ [green]{label} (Aktif)[/green]"
+            option_list.add_option(label)
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        chosen_id = self.models[event.option_index]["id"]
+        self.dismiss(chosen_id)
+
+
+    def on_key(self, event: Any) -> None:
+        if event.key == "escape":
+            self.dismiss(None)
 
 
 class StatusWidget(Static):
@@ -59,8 +113,15 @@ class StatusWidget(Static):
 [bold]MaxTok[/bold]  : {self.cfg.cloudflare.max_tokens}
 
 [bold]P.Mode[/bold]  : {self.cfg.autokeren.plan_mode}
-[bold]M.Calls[/bold] : {self.agent._tool_call_count}/{self.cfg.autokeren.max_tool_calls or 'unlimited'}"""
+[bold]M.Calls[/bold] : {self.agent._tool_call_count}/{self.cfg.autokeren.max_tool_calls or 'unlimited'}
+
+[dim]Klik di sini untuk ganti model[/dim]"""
         self.update(res)
+
+    async def on_click(self) -> None:
+        # Klik pada panel status memicu aksi pemilihan model
+        await self.app.action_model()  # type: ignore
+
 
 
 class MessageWidget(Static):
@@ -117,7 +178,6 @@ class ToolWidget(Static):
         return res
 
 
-
 class AutokerenTUI(App):
     """Aplikasi Full TUI untuk autokeren bergaya Antigravity."""
 
@@ -159,6 +219,28 @@ class AutokerenTUI(App):
         height: auto;
         margin: 0;
     }
+    ThinkingWidget {
+        height: auto;
+        margin: 1 0;
+    }
+    ModelSelectScreen {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.6);
+    }
+    #modal-dialog {
+        width: 50;
+        height: 14;
+        border: double $accent;
+        background: $panel;
+        padding: 1 2;
+    }
+    #modal-title {
+        text-align: center;
+        margin-bottom: 1;
+    }
+    #model-list {
+        height: 1fr;
+    }
     """
 
     BINDINGS = [
@@ -182,6 +264,7 @@ class AutokerenTUI(App):
         self.approval_queue: queue.Queue[bool] = queue.Queue()
 
         # Current active widgets
+        self.thinking_widget: ThinkingWidget | None = None
         self.current_assistant_widget: MessageWidget | None = None
         self.current_tool_widget: ToolWidget | None = None
 
@@ -217,21 +300,30 @@ class AutokerenTUI(App):
 
     def on_model_start(self) -> None:
         def _start():
-            self.current_assistant_widget = MessageWidget("assistant", "")
-            self.query_one("#chat-area").mount(self.current_assistant_widget)
+            self.thinking_widget = ThinkingWidget()
+            self.query_one("#chat-area").mount(self.thinking_widget)
             self.scroll_chat_to_end()
         self.call_from_thread(_start)
 
     def on_chunk(self, text: str) -> None:
         def _chunk():
+            # Hapus animasi mikir jika ada sebelum memount widget streaming text
+            if self.thinking_widget:
+                self.thinking_widget.remove()
+                self.thinking_widget = None
+                self.current_assistant_widget = MessageWidget("assistant", "")
+                self.query_one("#chat-area").mount(self.current_assistant_widget)
+
             if self.current_assistant_widget:
                 self.current_assistant_widget.update_content(self.current_assistant_widget.msg_content + text)
                 self.scroll_chat_to_end()
         self.call_from_thread(_chunk)
 
-
     def on_model_end(self, resp: ModelResponse) -> None:
         def _end():
+            if self.thinking_widget:
+                self.thinking_widget.remove()
+                self.thinking_widget = None
             self.current_assistant_widget = None
             self.update_status()
         self.call_from_thread(_end)
@@ -341,7 +433,6 @@ class AutokerenTUI(App):
                 allowed = True
                 if self.current_tool_widget:
                     self.allowed_tools.add(self.current_tool_widget.tool_name)
-
             elif choice in ("a", "all"):
                 allowed = True
                 self.allow_all = True
@@ -380,7 +471,6 @@ class AutokerenTUI(App):
                 else:
                     self.agent.context.add_user("User menolak rencana. Tanya apa yang perlu diubah.")
                     self.agent.run("")
-
 
         except Exception as e:
             self.append_chat_message("system", f"[red]Error saat menjalankan agent: {e}[/red]")
@@ -441,12 +531,19 @@ class AutokerenTUI(App):
     async def action_model(self) -> None:
         from autokeren.models.cloudflare import fetch_available_models
         all_models = fetch_available_models(self.cfg)
-        lines = ["[bold yellow]DAFTAR MODEL TERSEDIA[/bold yellow] (Ketik [bold]/model <id>[/bold] untuk ganti):"]
-        current = self.agent.router.current_model_id()
-        for m in all_models:
-            active = " [green]*[/green]" if m["id"] == current else ""
-            lines.append(f"  - [bold]{m['name']}[/bold] ({m['id']}){active}")
-        self.append_chat_message("system", "\n".join(lines))
+        current_model = self.agent.router.current_model_id()
+
+        def on_select(chosen_id: str | None) -> None:
+            if chosen_id:
+                from autokeren.models.cloudflare import resolve_model_id
+                resolved = resolve_model_id(chosen_id, self.agent.router.models[0].auth_mode)
+                if self.agent.router.switch_model(resolved):
+                    self.append_chat_message("system", f"Model aktif diganti ke: [bold]{chosen_id}[/bold]")
+                    self.update_status()
+                else:
+                    self.append_chat_message("system", f"[red]Model '{chosen_id}' tidak ditemukan.[/red]")
+
+        self.push_screen(ModelSelectScreen(all_models, current_model), on_select)
 
     async def action_reset(self) -> None:
         self.agent.reset()
