@@ -1,13 +1,16 @@
 # autokeren
 
-**Cloudflare-first agentic coding CLI untuk developer Indonesia dan global.**
+**Cloudflare-first agentic coding CLI dengan antarmuka TUI interaktif untuk developer Indonesia dan global.**
 
-autokeren adalah CLI agentic coding yang dirancang khusus untuk stack Cloudflare-first. Dibangun dengan Python, mendukung 7 model AI dengan fallback otomatis, dilengkapi tools bawaan untuk file, shell, git, deploy Cloudflare, serta PaaS built-in untuk deploy aplikasi langsung dari terminal.
+autokeren adalah CLI agentic coding yang dirancang khusus untuk stack Cloudflare-first. Dibangun dengan Python, autokeren menghadirkan antarmuka **Text User Interface (TUI) interaktif** bergaya Antigravity/AGY yang membagi layar menjadi panel status statis dan area obrolan dinamis, mendukung 7 model AI dengan fallback otomatis, dilengkapi tools bawaan untuk file, shell, git, deploy Cloudflare, serta PaaS built-in.
 
 [![CI](https://github.com/autokeren/autokeren/actions/workflows/ci.yml/badge.svg)](https://github.com/autokeren/autokeren/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI](https://img.shields.io/pypi/v/autokeren.svg)](https://pypi.org/project/autokeren/)
+
+![autokeren TUI Screenshot](docs/screenshot.jpg)
+
 
 ---
 
@@ -57,13 +60,14 @@ autokeren
 
 ## Quick Start
 
-### Interactive chat
+### Interactive TUI Chat (Default)
 
+Menjalankan perintah tanpa argumen akan membuka antarmuka TUI interaktif:
 ```bash
 autokeren
 ```
 
-### Single prompt
+### Single prompt (Non-interactive)
 
 ```bash
 autokeren "buat file hello.py yang cetak hello world"
@@ -114,18 +118,34 @@ Agent akan otomatis create project, tulis kode, dan deploy ke Cloudflare Workers
 
 Pilih dengan `-m <alias>`. Default: `kimi-code` dengan fallback ke `glm-5.2`.
 
-## Commands
+## Commands & Shortcuts
 
-Perintah slash di interactive mode:
+Di mode interaktif TUI, Anda dapat menggunakan tombol pintas keyboard (*hotkeys*) dan perintah slash berikut:
+
+### Tombol Pintas Keyboard (Hotkeys)
+
+| Tombol | Aksi | Deskripsi |
+|---|---|---|
+| **`F1`** | Help | Tampilkan daftar bantuan perintah dan shortcut |
+| **`F2`** | Ganti Model | Memunculkan modal dialog interaktif untuk memilih model AI |
+| **`F3`** | Reset Sesi | Mereset seluruh percakapan dan status izin tool |
+| **`F4`** | Salin Respon | Menyalin pesan/jawaban terakhir AI ke clipboard sistem |
+| **`F5`** | Compact | Meringkas riwayat context window percakapan |
+| **`Ctrl+Q`**| Keluar | Keluar dari aplikasi autokeren secara aman |
+
+### Perintah Slash
+
+Dapat diketik langsung di kotak input chat:
 
 | Perintah | Deskripsi |
 |---|---|
 | `/help` | Tampilkan bantuan dan daftar perintah |
 | `/q` atau `/quit` | Keluar dari sesi |
-| `/status` | Tampilkan status context window, model aktif, dan info sesi |
+| `/model [nama]` | Ganti model aktif (buka modal pop-up jika nama kosong) |
 | `/compact` | Ringkas history percakapan, pertahankan N turn terakhir |
 | `/reset` | Reset sesi percakapan saat ini |
 | `/memory` | Tampilkan lokasi dan isi memory per-project |
+| `/permissions` | Tampilkan daftar tool yang diizinkan untuk sesi ini |
 | `/save [nama]` | Simpan sesi saat ini |
 | `/resume <nama\|id>` | Lanjutkan sesi tersimpan |
 | `/sessions` | Daftar semua sesi tersimpan |
@@ -207,12 +227,12 @@ pipx upgrade autokeren
 ## Arsitektur
 
 ```
-cli.py ──> agent.py (core loop) ──> models/ (Cloudflare client + router + retry)
-                                     tools/ (Tool base + registry + 21 tools)
-                                     context.py (session memory + token tracking)
-                                     memory.py (cross-session memory)
-                                     session.py (save/resume)
-                                     ui.py (rich terminal UI + markdown)
+cli.py ──> tui.py (TUI wrapper) ──> agent.py (core loop) ──> models/ (Cloudflare client + router + retry)
+                                                              tools/ (Tool base + registry + 21 tools)
+                                                              context.py (session memory + token tracking)
+                                                              memory.py (cross-session memory)
+                                                              session.py (save/resume)
+                                                              ui.py (fallback Rich CLI + markdown)
 ```
 
 ## Contributing
