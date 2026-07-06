@@ -351,8 +351,10 @@ class AutokerenTUI(App):
         Binding("f1", "help", "Help"),
         Binding("f2", "model", "Ganti Model"),
         Binding("f3", "reset", "Reset Sesi"),
+        Binding("f4", "copy_last", "Salin Respon"),
         Binding("f5", "compact", "Compact Context"),
         Binding("ctrl+q", "quit", "Keluar"),
+
     ]
 
     def __init__(self, agent: Agent, cfg: Config) -> None:
@@ -621,6 +623,7 @@ class AutokerenTUI(App):
             "  - [bold]F1[/bold]   : Bantuan ini\n"
             "  - [bold]F2[/bold]   : Tampilkan & Ganti Model aktif\n"
             "  - [bold]F3[/bold]   : Reset Sesi percakapan\n"
+            "  - [bold]F4[/bold]   : Salin respon terakhir AI ke clipboard\n"
             "  - [bold]F5[/bold]   : Compact Context (ringkas percakapan lama)\n"
             "  - [bold]Ctrl+Q[/bold]: Keluar dari aplikasi\n\n"
             "Perintah Slash:\n"
@@ -653,7 +656,24 @@ class AutokerenTUI(App):
 
         self.push_screen(ModelSelectScreen(all_models, current_model), on_select)
 
+    async def action_copy_last(self) -> None:
+        last_assistant_msg = None
+        for msg in reversed(self.agent.context.messages):
+            if msg.get("role") == "assistant" and msg.get("content"):
+                last_assistant_msg = msg["content"]
+                break
+        
+        if last_assistant_msg:
+            try:
+                self.copy_to_clipboard(last_assistant_msg)
+                self.append_chat_message("system", "✓ Respon terakhir berhasil disalin ke clipboard.")
+            except Exception as e:
+                self.append_chat_message("system", f"[red]Gagal menyalin ke clipboard: {e}[/red]")
+        else:
+            self.append_chat_message("system", "Belum ada respon assistant untuk disalin.")
+
     async def action_reset(self) -> None:
+
         self.agent.reset()
         self.allow_all = False
         self.allowed_tools.clear()
