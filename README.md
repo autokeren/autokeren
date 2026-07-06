@@ -9,7 +9,7 @@ autokeren adalah CLI agentic coding yang dirancang khusus untuk stack Cloudflare
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI](https://img.shields.io/pypi/v/autokeren.svg)](https://pypi.org/project/autokeren/)
 
-![autokeren TUI Screenshot](docs/screenshot.jpg)
+![autokeren TUI Screenshot](docs/assets/autogen-ui-preview.jpg)
 
 
 ---
