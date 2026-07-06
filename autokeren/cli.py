@@ -72,47 +72,8 @@ def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegist
 
 
 def _read_input(console: Console) -> str:
-    """Read user input with paste detection.
-
-    Long lines (>80 chars) or multi-line paste are shown as a yellow summary block.
-    User can type more, then Enter to send.
-    """
-    import select
-
-    PASTE_THRESHOLD = 80
-
-    line = Prompt.ask("[bold blue]kamu[/bold blue]").rstrip("\n")
-
-    if len(line) <= PASTE_THRESHOLD and "\n" not in line:
-        return line.strip()
-
-    pasted_parts = [line]
-    total_chars = len(line)
-
-    while select.select([sys.stdin], [], [], 0.05)[0]:
-        try:
-            more = input()
-        except (EOFError, KeyboardInterrupt):
-            break
-        if not more:
-            break
-        pasted_parts.append(more)
-        total_chars += len(more)
-
-    console.print(f"  [yellow on #1a1a00] 📋 {total_chars} chars dari clipboard [/yellow on #1a1a00] [dim]— ketik lagi atau Enter kosong untuk kirim[/dim]")
-
-    while True:
-        try:
-            more = input()
-        except (EOFError, KeyboardInterrupt):
-            break
-        if more.strip() == "":
-            break
-        pasted_parts.append(more)
-        total_chars += len(more)
-        console.print(f"  [yellow on #1a1a00] 📋 +{len(more)} chars (total {total_chars}) [/yellow on #1a1a00] [dim]— Enter kosong untuk kirim[/dim]")
-
-    return "\n".join(pasted_parts).strip()
+    """Read user input. Simple Prompt.ask, no paste detection."""
+    return Prompt.ask("[bold blue]kamu[/bold blue]").strip()
 
 
 def chat_loop(agent: Agent, cfg, ui: AgentUI):

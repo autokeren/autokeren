@@ -74,7 +74,7 @@ class AgentUI:
     # Banner
     # ------------------------------------------------------------------ #
 
-    def show_banner(self, version: str = "0.4.2") -> None:
+    def show_banner(self, version: str = "0.4.3") -> None:
         full_art = pyfiglet.figlet_format("AUTOKEREN", font="slant").rstrip("\n").split("\n")
         auto_art = pyfiglet.figlet_format("AUTO", font="slant").rstrip("\n").split("\n")
         colored = Text()
@@ -107,7 +107,7 @@ class AgentUI:
                 console=self.console,
                 refresh_per_second=12,
                 vertical_overflow="visible",
-                transient=True,
+                transient=False,
             )
             self._live.start()
         self._did_stream = True
@@ -119,7 +119,13 @@ class AgentUI:
                 self._last_render_time = now
                 self._live.update(Markdown(self._stream_text, code_theme="monokai"))
 
+    def _final_render(self) -> None:
+        """Final render sebelum stop Live — pastikan content lengkap."""
+        if self._live is not None and self._stream_text.strip():
+            self._live.update(Markdown(self._stream_text, code_theme="monokai"))
+
     def on_model_end(self, resp: "ModelResponse") -> None:
+        self._final_render()
         self._stop_all()
 
     def show_response(self, resp: "ModelResponse") -> None:
@@ -139,10 +145,9 @@ class AgentUI:
     # ------------------------------------------------------------------ #
 
     def on_tool_start(self, name: str, arguments: dict) -> None:
+        self._final_render()
         self._stop_all()
-        if self._stream_text.strip():
-            self.console.print(Markdown(self._stream_text.rstrip(), code_theme="monokai"))
-            self._stream_text = ""
+        self._stream_text = ""
         label = _format_tool_call(name, arguments)
         self.console.print(f"  [bold cyan]⏺[/bold cyan] {label}")
         self._status = self.console.status("  [dim]…[/dim]", spinner="dots")
