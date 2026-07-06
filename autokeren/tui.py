@@ -417,6 +417,26 @@ class AutokerenTUI(App):
         )
         self.append_chat_message("system", welcome)
         self.update_status()
+        self.run_worker(self.check_for_updates())
+
+    async def check_for_updates(self) -> None:
+        """Pengecekan versi terbaru dari PyPI secara asinkron di latar belakang."""
+        import httpx
+        from autokeren import __version__
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get("https://pypi.org/pypi/autokeren/json", timeout=2.0)
+                if resp.status_code == 200:
+                    latest_ver = resp.json()["info"]["version"]
+                    if latest_ver != __version__:
+                        self.append_chat_message(
+                            "system",
+                            f"🚀 [bold green]Versi baru autokeren tersedia: v{latest_ver}[/bold green]\n"
+                            "Jalankan [bold]pipx upgrade autokeren[/bold] untuk memperbarui!"
+                        )
+        except Exception:
+            pass
+
 
 
 
