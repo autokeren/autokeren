@@ -36,6 +36,7 @@ from autokeren.tools import (
     RememberTool,
     SearchCodeTool,
     ShellTool,
+    SpawnAgentTool,
     TodoTool,
     ToolRegistry,
     TmuxTool,
@@ -69,6 +70,7 @@ def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegist
     reg.register(TmuxTool(project_root))
     reg.register(TodoTool())
     reg.register(RememberTool(memory))
+    reg.register(SpawnAgentTool(cfg, str(project_root), memory))
     if cfg.auth.mode == "platform":
         reg.register(CreateProjectTool(cfg))
         reg.register(DeployProjectTool(cfg))

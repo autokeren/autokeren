@@ -673,45 +673,135 @@ class LanguageSelectScreen(ModalScreen[str]):
 
 
 class MCPManageScreen(ModalScreen[str]):
-    """Screen Modal untuk mengelola dan melihat status MCP servers yang terhubung."""
+    """Screen Modal untuk mengelola MCP servers: lihat status, list tools, tambah server baru."""
+
+    CSS = """
+    #mcp-add-form {
+        display: none;
+        height: auto;
+        margin-top: 1;
+    }
+    #mcp-add-form.visible {
+        display: block;
+    }
+    #mcp-name-input, #mcp-cmd-input {
+        width: 100%;
+        margin-bottom: 1;
+    }
+    """
 
     def __init__(self, mcp_clients: list[Any]) -> None:
         super().__init__()
         self._clients = mcp_clients
+        self._show_add_form = False
+        self._selected_index: int = -1
 
     @property
     def tui(self) -> AutokerenTUI:
         return self.app  # type: ignore
 
     def compose(self) -> ComposeResult:
+        items = self._build_options()
         yield Container(
             Static("[bold green]⚡ MCP Server Manager[/bold green]", id="modal-title"),
-            Static("[dim]Kelola MCP servers yang terhubung ke autokeren[/dim]", id="modal-desc"),
-            OptionList(id="mcp-list"),
+            Static("[dim]Pilih server untuk lihat tools · [bold]A[/bold] = Tambah · [bold]ESC[/bold] = Tutup[/dim]", id="modal-desc"),
+            OptionList(*items, id="mcp-list"),
+            Container(
+                Static("[bold yellow]+ Tambah MCP Server[/bold yellow]"),
+                Static("[dim]Nama server:[/dim]"),
+                Input(placeholder="misal: filesystem", id="mcp-name-input"),
+                Static("[dim]Command (pisah spasi, contoh: npx -y @modelcontextprotocol/server-filesystem /tmp):[/dim]"),
+                Input(placeholder="npx -y @modelcontextprotocol/server-filesystem", id="mcp-cmd-input"),
+                Static("[dim]Tekan Enter setelah mengisi command untuk menyimpan · ESC untuk batal[/dim]"),
+                id="mcp-add-form",
+            ),
             id="modal-dialog",
         )
 
-    def on_mount(self) -> None:
-        option_list = self.query_one("#mcp-list", OptionList)
+    def _build_options(self) -> list[str]:
         if not self._clients:
-            option_list.add_option("[dim]Tidak ada MCP server aktif.[/dim]")
-            option_list.add_option("[dim]Tambahkan ke config.yaml:[/dim]")
-            option_list.add_option("[dim]  mcp_servers:[/dim]")
-            option_list.add_option("[dim]    - name: filesystem[/dim]")
-            option_list.add_option("[dim]      command: [npx, -y, @modelcontextprotocol/server-filesystem][/dim]")
-        else:
-            for client in self._clients:
-                status = "🟢 Connected" if client.is_alive() else "🔴 Disconnected"
-                tools_count = len(client.tools())
-                label = f"{status}  [bold]{client.name}[/bold]  ({tools_count} tools)"
-                option_list.add_option(label)
+            return [
+                "[dim]Tidak ada MCP server aktif[/dim]",
+                "[dim]──────────────────────────[/dim]",
+                "[bold cyan]+ Tambah server baru (tekan A)[/bold cyan]",
+            ]
+        items = []
+        for client in self._clients:
+            status = "🟢" if client.is_alive() else "🔴"
+            tc = len(client.tools()) if client.is_alive() else 0
+            items.append(f"{status} [bold]{client.name}[/bold]  ({tc} tools) — klik untuk lihat tools")
+        items.append("[dim]──────────────────────────[/dim]")
+        items.append("[bold cyan]+ Tambah server baru (tekan A)[/bold cyan]")
+        return items
 
-    def on_option_list_option_selected(self, _: OptionList.OptionSelected) -> None:
-        self.dismiss("ok")
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        idx = event.option_index
+        if idx < len(self._clients):
+            # Tampilkan tool list server yang dipilih
+            client = self._clients[idx]
+            try:
+                tools = client.tools()
+                tool_names = "\n".join(f"  • {t['name']}: {t.get('description', '')[:60]}" for t in tools)
+                self.tui.append_chat_message(
+                    "system",
+                    f"[bold green]🔧 Tools di server '[bold]{client.name}[/bold]':[/bold green]\n{tool_names or '(tidak ada tools)'}"
+                )
+            except Exception as exc:
+                self.tui.append_chat_message("system", f"[red]Gagal baca tools: {exc}[/red]")
+            self.dismiss("ok")
+        else:
+            # Klik "Tambah server baru"
+            self._toggle_add_form()
+
+    def _toggle_add_form(self) -> None:
+        form = self.query_one("#mcp-add-form")
+        self._show_add_form = not self._show_add_form
+        if self._show_add_form:
+            form.add_class("visible")
+            self.query_one("#mcp-name-input", Input).focus()
+        else:
+            form.remove_class("visible")
+            self.query_one("#mcp-list", OptionList).focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "mcp-name-input":
+            # Pindah fokus ke field command
+            self.query_one("#mcp-cmd-input", Input).focus()
+        elif event.input.id == "mcp-cmd-input":
+            self._save_new_server()
+
+    def _save_new_server(self) -> None:
+        name = self.query_one("#mcp-name-input", Input).value.strip()
+        cmd_raw = self.query_one("#mcp-cmd-input", Input).value.strip()
+        if not name or not cmd_raw:
+            return
+        command = cmd_raw.split()
+        try:
+            from autokeren.config import save_config
+            from autokeren.config import MCPServerConfig
+            # Tambah ke config
+            new_srv = MCPServerConfig(name=name, command=command)
+            self.tui.cfg.mcp_servers.append(new_srv)
+            save_config(self.tui.cfg)
+            self.tui.append_chat_message(
+                "system",
+                f"[green]✓ Server '[bold]{name}[/bold]' ditambahkan ke config.yaml.[/green]\n"
+                f"  Restart autokeren untuk mengaktifkannya.",
+            )
+        except Exception as exc:
+            self.tui.append_chat_message("system", f"[red]Gagal simpan: {exc}[/red]")
+        self.dismiss("saved")
 
     def on_key(self, event: Any) -> None:
         if event.key == "escape":
-            self.dismiss(None)
+            if self._show_add_form:
+                self._toggle_add_form()
+                event.stop()
+            else:
+                self.dismiss(None)
+        elif event.key == "a" and not self._show_add_form:
+            self._toggle_add_form()
+            event.stop()
 
 
 class PermissionSelectScreen(ModalScreen[str]):
@@ -1175,6 +1265,7 @@ class AutokerenTUI(App):
 
         # Jalankan pengecekan update di background worker asinkron
         self.run_worker(self.check_for_updates())
+        self._focus_input()
 
     async def check_for_updates(self) -> None:
         """Pengecekan versi terbaru dari PyPI secara asinkron di latar belakang."""
@@ -1312,6 +1403,13 @@ class AutokerenTUI(App):
         self.call_after_refresh(_scroll)
 
 
+    def _focus_input(self) -> None:
+        """Kembalikan fokus kursor ke input box."""
+        try:
+            self.query_one("#input-pane", Input).focus()
+        except Exception:
+            pass
+
     def update_status(self) -> None:
         self.query_one("#status-pane StatusWidget", StatusWidget).update_status()
 
@@ -1329,6 +1427,7 @@ class AutokerenTUI(App):
 
         if val.startswith("/"):
             await self.handle_slash_command(val)
+            self._focus_input()
             return
 
         self.append_chat_message("user", val)
@@ -1436,6 +1535,7 @@ class AutokerenTUI(App):
                     self.update_status()
                 else:
                     self.append_chat_message("system", f"[red]Model '{chosen_id}' not found.[/red]")
+            self._focus_input()
 
         self.push_screen(ModelSelectScreen(all_models, current_model), on_select)
 
@@ -1455,6 +1555,7 @@ class AutokerenTUI(App):
                 # Update placeholder input
                 self.query_one("#input-pane", Input).placeholder = self.t("input_placeholder")
                 self.update_status()
+            self._focus_input()
 
         self.push_screen(LanguageSelectScreen(self.active_language), on_select)
 

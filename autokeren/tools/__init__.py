@@ -9,6 +9,7 @@ from autokeren.tools.project import CreateProjectTool, DeployProjectTool, ListPr
 from autokeren.tools.remember import RememberTool
 from autokeren.tools.search import SearchCodeTool
 from autokeren.tools.shell import ShellTool
+from autokeren.tools.spawn_agent import SpawnAgentTool
 from autokeren.tools.tmux import TmuxTool
 from autokeren.tools.todo import TodoTool
 from autokeren.tools.web import FetchURLTool
@@ -40,4 +41,5 @@ __all__ = [
     "CreateProjectTool",
     "DeployProjectTool",
     "ListProjectsTool",
+    "SpawnAgentTool",
 ]
