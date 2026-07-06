@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-07-06
+
+### Fixed
+- **Instant Ctrl+C Cancellation Recovery:** Tombol `Ctrl+C` sekarang langsung mengaktifkan kembali dan memfokuskan input box percakapan secara instan, tanpa harus menunggu background thread/subprocess (seperti shell execution atau API request) selesai dibatalkan.
+
 ## [0.6.1] - 2026-07-06
 
 ### Added
@@ -73,6 +78,7 @@ Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan
 - Indonesian localization untuk seluruh UI text.
 - 18 tools bawaan.
 
+[0.6.2]: https://github.com/autokeren/autokeren/releases/tag/v0.6.2
 [0.6.1]: https://github.com/autokeren/autokeren/releases/tag/v0.6.1
 [0.6.0]: https://github.com/autokeren/autokeren/releases/tag/v0.6.0
 [0.5.2]: https://github.com/autokeren/autokeren/releases/tag/v0.5.2

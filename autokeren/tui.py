@@ -1565,6 +1565,14 @@ class AutokerenTUI(App):
         """Menghentikan proses AI yang sedang berjalan."""
         self.agent.interrupted = True
         self.append_chat_message("system", self.t("interrupted_msg"))
+        try:
+            input_pane = self.query_one("#input-pane", Input)
+            input_pane.disabled = False
+            input_pane.placeholder = self.t("input_placeholder")
+            input_pane.focus()
+        except Exception:
+            pass
+        self.update_status()
 
     async def action_reset(self) -> None:
         self.agent.reset()
