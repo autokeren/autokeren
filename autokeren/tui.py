@@ -58,6 +58,7 @@ TRANSLATIONS = {
         "allowed_all": "All tools are allowed for this session.",
         "denied_tool": "Tool denied by user.",
         "allowed_tool": "Tool [bold cyan]{name}[/bold cyan] allowed.",
+        "model_changed": "⚡ Active AI model changed to: [bold cyan]{name}[/bold cyan]",
         "denied_tool_msg": "Tool [bold red]{name}[/bold red] denied.",
         "approved_plan": "Plan approved.",
         "rejected_plan": "Plan rejected.",
@@ -121,6 +122,7 @@ TRANSLATIONS = {
         "allowed_all": "Semua tool diizinkan untuk sesi ini.",
         "denied_tool": "Tool ditolak oleh user.",
         "allowed_tool": "Tool [bold cyan]{name}[/bold cyan] diizinkan.",
+        "model_changed": "⚡ Model AI aktif diganti ke: [bold cyan]{name}[/bold cyan]",
         "denied_tool_msg": "Tool [bold red]{name}[/bold red] ditolak.",
         "approved_plan": "Rencana kerja disetujui.",
         "rejected_plan": "Rencana kerja ditolak.",
@@ -184,6 +186,7 @@ TRANSLATIONS = {
         "allowed_all": "此会话允许所有工具调用。",
         "denied_tool": "用户拒绝了工具执行。",
         "allowed_tool": "工具 [bold cyan]{name}[/bold cyan] 已允许执行。",
+        "model_changed": "⚡ 活跃 AI 模型已切换为: [bold cyan]{name}[/bold cyan]",
         "denied_tool_msg": "工具 [bold red]{name}[/bold red] 已被拒绝。",
         "approved_plan": "工作计划已批准。",
         "rejected_plan": "工作计划已拒绝。",
@@ -247,6 +250,7 @@ TRANSLATIONS = {
         "allowed_all": "このセッションですべてのツール実行が許可されました。",
         "denied_tool": "ツール実行がユーザーに拒否されました。",
         "allowed_tool": "ツール [bold cyan]{name}[/bold cyan] が許可されました。",
+        "model_changed": "⚡ アクティブな AI モデルが変更されました: [bold cyan]{name}[/bold cyan]",
         "denied_tool_msg": "ツール [bold red]{name}[/bold red] が拒否されました。",
         "approved_plan": "計画が承認されました。",
         "rejected_plan": "計画が却下されました。",
@@ -310,6 +314,7 @@ TRANSLATIONS = {
         "allowed_all": "Alle Werkzeuge sind für diese Sitzung zugelassen.",
         "denied_tool": "Werkzeugausführung vom Benutzer abgelehnt.",
         "allowed_tool": "Werkzeug [bold cyan]{name}[/bold cyan] zugelassen.",
+        "model_changed": "⚡ Aktives KI-Modell geändert zu: [bold cyan]{name}[/bold cyan]",
         "denied_tool_msg": "Werkzeug [bold red]{name}[/bold red] abgelehnt.",
         "approved_plan": "Arbeitsplan genehmigt.",
         "rejected_plan": "Arbeitsplan abgelehnt.",
@@ -373,6 +378,7 @@ TRANSLATIONS = {
         "allowed_all": "تم السماح بجميع الأدوات لهذه الجلسة.",
         "denied_tool": "رفض المستخدم تشغيل الأداة.",
         "allowed_tool": "تم السماح بالأداة [bold cyan]{name}[/bold cyan].",
+        "model_changed": "⚡ تم تغيير نموذج الذكاء الاصطناعي النشط إلى: [bold cyan]{name}[/bold cyan]",
         "denied_tool_msg": "تم رفض الأداة [bold red]{name}[/bold red].",
         "approved_plan": "تمت الموافقة على خطة العمل.",
         "rejected_plan": "تم رفض خطة العمل.",
@@ -436,6 +442,7 @@ TRANSLATIONS = {
         "allowed_all": "Todas las herramientas están permitidas para esta sesión.",
         "denied_tool": "Ejecución de herramienta rechazada por el usuario.",
         "allowed_tool": "Herramienta [bold cyan]{name}[/bold cyan] permitida.",
+        "model_changed": "⚡ Modelo de IA activo cambiado a: [bold cyan]{name}[/bold cyan]",
         "denied_tool_msg": "Herramienta [bold red]{name}[/bold red] rechazada.",
         "approved_plan": "Plan de trabajo aprobado.",
         "rejected_plan": "Plan de trabajo rechazado.",
@@ -499,6 +506,7 @@ TRANSLATIONS = {
         "allowed_all": "Todas as ferramentas são permitidas nesta sessão.",
         "denied_tool": "Execução de ferramenta rejeitada pelo usuário.",
         "allowed_tool": "Ferramenta [bold cyan]{name}[/bold cyan] permitida.",
+        "model_changed": "⚡ Modelo de IA ativo alterado para: [bold cyan]{name}[/bold cyan]",
         "denied_tool_msg": "Ferramenta [bold red]{name}[/bold red] rejeitada.",
         "approved_plan": "Plano de trabalho aprovado.",
         "rejected_plan": "Plano de trabalho rejeitado.",
@@ -1306,7 +1314,7 @@ class AutokerenTUI(App):
                 from autokeren.models.cloudflare import resolve_model_id
                 resolved = resolve_model_id(chosen_id, self.agent.router.models[0].auth_mode)
                 if self.agent.router.switch_model(resolved):
-                    self.append_chat_message("system", self.t("allowed_tool", name=chosen_id))
+                    self.append_chat_message("system", self.t("model_changed", name=chosen_id))
                     self.update_status()
                 else:
                     self.append_chat_message("system", f"[red]Model '{chosen_id}' not found.[/red]")
