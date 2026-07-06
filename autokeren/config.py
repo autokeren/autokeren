@@ -54,6 +54,8 @@ class AutokerenConfig(BaseModel):
     auto_save_session: bool = False
     max_tool_calls: int = 0  # 0 = unlimited (batas alami: context window + neuron quota)
     mermaid_render: bool = False  # render mermaid sebagai image (false = code block only)
+    language: str = ""            # kode bahasa preferensi, contoh: "en", "id". Kosong = auto-detect.
+
 
 
 class CamofoxConfig(BaseModel):

@@ -1,4 +1,4 @@
-"""TUI (Text User Interface) untuk autokeren berbasis Textual."""
+"""TUI (Text User Interface) untuk autokeren berbasis Textual dengan dukungan Multi-Bahasa."""
 from __future__ import annotations
 
 import threading
@@ -13,31 +13,533 @@ from textual.binding import Binding
 from rich.markdown import Markdown
 from rich.text import Text
 
-
 from autokeren.agent import Agent
 from autokeren.config import Config
 from autokeren.models.base import ModelResponse
 from autokeren.ui import _format_tool_call, _summarize_tool_result
 
+# ------------------------------------------------------------------ #
+# Sistem Multi-Bahasa (i18n)
+# ------------------------------------------------------------------ #
+
+LANGUAGES = {
+    "id": "Bahasa Indonesia",
+    "en": "English",
+    "zh": "中文 (Chinese)",
+    "ja": "日本語 (Japanese)",
+    "de": "Deutsch (German)",
+    "ar": "العربية (Arabic)",
+    "es": "Español (Spanish)",
+    "pt": "Português (Portuguese)",
+}
+
+TRANSLATIONS = {
+    "en": {
+        "welcome_sub": "Type your question below, or press [bold]F1[/bold] for command help.",
+        "status_title": "STATUS",
+        "model": "Model",
+        "auth": "Auth",
+        "tokens": "Tokens",
+        "remaining_tokens": "Rem. Tok",
+        "neurons": "Neurons",
+        "active": "Active",
+        "session": "Session",
+        "temp": "Temp",
+        "maxtok": "MaxTok",
+        "pmode": "P.Mode",
+        "mcalls": "M.Calls",
+        "click_change_model": "Click here to change model",
+        "click_change_lang": "Click here to change language",
+        "lang": "Lang",
+        "allowed_all": "All tools are allowed for this session.",
+        "denied_tool": "Tool denied by user.",
+        "allowed_tool": "Tool [bold cyan]{name}[/bold cyan] allowed.",
+        "denied_tool_msg": "Tool [bold red]{name}[/bold red] denied.",
+        "approved_plan": "Plan approved.",
+        "rejected_plan": "Plan rejected.",
+        "reset_success": "Session and tool permissions successfully reset.",
+        "compacting": "Compacting conversation context...",
+        "compact_success": "Compacted context successfully.",
+        "compact_fail": "Compact failed: {error}",
+        "save_success": "Session '{name}' saved. ID: {sid}",
+        "save_fail": "Save failed: {error}",
+        "resume_fail": "Resume failed: {error}",
+        "no_sessions": "No saved sessions found.",
+        "sessions_title": "SAVED SESSIONS:",
+        "unknown_cmd": "Unknown command: {cmd}",
+        "mikir": "thinking",
+        "help_title": "KEY BINDINGS & SLASH COMMANDS HELP",
+        "shortcuts": "Shortcuts:",
+        "slash_commands_label": "Slash Commands:",
+        "f1_desc": "This help menu",
+        "f2_desc": "Display & change active AI model",
+        "f3_desc": "Reset conversation session",
+        "f4_desc": "Copy last AI response to clipboard",
+        "f5_desc": "Compact context window history",
+        "f6_desc": "Change active UI language",
+        "ctrlq_desc": "Exit autokeren cleanly",
+        "last_copied": "✓ Last response successfully copied to clipboard.",
+        "copy_fail": "Failed to copy to clipboard: {error}",
+        "no_last_msg": "No assistant response to copy.",
+        "confirm_title": "TOOL EXECUTION PERMISSION",
+        "confirm_sub": "⚡ Run [bold cyan]{label}[/bold cyan]? — {desc}",
+        "opt_allow_once": "✓ Allow Once",
+        "opt_allow_all": "⚡ Allow All Tools in This Session",
+        "opt_deny": "✗ Deny Execution",
+        "approve_title": "APPROVE WORK PLAN?",
+        "opt_approve": "✓ Approve Plan",
+        "opt_reject": "✗ Reject Plan",
+        "model_title": "SELECT AI MODEL",
+        "lang_title": "SELECT LANGUAGE",
+        "thinking_placeholder": "Thinking...",
+        "input_placeholder": "✍️ Type a message here...",
+    },
+    "id": {
+        "welcome_sub": "Ketik pertanyaan kamu di bawah, atau tekan [bold]F1[/bold] untuk bantuan perintah.",
+        "status_title": "STATUS",
+        "model": "Model",
+        "auth": "Auth",
+        "tokens": "Tokens",
+        "remaining_tokens": "Sisa Tok",
+        "neurons": "Neurons",
+        "active": "Active",
+        "session": "Session",
+        "temp": "Temp",
+        "maxtok": "MaxTok",
+        "pmode": "P.Mode",
+        "mcalls": "M.Calls",
+        "click_change_model": "Klik di sini untuk ganti model",
+        "click_change_lang": "Klik di sini untuk ganti bahasa",
+        "lang": "Lang",
+        "allowed_all": "Semua tool diizinkan untuk sesi ini.",
+        "denied_tool": "Tool ditolak oleh user.",
+        "allowed_tool": "Tool [bold cyan]{name}[/bold cyan] diizinkan.",
+        "denied_tool_msg": "Tool [bold red]{name}[/bold red] ditolak.",
+        "approved_plan": "Rencana kerja disetujui.",
+        "rejected_plan": "Rencana kerja ditolak.",
+        "reset_success": "Sesi dan izin tool berhasil direset.",
+        "compacting": "Meringkas context percakapan...",
+        "compact_success": "Context berhasil diringkas.",
+        "compact_fail": "Compact gagal: {error}",
+        "save_success": "Sesi '{name}' disimpan. ID: {sid}",
+        "save_fail": "Save gagal: {error}",
+        "resume_fail": "Resume gagal: {error}",
+        "no_sessions": "Belum ada sesi yang disimpan.",
+        "sessions_title": "SESI YANG DISIMPAN:",
+        "unknown_cmd": "Perintah tidak dikenal: {cmd}",
+        "mikir": "mikir",
+        "help_title": "BANTUAN KEY BINDING & SLASH COMMANDS",
+        "shortcuts": "Tombol Pintas:",
+        "slash_commands_label": "Perintah Slash:",
+        "f1_desc": "Bantuan ini",
+        "f2_desc": "Tampilkan & Ganti Model aktif",
+        "f3_desc": "Reset Sesi percakapan",
+        "f4_desc": "Salin respon terakhir AI ke clipboard",
+        "f5_desc": "Compact Context (ringkas percakapan lama)",
+        "f6_desc": "Ganti bahasa antarmuka UI",
+        "ctrlq_desc": "Keluar dari aplikasi secara bersih",
+        "last_copied": "✓ Respon terakhir berhasil disalin ke clipboard.",
+        "copy_fail": "Gagal menyalin ke clipboard: {error}",
+        "no_last_msg": "Belum ada respon assistant untuk disalin.",
+        "confirm_title": "IZIN EKSEKUSI TOOL",
+        "confirm_sub": "⚡ Panggil [bold cyan]{label}[/bold cyan]? — {desc}",
+        "opt_allow_once": "✓ Izinkan Sekali",
+        "opt_allow_all": "⚡ Izinkan Semua Tool Sesi Ini",
+        "opt_deny": "✗ Tolak Eksekusi",
+        "approve_title": "SETUJUI RENCANA KERJA?",
+        "opt_approve": "✓ Setujui Rencana",
+        "opt_reject": "✗ Tolak Rencana",
+        "model_title": "PILIH MODEL AI",
+        "lang_title": "PILIH BAHASA / SELECT LANGUAGE",
+        "thinking_placeholder": "Sedang berpikir...",
+        "input_placeholder": "✍️ Ketik pesan di sini...",
+    },
+    "zh": {
+        "welcome_sub": "在下方输入您的问题，或按 [bold]F1[/bold] 获取命令帮助。",
+        "status_title": "状态",
+        "model": "模型",
+        "auth": "认证",
+        "tokens": "Token数",
+        "remaining_tokens": "剩余Token",
+        "neurons": "配额 (Neurons)",
+        "active": "当前目录",
+        "session": "会话消息",
+        "temp": "温度 (Temp)",
+        "maxtok": "最大Token",
+        "pmode": "计划模式",
+        "mcalls": "工具调用",
+        "click_change_model": "点击此处更改模型",
+        "click_change_lang": "点击此处更改语言",
+        "lang": "语言",
+        "allowed_all": "此会话允许所有工具调用。",
+        "denied_tool": "用户拒绝了工具执行。",
+        "allowed_tool": "工具 [bold cyan]{name}[/bold cyan] 已允许执行。",
+        "denied_tool_msg": "工具 [bold red]{name}[/bold red] 已被拒绝。",
+        "approved_plan": "工作计划已批准。",
+        "rejected_plan": "工作计划已拒绝。",
+        "reset_success": "会话和工具授权已重置。",
+        "compacting": "正在压缩对话上下文...",
+        "compact_success": "成功压缩上下文。",
+        "compact_fail": "压缩失败: {error}",
+        "save_success": "会话 '{name}' 已保存。ID: {sid}",
+        "save_fail": "保存失败: {error}",
+        "resume_fail": "恢复失败: {error}",
+        "no_sessions": "未发现已保存的会话。",
+        "sessions_title": "已保存的会话:",
+        "unknown_cmd": "未知命令: {cmd}",
+        "mikir": "思考中",
+        "help_title": "按键绑定与斜杠命令帮助",
+        "shortcuts": "快捷键:",
+        "slash_commands_label": "斜杠命令:",
+        "f1_desc": "显示此帮助菜单",
+        "f2_desc": "显示并更改当前 AI 模型",
+        "f3_desc": "重置当前对话会话",
+        "f4_desc": "将 AI 的最后一条回复复制到剪贴板",
+        "f5_desc": "压缩上下文窗口历史记录",
+        "f6_desc": "更改当前界面语言",
+        "ctrlq_desc": "安全退出应用程序",
+        "last_copied": "✓ 最后的回复已成功复制到剪贴板。",
+        "copy_fail": "复制到剪贴板失败: {error}",
+        "no_last_msg": "没有可复制的回复。",
+        "confirm_title": "工具执行权限请求",
+        "confirm_sub": "⚡ 是否执行 [bold cyan]{label}[/bold cyan]? — {desc}",
+        "opt_allow_once": "✓ 允许一次",
+        "opt_allow_all": "⚡ 在此会话中允许所有工具",
+        "opt_deny": "✗ 拒绝执行",
+        "approve_title": "批准工作计划？",
+        "opt_approve": "✓ 批准计划",
+        "opt_reject": "✗ 拒绝计划",
+        "model_title": "选择 AI 模型",
+        "lang_title": "选择界面语言",
+        "thinking_placeholder": "思考中...",
+        "input_placeholder": "✍️ 在此处输入消息...",
+    },
+    "ja": {
+        "welcome_sub": "質問を以下に入力するか、[bold]F1[/bold] キーでコマンドのヘルプを表示します。",
+        "status_title": "ステータス",
+        "model": "モデル",
+        "auth": "認証",
+        "tokens": "トークン",
+        "remaining_tokens": "残トークン",
+        "neurons": "ニューロン",
+        "active": "アクティブ",
+        "session": "セッション",
+        "temp": "温度",
+        "maxtok": "最大トークン",
+        "pmode": "計画モード",
+        "mcalls": "呼出数",
+        "click_change_model": "ここをクリックしてモデルを変更",
+        "click_change_lang": "ここをクリックして言語を変更",
+        "lang": "言語",
+        "allowed_all": "このセッションですべてのツール実行が許可されました。",
+        "denied_tool": "ツール実行がユーザーに拒否されました。",
+        "allowed_tool": "ツール [bold cyan]{name}[/bold cyan] が許可されました。",
+        "denied_tool_msg": "ツール [bold red]{name}[/bold red] が拒否されました。",
+        "approved_plan": "計画が承認されました。",
+        "rejected_plan": "計画が却下されました。",
+        "reset_success": "セッションとツール実行の権限がリセットされました。",
+        "compacting": "コンテキストを圧縮中...",
+        "compact_success": "コンテキストの圧縮に成功しました。",
+        "compact_fail": "圧縮失敗: {error}",
+        "save_success": "セッション '{name}' が保存されました。ID: {sid}",
+        "save_fail": "保存失敗: {error}",
+        "resume_fail": "復元失敗: {error}",
+        "no_sessions": "保存されたセッションが見つかりません。",
+        "sessions_title": "保存されたセッション:",
+        "unknown_cmd": "不明なコマンド: {cmd}",
+        "mikir": "考え中",
+        "help_title": "キーバインディングとスラッシュコマンドのヘルプ",
+        "shortcuts": "ショートカットキー:",
+        "slash_commands_label": "スラッシュコマンド:",
+        "f1_desc": "このヘルプを表示",
+        "f2_desc": "AI モデル의 표시と変更",
+        "f3_desc": "会話セッションのリセット",
+        "f4_desc": "最後の AI の応答をクリップボードにコピー",
+        "f5_desc": "コンテキスト履歴を圧縮",
+        "f6_desc": "UI 表示言語の変更",
+        "ctrlq_desc": "アプリケーションを安全に終了",
+        "last_copied": "✓ 最後の応答がクリップボードにコピーされました。",
+        "copy_fail": "コピー失敗: {error}",
+        "no_last_msg": "コピーする応答がありません。",
+        "confirm_title": "ツールの実行許可確認",
+        "confirm_sub": "⚡ [bold cyan]{label}[/bold cyan] を実行しますか？ — {desc}",
+        "opt_allow_once": "✓ 1回許可",
+        "opt_allow_all": "⚡ このセッションですべて許可",
+        "opt_deny": "✗ 実行を拒否",
+        "approve_title": "作業計画を承認しますか？",
+        "opt_approve": "✓ 計画を承認",
+        "opt_reject": "✗ 計画を却下",
+        "model_title": "AI モデルの選択",
+        "lang_title": "言語を選択してください",
+        "thinking_placeholder": "考え中...",
+        "input_placeholder": "✍️ メッセージを入力...",
+    },
+    "de": {
+        "welcome_sub": "Geben Sie Ihre Frage unten ein oder drücken Sie [bold]F1[/bold] für Befehlshilfe.",
+        "status_title": "STATUS",
+        "model": "Modell",
+        "auth": "Auth",
+        "tokens": "Tokens",
+        "remaining_tokens": "Verbl. Tok.",
+        "neurons": "Neurons",
+        "active": "Aktiv",
+        "session": "Sitzung",
+        "temp": "Temp",
+        "maxtok": "MaxTok",
+        "pmode": "P.Modus",
+        "mcalls": "M.Aufrufe",
+        "click_change_model": "Klicken Sie hier, um das Modell zu ändern",
+        "click_change_lang": "Klicken Sie hier, um die Sprache zu ändern",
+        "lang": "Sprache",
+        "allowed_all": "Alle Werkzeuge sind für diese Sitzung zugelassen.",
+        "denied_tool": "Werkzeugausführung vom Benutzer abgelehnt.",
+        "allowed_tool": "Werkzeug [bold cyan]{name}[/bold cyan] zugelassen.",
+        "denied_tool_msg": "Werkzeug [bold red]{name}[/bold red] abgelehnt.",
+        "approved_plan": "Arbeitsplan genehmigt.",
+        "rejected_plan": "Arbeitsplan abgelehnt.",
+        "reset_success": "Sitzung und Werkzeugberechtigungen erfolgreich zurückgesetzt.",
+        "compacting": "Kontext wird komprimiert...",
+        "compact_success": "Kontext erfolgreich komprimiert.",
+        "compact_fail": "Komprimierung fehlgeschlagen: {error}",
+        "save_success": "Sitzung '{name}' gespeichert. ID: {sid}",
+        "save_fail": "Speichern fehlgeschlagen: {error}",
+        "resume_fail": "Wiederherstellung fehlgeschlagen: {error}",
+        "no_sessions": "Keine gespeicherten Sitzungen gefunden.",
+        "sessions_title": "GESPEICHERTE SITZUNGEN:",
+        "unknown_cmd": "Unbekannter Befehl: {cmd}",
+        "mikir": "nachdenken",
+        "help_title": "TASTENBELEGUNG & SLASH-BEFEHLE HILFE",
+        "shortcuts": "Tastaturkürzel:",
+        "slash_commands_label": "Slash-Befehle:",
+        "f1_desc": "Dieses Hilfemenü",
+        "f2_desc": "Aktives AI-Modell anzeigen & ändern",
+        "f3_desc": "Konversationssitzung zurücksetzen",
+        "f4_desc": "Letzte AI-Antwort in die Zwischenablage kopieren",
+        "f5_desc": "Kontexthistorie komprimieren",
+        "f6_desc": "Aktive UI-Sprache ändern",
+        "ctrlq_desc": "Anwendung sauber beenden",
+        "last_copied": "✓ Letzte Antwort erfolgreich in die Zwischenablage kopiert.",
+        "copy_fail": "Kopieren fehlgeschlagen: {error}",
+        "no_last_msg": "Keine Antwort zum Kopieren vorhanden.",
+        "confirm_title": "WERKZEUGAUSFÜHRUNGSRECHTE",
+        "confirm_sub": "⚡ [bold cyan]{label}[/bold cyan] ausführen? — {desc}",
+        "opt_allow_once": "✓ Einmalig zulassen",
+        "opt_allow_all": "⚡ Alle Werkzeuge in dieser Sitzung zulassen",
+        "opt_deny": "✗ Ausführung ablehnen",
+        "approve_title": "ARBEITSPLAN GENEHMIGEN?",
+        "opt_approve": "✓ Plan genehmigen",
+        "opt_reject": "✗ Plan ablehnen",
+        "model_title": "AI-MODELL AUSWÄHLEN",
+        "lang_title": "SPRACHE AUSWÄHLEN",
+        "thinking_placeholder": "Nachdenken...",
+        "input_placeholder": "✍️ Nachricht hier eingeben...",
+    },
+    "ar": {
+        "welcome_sub": "اكتب سؤالك أدناه، أو اضغط على [bold]F1[/bold] للحصول على مساعدة بشأن الأوامر.",
+        "status_title": "الحالة",
+        "model": "النموذج",
+        "auth": "المصادقة",
+        "tokens": "الرموز",
+        "remaining_tokens": "المتبقي",
+        "neurons": "الحصص",
+        "active": "النشط",
+        "session": "الجلسة",
+        "temp": "الحرارة",
+        "maxtok": "أقصى رموز",
+        "pmode": "وضع الخطة",
+        "mcalls": "الاتصالات",
+        "click_change_model": "انقر هنا لتغيير النموذج",
+        "click_change_lang": "انقر هنا لتغيير اللغة",
+        "lang": "اللغة",
+        "allowed_all": "تم السماح بجميع الأدوات لهذه الجلسة.",
+        "denied_tool": "رفض المستخدم تشغيل الأداة.",
+        "allowed_tool": "تم السماح بالأداة [bold cyan]{name}[/bold cyan].",
+        "denied_tool_msg": "تم رفض الأداة [bold red]{name}[/bold red].",
+        "approved_plan": "تمت الموافقة على خطة العمل.",
+        "rejected_plan": "تم رفض خطة العمل.",
+        "reset_success": "تم إعادة تعيين الجلسة وأذونات الأدوات بنجاح.",
+        "compacting": "جاري ضغط سياق المحادثة...",
+        "compact_success": "تم ضغط السياق بنجاح.",
+        "compact_fail": "فشل الضغط: {error}",
+        "save_success": "تم حفظ الجلسة '{name}'. المعرف: {sid}",
+        "save_fail": "فشل الحفظ: {error}",
+        "resume_fail": "فشلت الاستعادة: {error}",
+        "no_sessions": "لم يتم العثور على جلسات محفوظة.",
+        "sessions_title": "الجلسات المحفوظة:",
+        "unknown_cmd": "أمر غير معروف: {cmd}",
+        "mikir": "جاري التفكير",
+        "help_title": "مساعدة أزرار الاختصار وأوامر سلاش",
+        "shortcuts": "الاختصارات:",
+        "slash_commands_label": "أوامر سلاش:",
+        "f1_desc": "قائمة المساعدة هذه",
+        "f2_desc": "عرض وتغيير نموذج الذكاء الاصطناعي النشط",
+        "f3_desc": "إعادة تعيين جلسة المحادثة",
+        "f4_desc": "نسخ آخر رد للذكاء الاصطناعي إلى الحافظة",
+        "f5_desc": "ضغط تاريخ السياق للمحادثة",
+        "f6_desc": "تغيير لغة واجهة المستخدم",
+        "ctrlq_desc": "الخروج الآمن من التطبيق",
+        "last_copied": "✓ تم نسخ آخر رد بنجاح إلى الحافظة.",
+        "copy_fail": "فشل النسخ إلى الحافظة: {error}",
+        "no_last_msg": "لا يوجد رد للنسخ.",
+        "confirm_title": "إذن تشغيل الأداة",
+        "confirm_sub": "⚡ هل تريد تشغيل [bold cyan]{label}[/bold cyan]؟ — {desc}",
+        "opt_allow_once": "✓ السماح مرة واحدة",
+        "opt_allow_all": "⚡ السماح بجميع الأدوات في هذه الجلسة",
+        "opt_deny": "✗ رفض التشغيل",
+        "approve_title": "الموافقة على خطة العمل؟",
+        "opt_approve": "✓ الموافقة على الخطة",
+        "opt_reject": "✗ رفض الخطة",
+        "model_title": "اختر نموذج الذكاء الاصطناعي",
+        "lang_title": "اختر اللغة / SELECT LANGUAGE",
+        "thinking_placeholder": "جاري التفكير...",
+        "input_placeholder": "✍️ اكتب رسالتك هنا...",
+    },
+    "es": {
+        "welcome_sub": "Escriba su pregunta a continuación o presione [bold]F1[/bold] para obtener ayuda sobre comandos.",
+        "status_title": "ESTADO",
+        "model": "Modelo",
+        "auth": "Autenticación",
+        "tokens": "Tokens",
+        "remaining_tokens": "Tok. Rest.",
+        "neurons": "Neurons",
+        "active": "Activo",
+        "session": "Sesión",
+        "temp": "Temp",
+        "maxtok": "MaxTok",
+        "pmode": "Modo Plan",
+        "mcalls": "Llamadas M.",
+        "click_change_model": "Haga clic aquí para cambiar el modelo",
+        "click_change_lang": "Haga clic aquí para cambiar el idioma",
+        "lang": "Idioma",
+        "allowed_all": "Todas las herramientas están permitidas para esta sesión.",
+        "denied_tool": "Ejecución de herramienta rechazada por el usuario.",
+        "allowed_tool": "Herramienta [bold cyan]{name}[/bold cyan] permitida.",
+        "denied_tool_msg": "Herramienta [bold red]{name}[/bold red] rechazada.",
+        "approved_plan": "Plan de trabajo aprobado.",
+        "rejected_plan": "Plan de trabajo rechazado.",
+        "reset_success": "Sesión y permisos de herramientas restablecidos con éxito.",
+        "compacting": "Compactando el contexto de la conversación...",
+        "compact_success": "Contexto compactado con éxito.",
+        "compact_fail": "Error de compactación: {error}",
+        "save_success": "Sesión '{name}' guardada. ID: {sid}",
+        "save_fail": "Error al guardar: {error}",
+        "resume_fail": "Error al reanudar: {error}",
+        "no_sessions": "No se encontraron sesiones guardadas.",
+        "sessions_title": "SESIONES GUARDADAS:",
+        "unknown_cmd": "Comando desconocido: {cmd}",
+        "mikir": "pensando",
+        "help_title": "AYUDA DE ATAJOS DE TECLADO Y COMANDOS DE BARRA",
+        "shortcuts": "Atajos de teclado:",
+        "slash_commands_label": "Comandos de barra:",
+        "f1_desc": "Este menú de ayuda",
+        "f2_desc": "Mostrar y cambiar el modelo de IA activo",
+        "f3_desc": "Restablecer la sesión de conversación",
+        "f4_desc": "Copiar la última respuesta de IA al portapapeles",
+        "f5_desc": "Compactar el historial de contexto",
+        "f6_desc": "Cambiar el idioma de la interfaz de usuario",
+        "ctrlq_desc": "Salir de la aplicación de forma limpia",
+        "last_copied": "✓ Última respuesta copiada al portapapeles con éxito.",
+        "copy_fail": "Error al copiar al portapapeles: {error}",
+        "no_last_msg": "No hay respuesta para copiar.",
+        "confirm_title": "PERMISO DE EJECUCIÓN DE HERRAMIENTA",
+        "confirm_sub": "⚡ ¿Ejecutar [bold cyan]{label}[/bold cyan]? — {desc}",
+        "opt_allow_once": "✓ Permitir una vez",
+        "opt_allow_all": "⚡ Permitir todas las herramientas en esta sesión",
+        "opt_deny": "✗ Denegar ejecución",
+        "approve_title": "¿APROBAR EL PLAN DE TRABAJO?",
+        "opt_approve": "✓ Aprobar plan",
+        "opt_reject": "✗ Rechazar plan",
+        "model_title": "SELECCIONAR MODELO DE IA",
+        "lang_title": "SELECCIONAR IDIOMA",
+        "thinking_placeholder": "Pensando...",
+        "input_placeholder": "✍️ Escriba un mensaje aquí...",
+    },
+    "pt": {
+        "welcome_sub": "Digite sua pergunta abaixo ou pressione [bold]F1[/bold] para obter ajuda sobre comandos.",
+        "status_title": "STATUS",
+        "model": "Modelo",
+        "auth": "Autenticação",
+        "tokens": "Tokens",
+        "remaining_tokens": "Tok. Rest.",
+        "neurons": "Neurons",
+        "active": "Ativo",
+        "session": "Sessão",
+        "temp": "Temp",
+        "maxtok": "MaxTok",
+        "pmode": "Modo Plano",
+        "mcalls": "Chamadas M.",
+        "click_change_model": "Clique aqui para alterar o modelo",
+        "click_change_lang": "Clique aqui para alterar o idioma",
+        "lang": "Idioma",
+        "allowed_all": "Todas as ferramentas são permitidas nesta sessão.",
+        "denied_tool": "Execução de ferramenta rejeitada pelo usuário.",
+        "allowed_tool": "Ferramenta [bold cyan]{name}[/bold cyan] permitida.",
+        "denied_tool_msg": "Ferramenta [bold red]{name}[/bold red] rejeitada.",
+        "approved_plan": "Plano de trabalho aprovado.",
+        "rejected_plan": "Plano de trabalho rejeitado.",
+        "reset_success": "Sessão e permissões de ferramentas redefinidas com sucesso.",
+        "compacting": "Compactando o contexto da conversa...",
+        "compact_success": "Contexto compactado com sucesso.",
+        "compact_fail": "Falha na compactação: {error}",
+        "save_success": "Sessão '{name}' salva. ID: {sid}",
+        "save_fail": "Falha ao salvar: {error}",
+        "resume_fail": "Falha ao retomar: {error}",
+        "no_sessions": "Nenhuma sessão salva encontrada.",
+        "sessions_title": "SESSÕES SALVAS:",
+        "unknown_cmd": "Comando desconhecido: {cmd}",
+        "mikir": "pensando",
+        "help_title": "AJUDA DE ATALHOS DE TECLADO E COMANDOS DE BARRA",
+        "shortcuts": "Atalhos de teclado:",
+        "slash_commands_label": "Comandos de barra:",
+        "f1_desc": "Este menu de ajuda",
+        "f2_desc": "Exibir e alterar o modelo de IA ativo",
+        "f3_desc": "Redefinir a sessão de conversa",
+        "f4_desc": "Copiar a última resposta de IA para a área de transferência",
+        "f5_desc": "Compactar o histórico do contexto",
+        "f6_desc": "Alterar o idioma da interface do usuário",
+        "ctrlq_desc": "Sair do aplicativo de forma limpa",
+        "last_copied": "✓ Última resposta copiada para a área de transferência com sucesso.",
+        "copy_fail": "Falha ao copiar para a área de transferência: {error}",
+        "no_last_msg": "Nenhuma resposta para copiar.",
+        "confirm_title": "PERMISSÃO DE EXECUÇÃO DE FERRAMENTA",
+        "confirm_sub": "⚡ Executar [bold cyan]{label}[/bold cyan]? — {desc}",
+        "opt_allow_once": "✓ Permitir uma vez",
+        "opt_allow_all": "⚡ Permitir todas as ferramentas nesta sessão",
+        "opt_deny": "✗ Recusar execução",
+        "approve_title": "APROVAR PLANO DE TRABALHO?",
+        "opt_approve": "✓ Aprovar plano",
+        "opt_reject": "✗ Rejeitar plano",
+        "model_title": "SELECIONAR MODELO DE IA",
+        "lang_title": "SELECIONAR IDIOMA",
+        "thinking_placeholder": "Pensando...",
+        "input_placeholder": "✍️ Digite uma mensagem aqui...",
+    }
+}
+
 
 class ThinkingWidget(Static):
-    """Widget untuk animasi 'mikir...'."""
+    """Widget untuk menampilkan animasi 'mikir...'."""
+
+    @property
+    def tui(self) -> AutokerenTUI:
+        return self.app  # type: ignore
 
     def on_mount(self) -> None:
         self.frame = 0
+        mikir_text = self.tui.t("mikir")
         self.frames = [
-            "🤔 [dim]mikir .  [/dim]",
-            "🤔 [dim]mikir .. [/dim]",
-            "🤔 [dim]mikir ...[/dim]",
-            "🤔 [dim]mikir  ..[/dim]",
-            "🤔 [dim]mikir   .[/dim]",
+            f"🤔 [dim]{mikir_text} .  [/dim]",
+            f"🤔 [dim]{mikir_text} .. [/dim]",
+            f"🤔 [dim]{mikir_text} ...[/dim]",
+            f"🤔 [dim]{mikir_text}  ..[/dim]",
+            f"🤔 [dim]{mikir_text}   .[/dim]",
         ]
-        self.update(self.frames[0])
+        self.update(Text.from_markup(self.frames[0]))
         self.timer = self.set_interval(0.3, self.next_frame)
 
     def next_frame(self) -> None:
         self.frame = (self.frame + 1) % len(self.frames)
-        self.update(self.frames[self.frame])
+        self.update(Text.from_markup(self.frames[self.frame]))
 
 
 class ModelSelectScreen(ModalScreen[str]):
@@ -48,9 +550,13 @@ class ModelSelectScreen(ModalScreen[str]):
         self.models = models
         self.current_model = current_model
 
+    @property
+    def tui(self) -> AutokerenTUI:
+        return self.app  # type: ignore
+
     def compose(self) -> ComposeResult:
         yield Container(
-            Static("[bold green]PILIH MODEL AI[/bold green]", id="modal-title"),
+            Static(f"[bold green]{self.tui.t('model_title')}[/bold green]", id="modal-title"),
             OptionList(id="model-list"),
             id="modal-dialog",
         )
@@ -60,13 +566,48 @@ class ModelSelectScreen(ModalScreen[str]):
         for m in self.models:
             label = m.get("name", m["id"])
             if m["id"] == self.current_model:
-                label = f"✨ [green]{label} (Aktif)[/green]"
+                label = f"✨ [green]{label} ({self.tui.t('active')})[/green]"
             option_list.add_option(label)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         chosen_id = self.models[event.option_index]["id"]
         self.dismiss(chosen_id)
 
+    def on_key(self, event: Any) -> None:
+        if event.key == "escape":
+            self.dismiss(None)
+
+
+class LanguageSelectScreen(ModalScreen[str]):
+    """Screen Modal untuk memilih bahasa UI secara interaktif."""
+
+    def __init__(self, current_lang: str) -> None:
+        super().__init__()
+        self.current_lang = current_lang
+
+    @property
+    def tui(self) -> AutokerenTUI:
+        return self.app  # type: ignore
+
+    def compose(self) -> ComposeResult:
+        yield Container(
+            Static(f"[bold green]{self.tui.t('lang_title')}[/bold green]", id="modal-title"),
+            OptionList(id="lang-list"),
+            id="modal-dialog",
+        )
+
+    def on_mount(self) -> None:
+        option_list = self.query_one("#lang-list", OptionList)
+        self.lang_codes = list(LANGUAGES.keys())
+        for code in self.lang_codes:
+            label = f"{LANGUAGES[code]} ({code})"
+            if code == self.current_lang:
+                label = f"✨ [green]{label} ({self.tui.t('active')})[/green]"
+            option_list.add_option(label)
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        chosen_code = self.lang_codes[event.option_index]
+        self.dismiss(chosen_code)
 
     def on_key(self, event: Any) -> None:
         if event.key == "escape":
@@ -81,14 +622,18 @@ class PermissionSelectScreen(ModalScreen[str]):
         self.tool_call_label = tool_call_label
         self.description = description
 
+    @property
+    def tui(self) -> AutokerenTUI:
+        return self.app  # type: ignore
+
     def compose(self) -> ComposeResult:
         yield Container(
-            Static("[bold yellow]IZIN EKSEKUSI TOOL[/bold yellow]", id="modal-title"),
+            Static(f"[bold yellow]{self.tui.t('confirm_title')}[/bold yellow]", id="modal-title"),
             Static(f"[bold]{self.tool_call_label}[/bold]\n[dim]{self.description}[/dim]", id="modal-desc"),
             OptionList(
-                "✓ Izinkan Sekali",
-                "⚡ Izinkan Semua Tool Sesi Ini",
-                "✗ Tolak Eksekusi",
+                self.tui.t("opt_allow_once"),
+                self.tui.t("opt_allow_all"),
+                self.tui.t("opt_deny"),
                 id="perm-list"
             ),
             id="modal-dialog-perm",
@@ -106,12 +651,16 @@ class PermissionSelectScreen(ModalScreen[str]):
 class ApprovalSelectScreen(ModalScreen[bool]):
     """Screen Modal untuk menyetujui rencana kerja."""
 
+    @property
+    def tui(self) -> AutokerenTUI:
+        return self.app  # type: ignore
+
     def compose(self) -> ComposeResult:
         yield Container(
-            Static("[bold yellow]SETUJUI RENCANA KERJA?[/bold yellow]", id="modal-title"),
+            Static(f"[bold yellow]{self.tui.t('approve_title')}[/bold yellow]", id="modal-title"),
             OptionList(
-                "✓ Setujui Rencana",
-                "✗ Tolak Rencana",
+                self.tui.t("opt_approve"),
+                self.tui.t("opt_reject"),
                 id="approve-list"
             ),
             id="modal-dialog-approve",
@@ -126,7 +675,6 @@ class ApprovalSelectScreen(ModalScreen[bool]):
             self.dismiss(False)
 
 
-
 class StatusWidget(Static):
     """Widget untuk menampilkan informasi status di panel kiri."""
 
@@ -134,6 +682,10 @@ class StatusWidget(Static):
         super().__init__()
         self.agent = agent
         self.cfg = cfg
+
+    @property
+    def tui(self) -> AutokerenTUI:
+        return self.app  # type: ignore
 
     def on_mount(self) -> None:
         self.update_status()
@@ -153,35 +705,35 @@ class StatusWidget(Static):
             neurons_str = "-"
 
         sisa_tokens = ctx["window"] - ctx["tokens"] if ctx["window"] > 0 else 0
+        lang_label = LANGUAGES.get(self.tui.active_language, self.tui.active_language)
 
-        res = f"""[bold yellow]STATUS[/bold yellow]
+        res = f"""[bold yellow]{self.tui.t('status_title')}[/bold yellow]
 
-[bold]Model[/bold]   : {model}
-[bold]Auth[/bold]    : {self.cfg.auth.mode}
-[bold]Tokens[/bold]  : {ctx['tokens']:,} ({ctx['pct']:.1f}%)
-[bold]Sisa Tok[/bold]: {sisa_tokens:,}
-[bold]Neurons[/bold] : {neurons_str}
+[bold]{self.tui.t('model')}[/bold]   : {model}
+[bold]{self.tui.t('auth')}[/bold]    : {self.cfg.auth.mode}
+[bold]{self.tui.t('tokens')}[/bold]  : {ctx['tokens']:,} ({ctx['pct']:.1f}%)
+[bold]{self.tui.t('remaining_tokens')}[/bold]: {sisa_tokens:,}
+[bold]{self.tui.t('neurons')}[/bold] : {neurons_str}
 
-[bold]Active[/bold]  : {cwd}
-[bold]Session[/bold] : {self.agent.context.summary().get('messages', 0)} msg
+[bold]{self.tui.t('active')}[/bold]  : {cwd}
+[bold]{self.tui.t('session')}[/bold] : {self.agent.context.summary().get('messages', 0)} msg
+[bold]{self.tui.t('lang')}[/bold]    : {lang_label}
 
-[bold]Temp[/bold]    : {self.cfg.cloudflare.temperature}
-[bold]MaxTok[/bold]  : {self.cfg.cloudflare.max_tokens}
+[bold]{self.tui.t('temp')}[/bold]    : {self.cfg.cloudflare.temperature}
+[bold]{self.tui.t('maxtok')}[/bold]  : {self.cfg.cloudflare.max_tokens}
 
-[bold]P.Mode[/bold]  : {self.cfg.autokeren.plan_mode}
-[bold]M.Calls[/bold] : {self.agent._tool_call_count}/{self.cfg.autokeren.max_tool_calls or 'unlimited'}
+[bold]{self.tui.t('pmode')}[/bold]  : {self.cfg.autokeren.plan_mode}
+[bold]{self.tui.t('mcalls')}[/bold] : {self.agent._tool_call_count}/{self.cfg.autokeren.max_tool_calls or 'unlimited'}
 
-[dim]Klik di sini untuk ganti model[/dim]"""
+[dim]{self.tui.t('click_change_model')}[/dim]"""
         try:
             self.update(Text.from_markup(res))
         except Exception:
             self.update(res)
 
-
     async def on_click(self) -> None:
         # Klik pada panel status memicu aksi pemilihan model
-        await self.app.action_model()  # type: ignore
-
+        await self.tui.action_model()
 
 
 class MessageWidget(Static):
@@ -209,8 +761,6 @@ class MessageWidget(Static):
                 self.update(self.msg_content)
         else:
             self.update(Markdown(self.msg_content or "..."))
-
-
 
 
 class ToolWidget(Static):
@@ -253,8 +803,6 @@ class ToolWidget(Static):
                 res.append("  │ ", style="dim")
                 res.append(line)
         return res
-
-
 
 
 class AutokerenTUI(App):
@@ -308,7 +856,7 @@ class AutokerenTUI(App):
         height: auto;
         margin: 1 0;
     }
-    ModelSelectScreen, PermissionSelectScreen, ApprovalSelectScreen {
+    ModelSelectScreen, LanguageSelectScreen, PermissionSelectScreen, ApprovalSelectScreen {
         align: center middle;
         background: rgba(0, 0, 0, 0.6);
     }
@@ -341,10 +889,9 @@ class AutokerenTUI(App):
         text-align: center;
         margin-bottom: 1;
     }
-    #model-list, #perm-list, #approve-list {
+    #model-list, #perm-list, #approve-list, #lang-list {
         height: 1fr;
     }
-
     """
 
     BINDINGS = [
@@ -353,8 +900,8 @@ class AutokerenTUI(App):
         Binding("f3", "reset", "Reset Sesi"),
         Binding("f4", "copy_last", "Salin Respon"),
         Binding("f5", "compact", "Compact Context"),
+        Binding("f6", "lang", "Bahasa / Lang"),
         Binding("ctrl+q", "quit", "Keluar"),
-
     ]
 
     def __init__(self, agent: Agent, cfg: Config) -> None:
@@ -365,6 +912,11 @@ class AutokerenTUI(App):
         self.allow_all = False
         self.allowed_tools: set[str] = set()
 
+        # Inisialisasi bahasa aktif (pilihan config atau deteksi sistem)
+        self.active_language = self.cfg.autokeren.language
+        if not self.active_language:
+            self.active_language = self.detect_system_language()
+
         # Shared thread-safe structures
         self.permission_queue: queue.Queue[tuple[bool, bool]] = queue.Queue()
         self.approval_queue: queue.Queue[bool] = queue.Queue()
@@ -374,16 +926,46 @@ class AutokerenTUI(App):
         self.current_assistant_widget: MessageWidget | None = None
         self.current_tool_widget: ToolWidget | None = None
 
+    def t(self, key: str, **kwargs: Any) -> str:
+        """Menerjemahkan key string berdasarkan bahasa aktif saat ini."""
+        translated = TRANSLATIONS.get(self.active_language, {}).get(key, TRANSLATIONS["en"].get(key, key))
+        if kwargs:
+            return translated.format(**kwargs)
+        return translated
+
+    def detect_system_language(self) -> str:
+        """Mendeteksi bahasa sistem terminal secara otomatis."""
+        import os
+        import locale
+        
+        # 1. Cek variabel lingkungan LANG
+        lang_env = os.environ.get("LANG", "").lower()
+        for code in LANGUAGES:
+            if code in lang_env:
+                return code
+                
+        # 2. Cek default locale OS
+        try:
+            sys_loc, _ = locale.getdefaultlocale()
+            if sys_loc:
+                sys_loc = sys_loc.lower()
+                for code in LANGUAGES:
+                    if code in sys_loc:
+                        return code
+        except Exception:
+            pass
+            
+        return "en"
+
     def compose(self) -> ComposeResult:
         yield Horizontal(
             Container(StatusWidget(self.agent, self.cfg), id="status-pane"),
             Container(
                 VerticalScroll(Container(id="chat-area"), id="chat-pane"),
-                Input(id="input-pane", placeholder="✍️ Ketik pesan di sini..."),
+                Input(id="input-pane", placeholder=self.t("input_placeholder")),
                 id="right-layout"
             )
         )
-
 
     def on_mount(self) -> None:
         # Bind Agent callbacks ke TUI
@@ -413,10 +995,12 @@ class AutokerenTUI(App):
         
         welcome = (
             "\n".join(colored_lines) + "\n\n"
-            "Ketik pertanyaan kamu di bawah, atau tekan [bold]F1[/bold] untuk bantuan perintah."
+            + self.t("welcome_sub")
         )
         self.append_chat_message("system", welcome)
         self.update_status()
+
+        # Jalankan pengecekan update di background worker asinkron
         self.run_worker(self.check_for_updates())
 
     async def check_for_updates(self) -> None:
@@ -431,14 +1015,10 @@ class AutokerenTUI(App):
                     if latest_ver != __version__:
                         self.append_chat_message(
                             "system",
-                            f"🚀 [bold green]Versi baru autokeren tersedia: v{latest_ver}[/bold green]\n"
-                            "Jalankan [bold]pipx upgrade autokeren[/bold] untuk memperbarui!"
+                            self.t("pypi_update", version=latest_ver)
                         )
         except Exception:
             pass
-
-
-
 
     # ------------------------------------------------------------------ #
     # Agent Thread-safe Callbacks
@@ -517,7 +1097,7 @@ class AutokerenTUI(App):
             label = _format_tool_call(tool_name, arguments)
             label_esc = escape(label)
             desc_esc = escape(description)
-            self.append_chat_message("system", f"⚡ Panggil [bold cyan]{label_esc}[/bold cyan]? — {desc_esc}")
+            self.append_chat_message("system", self.t("confirm_sub", label=label_esc, desc=desc_esc))
 
             def on_perm_result(choice: str | None) -> None:
                 from rich.markup import escape
@@ -526,13 +1106,13 @@ class AutokerenTUI(App):
                 if choice == "y":
                     allowed = True
                     self.allowed_tools.add(tool_name)
-                    self.append_chat_message("system", f"Tool [bold cyan]{name_esc}[/bold cyan] diizinkan.")
+                    self.append_chat_message("system", self.t("allowed_tool", name=name_esc))
                 elif choice == "a":
                     allowed = True
                     self.allow_all = True
-                    self.append_chat_message("system", "Semua tool diizinkan untuk sesi ini.")
+                    self.append_chat_message("system", self.t("allowed_all"))
                 else:
-                    self.append_chat_message("system", f"Tool [bold red]{name_esc}[/bold red] ditolak.")
+                    self.append_chat_message("system", self.t("denied_tool_msg", name=name_esc))
 
                 result[0] = allowed
                 evt.set()
@@ -542,8 +1122,6 @@ class AutokerenTUI(App):
         self.call_from_thread(_prompt)
         evt.wait()
         return result[0]
-
-
 
     # ------------------------------------------------------------------ #
     # Helper & UI Actions
@@ -579,11 +1157,10 @@ class AutokerenTUI(App):
 
         self.append_chat_message("user", val)
         input_pane.disabled = True
-        input_pane.placeholder = "Sedang berpikir..."
+        input_pane.placeholder = self.t("thinking_placeholder")
         
         # Jalankan agent loop di background worker thread
         self.run_worker(self._run_agent_flow(val), thread=True)
-
 
     async def _run_agent_flow(self, user_input: str) -> None:
         try:
@@ -601,12 +1178,12 @@ class AutokerenTUI(App):
                     self.agent.run("")
 
         except Exception as e:
-            self.append_chat_message("system", f"[red]Error saat menjalankan agent: {e}[/red]")
+            self.append_chat_message("system", self.t("unknown_cmd", cmd=str(e)))
         finally:
             def _reset_input():
                 input_pane = self.query_one("#input-pane", Input)
                 input_pane.disabled = False
-                input_pane.placeholder = "✍️ Ketik pesan di sini..."
+                input_pane.placeholder = self.t("input_placeholder")
                 input_pane.focus()
                 self.update_status()
             self.call_from_thread(_reset_input)
@@ -619,9 +1196,9 @@ class AutokerenTUI(App):
             def on_approve_result(approved: bool | None) -> None:
                 res = approved if approved is not None else False
                 if res:
-                    self.append_chat_message("system", "Rencana kerja disetujui.")
+                    self.append_chat_message("system", self.t("approved_plan"))
                 else:
-                    self.append_chat_message("system", "Rencana kerja ditolak.")
+                    self.append_chat_message("system", self.t("rejected_plan"))
                 result[0] = res
                 evt.set()
 
@@ -631,31 +1208,32 @@ class AutokerenTUI(App):
         evt.wait()
         return result[0]
 
-
     # ------------------------------------------------------------------ #
     # Key Bindings & Slash Commands
     # ------------------------------------------------------------------ #
 
     async def action_help(self) -> None:
         help_text = (
-            "[bold yellow]BANTUAN KEY BINDING & SLASH COMMANDS[/bold yellow]\n\n"
-            "Tombol Pintas:\n"
-            "  - [bold]F1[/bold]   : Bantuan ini\n"
-            "  - [bold]F2[/bold]   : Tampilkan & Ganti Model aktif\n"
-            "  - [bold]F3[/bold]   : Reset Sesi percakapan\n"
-            "  - [bold]F4[/bold]   : Salin respon terakhir AI ke clipboard\n"
-            "  - [bold]F5[/bold]   : Compact Context (ringkas percakapan lama)\n"
-            "  - [bold]Ctrl+Q[/bold]: Keluar dari aplikasi\n\n"
-            "Perintah Slash:\n"
-            "  - [bold]/model <nama>[/bold]: Ganti model aktif\n"
-            "  - [bold]/compact[/bold]     : Meringkas riwayat context\n"
-            "  - [bold]/reset[/bold]       : Reset seluruh sesi chat\n"
-            "  - [bold]/permissions[/bold] : Cek daftar izin tool\n"
-            "  - [bold]/memory[/bold]      : Tampilkan memory proyek\n"
-            "  - [bold]/sessions[/bold]    : Tampilkan saved sessions\n"
-            "  - [bold]/save <nama>[/bold]  : Simpan sesi obrolan saat ini\n"
-            "  - [bold]/resume <id>[/bold]  : Resume sesi obrolan lama\n"
-            "  - [bold]/q[/bold]            : Keluar dari aplikasi"
+            f"[bold yellow]{self.t('help_title')}[/bold yellow]\n\n"
+            f"{self.t('shortcuts')}\n"
+            f"  - [bold]F1[/bold]   : {self.t('f1_desc')}\n"
+            f"  - [bold]F2[/bold]   : {self.t('f2_desc')}\n"
+            f"  - [bold]F3[/bold]   : {self.t('f3_desc')}\n"
+            f"  - [bold]F4[/bold]   : {self.t('f4_desc')}\n"
+            f"  - [bold]F5[/bold]   : {self.t('f5_desc')}\n"
+            f"  - [bold]F6[/bold]   : {self.t('f6_desc')}\n"
+            f"  - [bold]Ctrl+Q[/bold]: {self.t('ctrlq_desc')}\n\n"
+            f"{self.t('slash_commands_label')}\n"
+            "  - [bold]/model <name>[/bold]: Switch model\n"
+            "  - [bold]/lang <code2>[/bold]: Switch TUI language\n"
+            "  - [bold]/compact[/bold]      : Compact context history\n"
+            "  - [bold]/reset[/bold]        : Reset conversation session\n"
+            "  - [bold]/permissions[/bold]  : Check allowed tools\n"
+            "  - [bold]/memory[/bold]       : Display project memory\n"
+            "  - [bold]/sessions[/bold]     : List saved sessions\n"
+            "  - [bold]/save <name>[/bold]   : Save current session\n"
+            "  - [bold]/resume <id>[/bold]   : Resume saved session\n"
+            "  - [bold]/q[/bold]             : Quit autokeren"
         )
         self.append_chat_message("system", help_text)
 
@@ -669,12 +1247,44 @@ class AutokerenTUI(App):
                 from autokeren.models.cloudflare import resolve_model_id
                 resolved = resolve_model_id(chosen_id, self.agent.router.models[0].auth_mode)
                 if self.agent.router.switch_model(resolved):
-                    self.append_chat_message("system", f"Model aktif diganti ke: [bold]{chosen_id}[/bold]")
+                    self.append_chat_message("system", self.t("allowed_tool", name=chosen_id))
                     self.update_status()
                 else:
-                    self.append_chat_message("system", f"[red]Model '{chosen_id}' tidak ditemukan.[/red]")
+                    self.append_chat_message("system", f"[red]Model '{chosen_id}' not found.[/red]")
 
         self.push_screen(ModelSelectScreen(all_models, current_model), on_select)
+
+    async def action_lang(self) -> None:
+        """Picu modal pemilihan bahasa."""
+        def on_select(chosen_code: str | None) -> None:
+            if chosen_code:
+                self.active_language = chosen_code
+                self.cfg.autokeren.language = chosen_code
+                from autokeren.config import save_config
+                try:
+                    save_config(self.cfg)
+                except Exception:
+                    pass
+                self.append_chat_message("system", f"Language changed to: [bold]{LANGUAGES[chosen_code]}[/bold]")
+                
+                # Update placeholder input
+                self.query_one("#input-pane", Input).placeholder = self.t("input_placeholder")
+                self.update_status()
+
+        self.push_screen(LanguageSelectScreen(self.active_language), on_select)
+
+    async def action_reset(self) -> None:
+        self.agent.reset()
+        self.allow_all = False
+        self.allowed_tools.clear()
+        
+        # Hapus widget chat
+        chat_area = self.query_one("#chat-area")
+        for child in list(chat_area.children):
+            child.remove()
+            
+        self.append_chat_message("system", self.t("reset_success"))
+        self.update_status()
 
     async def action_copy_last(self) -> None:
         last_assistant_msg = None
@@ -686,34 +1296,20 @@ class AutokerenTUI(App):
         if last_assistant_msg:
             try:
                 self.copy_to_clipboard(last_assistant_msg)
-                self.append_chat_message("system", "✓ Respon terakhir berhasil disalin ke clipboard.")
+                self.append_chat_message("system", self.t("last_copied"))
             except Exception as e:
-                self.append_chat_message("system", f"[red]Gagal menyalin ke clipboard: {e}[/red]")
+                self.append_chat_message("system", self.t("copy_fail", error=str(e)))
         else:
-            self.append_chat_message("system", "Belum ada respon assistant untuk disalin.")
-
-    async def action_reset(self) -> None:
-
-        self.agent.reset()
-        self.allow_all = False
-        self.allowed_tools.clear()
-        
-        # Hapus widget chat
-        chat_area = self.query_one("#chat-area")
-        for child in list(chat_area.children):
-            child.remove()
-            
-        self.append_chat_message("system", "Sesi dan izin tool berhasil direset.")
-        self.update_status()
+            self.append_chat_message("system", self.t("no_last_msg"))
 
     async def action_compact(self) -> None:
-        self.append_chat_message("system", "Meringkas context percakapan...")
+        self.append_chat_message("system", self.t("compacting"))
         try:
             msg = self.agent.compact()
             self.append_chat_message("system", f"[green]{msg}[/green]")
             self.update_status()
         except Exception as e:
-            self.append_chat_message("system", f"[red]Compact gagal: {e}[/red]")
+            self.append_chat_message("system", self.t("compact_fail", error=str(e)))
 
     async def handle_slash_command(self, cmd_line: str) -> None:
         parts = cmd_line.split(" ", 1)
@@ -730,17 +1326,17 @@ class AutokerenTUI(App):
             await self.action_compact()
         elif cmd == "/permissions":
             if self.allow_all:
-                self.append_chat_message("system", "Semua tool diizinkan untuk sesi ini.")
+                self.append_chat_message("system", self.t("allowed_all"))
             elif self.allowed_tools:
-                self.append_chat_message("system", f"Tool diizinkan: {', '.join(sorted(self.allowed_tools))}")
+                self.append_chat_message("system", f"Tools: {', '.join(sorted(self.allowed_tools))}")
             else:
-                self.append_chat_message("system", "Belum ada tool yang diizinkan.")
+                self.append_chat_message("system", "No permissions granted yet.")
         elif cmd == "/memory":
             mem = self.agent.memory.load()
             if mem:
-                self.append_chat_message("system", f"[bold magenta]MEMORY PROYEK:[/bold magenta]\n{mem}")
+                self.append_chat_message("system", f"[bold magenta]MEMORY:[/bold magenta]\n{mem}")
             else:
-                self.append_chat_message("system", "Memory kosong.")
+                self.append_chat_message("system", "Memory is empty.")
         elif cmd == "/model":
             if not arg:
                 await self.action_model()
@@ -748,20 +1344,40 @@ class AutokerenTUI(App):
                 from autokeren.models.cloudflare import resolve_model_id
                 resolved = resolve_model_id(arg, self.agent.router.models[0].auth_mode)
                 if self.agent.router.switch_model(resolved):
-                    self.append_chat_message("system", f"Model aktif diganti ke: [bold]{arg}[/bold]")
+                    self.append_chat_message("system", self.t("allowed_tool", name=arg))
                     self.update_status()
                 else:
-                    self.append_chat_message("system", f"[red]Model '{arg}' tidak ditemukan.[/red]")
+                    self.append_chat_message("system", f"[red]Model '{arg}' not found.[/red]")
+        elif cmd == "/lang":
+            if not arg:
+                await self.action_lang()
+            else:
+                code = arg.lower()
+                if code in LANGUAGES:
+                    self.active_language = code
+                    self.cfg.autokeren.language = code
+                    from autokeren.config import save_config
+                    try:
+                        save_config(self.cfg)
+                    except Exception:
+                        pass
+                    self.append_chat_message("system", f"Language changed to: [bold]{LANGUAGES[code]}[/bold]")
+                    
+                    # Update placeholder input
+                    self.query_one("#input-pane", Input).placeholder = self.t("input_placeholder")
+                    self.update_status()
+                else:
+                    self.append_chat_message("system", f"[red]Language code '{arg}' not supported. Available: {', '.join(LANGUAGES.keys())}[/red]")
         elif cmd == "/save":
             name = arg or f"session-{len(self.agent.sessions.list()) + 1}"
             try:
                 sid = self.agent.save_session(name)
-                self.append_chat_message("system", f"[green]Sesi '{name}' disimpan. ID: {sid}[/green]")
+                self.append_chat_message("system", self.t("save_success", name=name, sid=sid))
             except Exception as e:
-                self.append_chat_message("system", f"[red]Save gagal: {e}[/red]")
+                self.append_chat_message("system", self.t("save_fail", error=str(e)))
         elif cmd == "/resume":
             if not arg:
-                self.append_chat_message("system", "Gunakan: [bold]/resume <nama|id>[/bold]")
+                self.append_chat_message("system", "Use: [bold]/resume <name|id>[/bold]")
             else:
                 try:
                     msg = self.agent.resume_session(arg)
@@ -769,18 +1385,18 @@ class AutokerenTUI(App):
                     self.rebuild_chat_history()
                     self.update_status()
                 except Exception as e:
-                    self.append_chat_message("system", f"[red]Resume gagal: {e}[/red]")
+                    self.append_chat_message("system", self.t("resume_fail", error=str(e)))
         elif cmd == "/sessions":
             sessions = self.agent.sessions.list()
             if not sessions:
-                self.append_chat_message("system", "Belum ada sesi yang disimpan.")
+                self.append_chat_message("system", self.t("no_sessions"))
             else:
-                lines = ["[bold yellow]SESI YANG DISIMPAN:[/bold yellow]"]
+                lines = [f"[bold yellow]{self.t('sessions_title')}[/bold yellow]"]
                 for s in sessions:
-                    lines.append(f"  - [cyan]{s['id']}[/cyan] [bold]{s['name']}[/bold] ({s['messages']} pesan)")
+                    lines.append(f"  - [cyan]{s['id']}[/cyan] [bold]{s['name']}[/bold] ({s['messages']} msg)")
                 self.append_chat_message("system", "\n".join(lines))
         else:
-            self.append_chat_message("system", f"[red]Perintah tidak dikenal: {cmd}[/red]")
+            self.append_chat_message("system", self.t("unknown_cmd", cmd=cmd))
 
     def rebuild_chat_history(self) -> None:
         chat_area = self.query_one("#chat-area")
@@ -803,4 +1419,3 @@ def run_tui(agent: Agent, cfg: Config) -> None:
         app.run()
     except KeyboardInterrupt:
         pass
-
