@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "autokeren"
-version = "0.7.4"
+version = "0.7.5"
 description = "Cloudflare-first agentic coding CLI untuk developer Indonesia dan global"
 readme = "README.md"
 license = {text = "MIT"}

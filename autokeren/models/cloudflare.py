@@ -128,10 +128,10 @@ class CloudflareModel:
 
     def _headers(self) -> dict[str, str]:
         token = self.api_key if self.auth_mode == "platform" else self.api_token
-        return {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        }
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        return headers
 
     @classmethod
     def from_config(cls, cfg) -> "CloudflareModel":
