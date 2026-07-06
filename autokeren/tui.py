@@ -35,6 +35,7 @@ LANGUAGES = {
 
 TRANSLATIONS = {
     "en": {
+        "user_label": "you",
         "welcome_sub": "Type your question below, or press [bold]F1[/bold] for command help.",
         "status_title": "STATUS",
         "model": "Model",
@@ -95,6 +96,7 @@ TRANSLATIONS = {
         "input_placeholder": "✍️ Type a message here...",
     },
     "id": {
+        "user_label": "kamu",
         "welcome_sub": "Ketik pertanyaan kamu di bawah, atau tekan [bold]F1[/bold] untuk bantuan perintah.",
         "status_title": "STATUS",
         "model": "Model",
@@ -155,6 +157,7 @@ TRANSLATIONS = {
         "input_placeholder": "✍️ Ketik pesan di sini...",
     },
     "zh": {
+        "user_label": "你",
         "welcome_sub": "在下方输入您的问题，或按 [bold]F1[/bold] 获取命令帮助。",
         "status_title": "状态",
         "model": "模型",
@@ -215,6 +218,7 @@ TRANSLATIONS = {
         "input_placeholder": "✍️ 在此处输入消息...",
     },
     "ja": {
+        "user_label": "あなた",
         "welcome_sub": "質問を以下に入力するか、[bold]F1[/bold] キーでコマンドのヘルプを表示します。",
         "status_title": "ステータス",
         "model": "モデル",
@@ -275,6 +279,7 @@ TRANSLATIONS = {
         "input_placeholder": "✍️ メッセージを入力...",
     },
     "de": {
+        "user_label": "du",
         "welcome_sub": "Geben Sie Ihre Frage unten ein oder drücken Sie [bold]F1[/bold] für Befehlshilfe.",
         "status_title": "STATUS",
         "model": "Modell",
@@ -335,6 +340,7 @@ TRANSLATIONS = {
         "input_placeholder": "✍️ Nachricht hier eingeben...",
     },
     "ar": {
+        "user_label": "أنت",
         "welcome_sub": "اكتب سؤالك أدناه، أو اضغط على [bold]F1[/bold] للحصول على مساعدة بشأن الأوامر.",
         "status_title": "الحالة",
         "model": "النموذج",
@@ -395,6 +401,7 @@ TRANSLATIONS = {
         "input_placeholder": "✍️ اكتب رسالتك هنا...",
     },
     "es": {
+        "user_label": "tú",
         "welcome_sub": "Escriba su pregunta a continuación o presione [bold]F1[/bold] para obtener ayuda sobre comandos.",
         "status_title": "ESTADO",
         "model": "Modelo",
@@ -455,6 +462,7 @@ TRANSLATIONS = {
         "input_placeholder": "✍️ Escriba un mensaje aquí...",
     },
     "pt": {
+        "user_label": "você",
         "welcome_sub": "Digite sua pergunta abaixo ou pressione [bold]F1[/bold] para obter ajuda sobre comandos.",
         "status_title": "STATUS",
         "model": "Modelo",
@@ -744,6 +752,10 @@ class MessageWidget(Static):
         self.role = role
         self.msg_content = content
 
+    @property
+    def tui(self) -> AutokerenTUI:
+        return self.app  # type: ignore
+
     def on_mount(self) -> None:
         self.update_content(self.msg_content)
 
@@ -751,7 +763,8 @@ class MessageWidget(Static):
         self.msg_content = new_content
         if self.role == "user":
             tx = Text()
-            tx.append("kamu: ", style="bold blue")
+            label = self.tui.t("user_label")
+            tx.append(f"{label}: ", style="bold blue")
             tx.append(self.msg_content)
             self.update(tx)
         elif self.role == "system":
@@ -761,6 +774,7 @@ class MessageWidget(Static):
                 self.update(self.msg_content)
         else:
             self.update(Markdown(self.msg_content or "..."))
+
 
 
 class ToolWidget(Static):
@@ -958,11 +972,17 @@ class AutokerenTUI(App):
         return "en"
 
     def compose(self) -> ComposeResult:
+        from textual.suggester import SuggestFromList
+        commands = [
+            "/help", "/reset", "/compact", "/permissions", "/memory",
+            "/model", "/lang", "/save", "/resume", "/sessions", "/q", "/quit"
+        ]
+        suggester = SuggestFromList(commands, case_sensitive=False)
         yield Horizontal(
             Container(StatusWidget(self.agent, self.cfg), id="status-pane"),
             Container(
                 VerticalScroll(Container(id="chat-area"), id="chat-pane"),
-                Input(id="input-pane", placeholder=self.t("input_placeholder")),
+                Input(id="input-pane", placeholder=self.t("input_placeholder"), suggester=suggester),
                 id="right-layout"
             )
         )
