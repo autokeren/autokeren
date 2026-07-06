@@ -186,20 +186,25 @@ class AutokerenTUI(App):
         layout: vertical;
         background: $background;
     }
-    .top-layout {
-        height: 1fr;
-        layout: horizontal;
+    Horizontal {
+        height: 100%;
+        width: 100%;
     }
     #status-pane {
         width: 32;
         height: 100%;
-        border: round $primary;
+        border: round #555555;
         padding: 1 1;
     }
-    #chat-pane {
+    #right-layout {
         width: 1fr;
         height: 100%;
-        border: round $primary;
+        layout: vertical;
+    }
+    #chat-pane {
+        height: 1fr;
+        width: 100%;
+        border: round #555555;
         padding: 0 1;
     }
     #chat-area {
@@ -208,7 +213,7 @@ class AutokerenTUI(App):
     #input-pane {
         height: 3;
         width: 100%;
-        border: round $primary;
+        border: round #555555;
         margin: 0;
     }
     MessageWidget {
@@ -230,7 +235,7 @@ class AutokerenTUI(App):
     #modal-dialog {
         width: 50;
         height: 14;
-        border: double $accent;
+        border: double #555555;
         background: $panel;
         padding: 1 2;
     }
@@ -271,10 +276,13 @@ class AutokerenTUI(App):
     def compose(self) -> ComposeResult:
         yield Horizontal(
             Container(StatusWidget(self.agent, self.cfg), id="status-pane"),
-            VerticalScroll(Container(id="chat-area"), id="chat-pane"),
-            classes="top-layout"
+            Container(
+                VerticalScroll(Container(id="chat-area"), id="chat-pane"),
+                Input(id="input-pane", placeholder="✍️ Ketik pesan di sini..."),
+                id="right-layout"
+            )
         )
-        yield Input(id="input-pane", placeholder="✍️ Ketik pesan di sini...")
+
 
     def on_mount(self) -> None:
         # Bind Agent callbacks ke TUI
