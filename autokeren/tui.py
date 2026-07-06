@@ -1205,6 +1205,7 @@ class AutokerenTUI(App):
         self.history_idx: int = -1
         self._history_draft: str = ""  # simpan draft saat navigasi history
         self._agent_running: bool = False  # guard: prevent double submit (Windows fix)
+        self.debug_mode: bool = False  # log debugging verbose
 
         # Multi-agent project manager
         from autokeren.multiagent import ProjectManager
@@ -1524,7 +1525,12 @@ class AutokerenTUI(App):
                     self.agent.run("")
 
         except Exception as e:
-            self.call_from_thread(self.append_chat_message, "system", self.t("unknown_cmd", cmd=str(e)))
+            if self.debug_mode:
+                import traceback
+                error_msg = f"[bold red]DEBUG ERROR:[/bold red]\n```python\n{traceback.format_exc()}\n```"
+            else:
+                error_msg = self.t("unknown_cmd", cmd=str(e))
+            self.call_from_thread(self.append_chat_message, "system", error_msg)
         finally:
             def _reset_input():
                 self._agent_running = False
@@ -1800,6 +1806,19 @@ class AutokerenTUI(App):
             else:
                 target_name, task_desc = arg.split("|", 1)
                 self.run_worker(self._run_tdd_workflow(target_name.strip(), task_desc.strip()))
+        elif cmd == "/debug":
+            self.debug_mode = not self.debug_mode
+            import os
+            import logging
+            if self.debug_mode:
+                os.environ["AUTOKEREN_DEBUG"] = "1"
+                logging.basicConfig(filename="autokeren-debug.log", level=logging.DEBUG, force=True)
+                logging.debug("Debug mode activated.")
+            else:
+                os.environ.pop("AUTOKEREN_DEBUG", None)
+                logging.getLogger().setLevel(logging.WARNING)
+            status = "AKTIF" if self.debug_mode else "NON-AKTIF"
+            self.append_chat_message("system", f"[blue]Mode Debug {status}. Error traceback akan ditampilkan lebih detail jika terjadi masalah internal. Cek autokeren-debug.log.[/blue]")
         else:
             self.append_chat_message("system", self.t("unknown_cmd", cmd=cmd))
 

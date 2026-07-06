@@ -118,6 +118,9 @@ class Agent:
                     self.on_model_end(ModelResponse(content=""))
                 return ModelResponse(content="[dibatalkan user]")
             except Exception as e:
+                import os
+                if os.environ.get("AUTOKEREN_DEBUG") == "1":
+                    raise
                 if self.on_model_end:
                     self.on_model_end(ModelResponse(content=""))
                 err_msg = str(e) or type(e).__name__
