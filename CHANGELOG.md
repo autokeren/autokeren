@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.5] - 2026-07-06
+
+### Fixed
+- **PyPI Update CLI Notification:** Mengubah instruksi pembaruan (upgrade) aplikasi di notifikasi TUI agar menggunakan `pipx upgrade autokeren` (sesuai rekomendasi utama di README) alih-alih `pip install`.
+
 ## [0.6.4] - 2026-07-06
 
 ### Added
@@ -88,6 +93,7 @@ Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan
 - Indonesian localization untuk seluruh UI text.
 - 18 tools bawaan.
 
+[0.6.5]: https://github.com/autokeren/autokeren/releases/tag/v0.6.5
 [0.6.4]: https://github.com/autokeren/autokeren/releases/tag/v0.6.4
 [0.6.3]: https://github.com/autokeren/autokeren/releases/tag/v0.6.3
 [0.6.2]: https://github.com/autokeren/autokeren/releases/tag/v0.6.2
