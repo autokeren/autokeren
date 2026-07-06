@@ -350,8 +350,10 @@ def main() -> int:
             ui.cleanup()
         return 0
 
-    chat_loop(agent, cfg, ui)
+    from autokeren.tui import run_tui
+    run_tui(agent, cfg)
     return 0
+
 
 
 if __name__ == "__main__":
