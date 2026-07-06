@@ -102,6 +102,7 @@ TRANSLATIONS = {
         "lang_title": "SELECT LANGUAGE",
         "thinking_placeholder": "Thinking...",
         "input_placeholder": "✍️ Type a message here...",
+        "pypi_update": "⚡ A new version of autokeren is available: [bold cyan]v{version}[/bold cyan]. Run [bold green]pip install --upgrade autokeren[/bold green] to update.",
     },
     "id": {
         "user_label": "kamu",
@@ -169,6 +170,7 @@ TRANSLATIONS = {
         "lang_title": "PILIH BAHASA / SELECT LANGUAGE",
         "thinking_placeholder": "Sedang berpikir...",
         "input_placeholder": "✍️ Ketik pesan di sini...",
+        "pypi_update": "⚡ Versi baru autokeren tersedia: [bold cyan]v{version}[/bold cyan]. Jalankan [bold green]pip install --upgrade autokeren[/bold green] untuk memperbarui.",
     },
     "zh": {
         "user_label": "你",
