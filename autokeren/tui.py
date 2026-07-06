@@ -369,12 +369,26 @@ class AutokerenTUI(App):
         self.agent.permission_callback = self.confirm_permission
 
         # Tampilkan welcome banner
+        import pyfiglet
+        from autokeren import __version__
+
+        full_art = pyfiglet.figlet_format("AUTOKEREN", font="slant").rstrip("\n").split("\n")
+        mid = len(full_art) // 2
+        colored_lines = []
+        for i, line in enumerate(full_art):
+            if i < mid:
+                colored_lines.append(f"[bold red]{line}[/bold red]")
+            else:
+                extra = f"  [bold yellow]v{__version__}[/bold yellow]" if i == mid else ""
+                colored_lines.append(f"[bold white]{line}[/bold white]{extra}")
+        
         welcome = (
-            "[bold green]Selamat datang di autokeren TUI![/bold green]\n"
+            "\n".join(colored_lines) + "\n\n"
             "Ketik pertanyaan kamu di bawah, atau tekan [bold]F1[/bold] untuk bantuan perintah."
         )
         self.append_chat_message("system", welcome)
         self.update_status()
+
 
     # ------------------------------------------------------------------ #
     # Agent Thread-safe Callbacks
@@ -711,4 +725,8 @@ class AutokerenTUI(App):
 def run_tui(agent: Agent, cfg: Config) -> None:
     """Fungsi runner untuk meluncurkan TUI."""
     app = AutokerenTUI(agent, cfg)
-    app.run()
+    try:
+        app.run()
+    except KeyboardInterrupt:
+        pass
+
