@@ -41,12 +41,37 @@ Daftar di **[developers.autokeren.com](https://developers.autokeren.com)** untuk
 
 ### 2. Install
 
+#### Linux / macOS
+
 ```bash
 pipx install autokeren
 ```
 
-> Kalau belum punya pipx: `sudo apt install pipx && pipx ensurepath`
+> Kalau belum punya pipx: `sudo apt install pipx && pipx ensurepath` (Linux) atau `brew install pipx` (macOS)
 > Alternatif: `pip install --user autokeren`
+
+#### Windows (PowerShell)
+
+**Langkah 1** — Install pipx via pip:
+
+```powershell
+python -m pip install --user pipx
+```
+
+**Langkah 2** — Daftarkan pipx ke PATH Windows:
+
+```powershell
+python -m pipx ensurepath
+```
+
+**Langkah 3** — Restart PowerShell (tutup dan buka kembali, wajib agar PATH terdeteksi).
+
+**Langkah 4** — Verifikasi & pasang autokeren:
+
+```powershell
+pipx --version
+pipx install autokeren
+```
 
 ### 3. Login
 
