@@ -1524,7 +1524,7 @@ class AutokerenTUI(App):
                     self.agent.run("")
 
         except Exception as e:
-            self.append_chat_message("system", self.t("unknown_cmd", cmd=str(e)))
+            self.call_from_thread(self.append_chat_message, "system", self.t("unknown_cmd", cmd=str(e)))
         finally:
             def _reset_input():
                 self._agent_running = False

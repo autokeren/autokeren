@@ -7,6 +7,13 @@ import sys
 import time
 from pathlib import Path
 
+if sys.platform == "win32":
+    import asyncio
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    except Exception:
+        pass
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
