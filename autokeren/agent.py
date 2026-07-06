@@ -57,6 +57,31 @@ class Agent:
             memory=mem,
             max_tool_calls=self.cfg.autokeren.max_tool_calls,
         )
+        
+        # Tambahkan instruksi pemaksaan bahasa respon AI
+        lang_code = self.cfg.autokeren.language
+        if not lang_code:
+            import os
+            lang_env = os.environ.get("LANG", "").lower()
+            lang_code = "en"
+            for code in ["id", "zh", "ja", "de", "ar", "es", "pt"]:
+                if code in lang_env:
+                    lang_code = code
+                    break
+
+        lang_names = {
+            "id": "Indonesian",
+            "en": "English",
+            "zh": "Chinese",
+            "ja": "Japanese",
+            "de": "German",
+            "ar": "Arabic",
+            "es": "Spanish",
+            "pt": "Portuguese",
+        }
+        lang_name = lang_names.get(lang_code, "English")
+        self._system_prompt += f"\n\nIMPORTANT: You must respond to the user in {lang_name}."
+
 
     def run(self, user_input: str) -> ModelResponse:
         self.context.add_user(user_input)
