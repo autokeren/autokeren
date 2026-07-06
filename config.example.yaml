@@ -26,7 +26,7 @@ retry:
 
 autokeren:
   plan_mode: false
-  max_iterations: 25
+  max_iterations: 50
   shell_timeout: 180
   shell_allowlist: []          # kosong = izinkan semua (dangerous commands tetap diblokir). atau set list misal ["git","npm"]
   project_root: "."

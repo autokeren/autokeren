@@ -42,7 +42,7 @@ class RetryConfig(BaseModel):
 
 class AutokerenConfig(BaseModel):
     plan_mode: bool = False
-    max_iterations: int = 25
+    max_iterations: int = 50
     shell_timeout: int = 180
     shell_allowlist: list[str] = Field(default_factory=list)
     project_root: str = "."
