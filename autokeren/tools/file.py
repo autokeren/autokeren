@@ -125,10 +125,32 @@ class PatchFileTool(Tool):
                 return ToolResult(error="old_string not found", ok=False)
             if text.count(old_string) > 1:
                 return ToolResult(error="old_string appears more than once; use a more specific chunk", ok=False)
+            
+            # Hitung line number awal (1-indexed) dan ambil konteks
+            offset = text.index(old_string)
+            lines_before = text[:offset].splitlines()
+            start_line = len(lines_before) + 1
+
+            all_lines = text.splitlines()
+            context_before_idx = max(0, len(lines_before) - 2)
+            context_before = all_lines[context_before_idx:len(lines_before)]
+
+            old_lines_count = len(old_string.splitlines())
+            context_after_idx = len(lines_before) + old_lines_count
+            context_after = all_lines[context_after_idx:context_after_idx + 2]
+
             bak = make_backup(target)
             text = text.replace(old_string, new_string, 1)
             target.write_text(text, encoding="utf-8")
-            return ToolResult(output={"path": str(target), "backup": str(bak) if bak else None})
+            return ToolResult(output={
+                "path": str(target),
+                "backup": str(bak) if bak else None,
+                "start_line": start_line,
+                "context_before": context_before,
+                "context_after": context_after,
+                "old_string": old_string,
+                "new_string": new_string,
+            })
         except Exception as e:
             return ToolResult(error=str(e), ok=False)
 

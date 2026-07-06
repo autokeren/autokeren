@@ -971,10 +971,12 @@ class ToolWidget(Static):
         self.status = "running"
         self.result_summary = ""
         self.output_lines: list[str] = []
+        self.output_payload: Any = None
 
-    def update_status(self, status: str, summary: str = "") -> None:
+    def update_status(self, status: str, summary: str = "", payload: Any = None) -> None:
         self.status = status
         self.result_summary = summary
+        self.output_payload = payload
         self.refresh()
 
     def append_line(self, line: str) -> None:
@@ -1000,6 +1002,44 @@ class ToolWidget(Static):
                 res.append("\n")
                 res.append("  │ ", style="dim")
                 res.append(line)
+
+        # Render code snippet diff jika tool patch_file sukses
+        if self.status == "success" and self.tool_name == "patch_file" and isinstance(self.output_payload, dict):
+            out = self.output_payload
+            start_line = out.get("start_line", 1)
+            before = out.get("context_before", [])
+            after = out.get("context_after", [])
+            old = out.get("old_string", "")
+            new = out.get("new_string", "")
+
+            # Render baris-baris sebelum
+            line_num = start_line - len(before)
+            for line in before:
+                res.append("\n")
+                res.append("  │ ", style="dim")
+                res.append(f" {line_num:4} │  {line}")
+                line_num += 1
+
+            # Render baris-baris yang dihapus (old)
+            for line in old.splitlines():
+                res.append("\n")
+                res.append("  │ ", style="dim")
+                res.append(f" {line_num:4} │- {line}", style="red")
+                line_num += 1
+
+            # Render baris-baris yang ditambahkan (new)
+            for line in new.splitlines():
+                res.append("\n")
+                res.append("  │ ", style="dim")
+                res.append(f" {' ':4} │+ {line}", style="green")
+
+            # Render baris-baris sesudah
+            for line in after:
+                res.append("\n")
+                res.append("  │ ", style="dim")
+                res.append(f" {line_num:4} │  {line}")
+                line_num += 1
+
         return res
 
 
@@ -1342,7 +1382,7 @@ class AutokerenTUI(App):
                 error = result.error if hasattr(result, "error") else None
                 status = "success" if ok else "error"
                 summary = _summarize_tool_result(name, output) if ok else (error or "gagal")
-                self.current_tool_widget.update_status(status, summary)
+                self.current_tool_widget.update_status(status, summary, output)
                 self.current_tool_widget = None
                 self.scroll_chat_to_end()
                 self.update_status()

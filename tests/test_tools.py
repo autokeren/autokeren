@@ -333,3 +333,31 @@ class TestTodoTool:
         todos = tool.get_todos()
         todos.clear()
         assert len(tool.get_todos()) == 1
+
+
+# ---------------------------------------------------------------------------
+# PatchFileTool
+# ---------------------------------------------------------------------------
+
+
+class TestPatchFileTool:
+    def test_patch_file_returns_correct_line_metadata(self, tmp_path: Path) -> None:
+        from autokeren.tools.file import PatchFileTool
+        test_file = tmp_path / "hello.py"
+        test_file.write_text("def hello():\n    print('greeting')\n    return True\n", encoding="utf-8")
+
+        tool = PatchFileTool(tmp_path)
+        result = tool.run(
+            path="hello.py",
+            old_string="    print('greeting')",
+            new_string="    print('hello world')"
+        )
+
+        assert result.ok is True
+        assert isinstance(result.output, dict)
+        assert result.output["start_line"] == 2
+        assert result.output["context_before"] == ["def hello():"]
+        assert result.output["context_after"] == ["    return True"]
+        assert result.output["old_string"] == "    print('greeting')"
+        assert result.output["new_string"] == "    print('hello world')"
+        assert test_file.read_text(encoding="utf-8") == "def hello():\n    print('hello world')\n    return True\n"

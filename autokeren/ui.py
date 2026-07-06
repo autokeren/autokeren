@@ -158,9 +158,39 @@ class AgentUI:
         if result.ok:
             summary = _summarize_tool_result(name, result.output)
             self.console.print(f"  [green]✓[/green] [dim]{summary}[/dim]")
+            if name == "patch_file" and isinstance(result.output, dict):
+                self._print_patch_diff(result.output)
         else:
             err = result.error or "gagal"
             self.console.print(f"  [red]✗[/red] [red]{err}[/red]")
+
+    def _print_patch_diff(self, output: dict) -> None:
+        start_line = output.get("start_line", 1)
+        before = output.get("context_before", [])
+        after = output.get("context_after", [])
+        old = output.get("old_string", "")
+        new = output.get("new_string", "")
+
+        from rich.markup import escape
+        # Cetak baris-baris sebelum
+        line_num = start_line - len(before)
+        for line in before:
+            self.console.print(f"  [dim]│[/dim]  {line_num:4} │  {escape(line)}")
+            line_num += 1
+
+        # Cetak baris-baris yang didelete (old)
+        for line in old.splitlines():
+            self.console.print(f"  [dim]│[/dim]  {line_num:4} │- [red]{escape(line)}[/red]")
+            line_num += 1
+
+        # Cetak baris-baris yang diadd (new)
+        for line in new.splitlines():
+            self.console.print(f"  [dim]│[/dim]  {' ':4} │+ [green]{escape(line)}[/green]")
+
+        # Cetak baris-baris sesudah
+        for line in after:
+            self.console.print(f"  [dim]│[/dim]  {line_num:4} │  {escape(line)}")
+            line_num += 1
 
     def on_tool_output(self, name: str, line: str) -> None:
         self._stop_status()

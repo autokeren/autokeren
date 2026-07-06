@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.3] - 2026-07-06
+
+### Added
+- **Inline Code Snippet Diff Visualization:** Menampilkan visualisasi potongan kode diff secara langsung (inline) di terminal CLI (`ui.py`) dan TUI (`tui.py`) lengkap dengan nomor baris saat file sukses diedit menggunakan `patch_file`.
+
 ## [0.6.2] - 2026-07-06
 
 ### Fixed
@@ -78,6 +83,7 @@ Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan
 - Indonesian localization untuk seluruh UI text.
 - 18 tools bawaan.
 
+[0.6.3]: https://github.com/autokeren/autokeren/releases/tag/v0.6.3
 [0.6.2]: https://github.com/autokeren/autokeren/releases/tag/v0.6.2
 [0.6.1]: https://github.com/autokeren/autokeren/releases/tag/v0.6.1
 [0.6.0]: https://github.com/autokeren/autokeren/releases/tag/v0.6.0
