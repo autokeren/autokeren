@@ -1181,7 +1181,10 @@ class AutokerenTUI(App):
 
     def scroll_chat_to_end(self) -> None:
         chat_pane = self.query_one("#chat-pane", VerticalScroll)
-        chat_pane.scroll_to(y=chat_pane.max_scroll_y, animate=False)
+        def _scroll() -> None:
+            chat_pane.scroll_to(y=chat_pane.max_scroll_y, animate=False)
+        self.call_after_refresh(_scroll)
+
 
     def update_status(self) -> None:
         self.query_one("#status-pane StatusWidget", StatusWidget).update_status()
