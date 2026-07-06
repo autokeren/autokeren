@@ -71,6 +71,60 @@ class ModelSelectScreen(ModalScreen[str]):
             self.dismiss(None)
 
 
+class PermissionSelectScreen(ModalScreen[str]):
+    """Screen Modal untuk meminta izin eksekusi tool."""
+
+    def __init__(self, tool_call_label: str, description: str) -> None:
+        super().__init__()
+        self.tool_call_label = tool_call_label
+        self.description = description
+
+    def compose(self) -> ComposeResult:
+        yield Container(
+            Static("[bold yellow]IZIN EKSEKUSI TOOL[/bold yellow]", id="modal-title"),
+            Static(f"[bold]{self.tool_call_label}[/bold]\n[dim]{self.description}[/dim]", id="modal-desc"),
+            OptionList(
+                "✓ Izinkan Sekali",
+                "⚡ Izinkan Semua Tool Sesi Ini",
+                "✗ Tolak Eksekusi",
+                id="perm-list"
+            ),
+            id="modal-dialog-perm",
+        )
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        choices = ["y", "a", "n"]
+        self.dismiss(choices[event.option_index])
+
+    def on_key(self, event: Any) -> None:
+        if event.key == "escape":
+            self.dismiss("n")
+
+
+class ApprovalSelectScreen(ModalScreen[bool]):
+    """Screen Modal untuk menyetujui rencana kerja."""
+
+    def compose(self) -> ComposeResult:
+        yield Container(
+            Static("[bold yellow]SETUJUI RENCANA KERJA?[/bold yellow]", id="modal-title"),
+            OptionList(
+                "✓ Setujui Rencana",
+                "✗ Tolak Rencana",
+                id="approve-list"
+            ),
+            id="modal-dialog-approve",
+        )
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        choices = [True, False]
+        self.dismiss(choices[event.option_index])
+
+    def on_key(self, event: Any) -> None:
+        if event.key == "escape":
+            self.dismiss(False)
+
+
+
 class StatusWidget(Static):
     """Widget untuk menampilkan informasi status di panel kiri."""
 
@@ -209,6 +263,7 @@ class AutokerenTUI(App):
     }
     #chat-area {
         height: auto;
+        padding-bottom: 2;
     }
     #input-pane {
         height: 3;
@@ -228,7 +283,7 @@ class AutokerenTUI(App):
         height: auto;
         margin: 1 0;
     }
-    ModelSelectScreen {
+    ModelSelectScreen, PermissionSelectScreen, ApprovalSelectScreen {
         align: center middle;
         background: rgba(0, 0, 0, 0.6);
     }
@@ -239,13 +294,32 @@ class AutokerenTUI(App):
         background: $panel;
         padding: 1 2;
     }
+    #modal-dialog-perm {
+        width: 55;
+        height: 14;
+        border: double #555555;
+        background: $panel;
+        padding: 1 2;
+    }
+    #modal-dialog-approve {
+        width: 40;
+        height: 10;
+        border: double #555555;
+        background: $panel;
+        padding: 1 2;
+    }
+    #modal-desc {
+        margin-bottom: 1;
+        height: auto;
+    }
     #modal-title {
         text-align: center;
         margin-bottom: 1;
     }
-    #model-list {
+    #model-list, #perm-list, #approve-list {
         height: 1fr;
     }
+
     """
 
     BINDINGS = [
@@ -377,22 +451,29 @@ class AutokerenTUI(App):
         def _prompt():
             label = _format_tool_call(tool_name, arguments)
             self.append_chat_message("system", f"⚡ Panggil [bold cyan]{label}[/bold cyan]? — {description}")
-            self.append_chat_message("system", "Ketik [bold]y[/bold] (Izinkan), [bold]n[/bold] (Tolak), atau [bold]a[/bold] (Izinkan semua)")
-            
-            # Ubah input mode ke permission
-            self.input_mode = "permission"
-            input_pane = self.query_one("#input-pane", Input)
-            input_pane.placeholder = "Izinkan? (y/n/a) > "
-            input_pane.value = ""
-            input_pane.focus()
-            
-            # Simpan target event dan result pointer ke instance
-            self._perm_event = evt
-            self._perm_result = result
+
+            def on_perm_result(choice: str | None) -> None:
+                allowed = False
+                if choice == "y":
+                    allowed = True
+                    self.allowed_tools.add(tool_name)
+                    self.append_chat_message("system", f"Tool [bold cyan]{tool_name}[/bold cyan] diizinkan.")
+                elif choice == "a":
+                    allowed = True
+                    self.allow_all = True
+                    self.append_chat_message("system", "Semua tool diizinkan untuk sesi ini.")
+                else:
+                    self.append_chat_message("system", f"Tool [bold red]{tool_name}[/bold red] ditolak.")
+
+                result[0] = allowed
+                evt.set()
+
+            self.push_screen(PermissionSelectScreen(label, description), on_perm_result)
 
         self.call_from_thread(_prompt)
         evt.wait()
         return result[0]
+
 
     # ------------------------------------------------------------------ #
     # Helper & UI Actions
@@ -422,48 +503,17 @@ class AutokerenTUI(App):
         input_pane = self.query_one("#input-pane", Input)
         input_pane.value = ""
 
-        if self.input_mode == "chat":
-            if val.startswith("/"):
-                await self.handle_slash_command(val)
-                return
+        if val.startswith("/"):
+            await self.handle_slash_command(val)
+            return
 
-            self.append_chat_message("user", val)
-            input_pane.disabled = True
-            input_pane.placeholder = "Sedang berpikir..."
-            
-            # Jalankan agent loop di background worker thread
-            self.run_worker(self._run_agent_flow(val), thread=True)
+        self.append_chat_message("user", val)
+        input_pane.disabled = True
+        input_pane.placeholder = "Sedang berpikir..."
+        
+        # Jalankan agent loop di background worker thread
+        self.run_worker(self._run_agent_flow(val), thread=True)
 
-        elif self.input_mode == "permission":
-            choice = val.lower()
-            allowed = False
-            if choice in ("y", "yes"):
-                allowed = True
-                if self.current_tool_widget:
-                    self.allowed_tools.add(self.current_tool_widget.tool_name)
-            elif choice in ("a", "all"):
-                allowed = True
-                self.allow_all = True
-                self.append_chat_message("system", "Semua tool diizinkan untuk sesi ini.")
-            else:
-                self.append_chat_message("system", "Tool ditolak oleh user.")
-
-            self._perm_result[0] = allowed
-            self._perm_event.set()
-            
-            # Kembalikan mode chat biasa
-            self.input_mode = "chat"
-            input_pane.placeholder = "✍️ Ketik pesan di sini..."
-
-        elif self.input_mode == "approval":
-            choice = val.lower()
-            approved = choice in ("y", "yes")
-            self._approval_result[0] = approved
-            self._approval_event.set()
-
-            # Kembalikan mode chat biasa
-            self.input_mode = "chat"
-            input_pane.placeholder = "✍️ Ketik pesan di sini..."
 
     async def _run_agent_flow(self, user_input: str) -> None:
         try:
@@ -496,19 +546,21 @@ class AutokerenTUI(App):
         result = [False]
 
         def _prompt():
-            self.append_chat_message("system", "⚡ Setujui rencana di atas? Ketik [bold]y[/bold] (Setuju) atau [bold]n[/bold] (Tolak)")
-            self.input_mode = "approval"
-            input_pane = self.query_one("#input-pane", Input)
-            input_pane.placeholder = "Setujui rencana? (y/n) > "
-            input_pane.value = ""
-            input_pane.focus()
-            
-            self._approval_event = evt
-            self._approval_result = result
+            def on_approve_result(approved: bool | None) -> None:
+                res = approved if approved is not None else False
+                if res:
+                    self.append_chat_message("system", "Rencana kerja disetujui.")
+                else:
+                    self.append_chat_message("system", "Rencana kerja ditolak.")
+                result[0] = res
+                evt.set()
+
+            self.push_screen(ApprovalSelectScreen(), on_approve_result)
 
         self.call_from_thread(_prompt)
         evt.wait()
         return result[0]
+
 
     # ------------------------------------------------------------------ #
     # Key Bindings & Slash Commands
