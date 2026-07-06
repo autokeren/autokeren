@@ -1204,6 +1204,7 @@ class AutokerenTUI(App):
         self.input_history: list[str] = []
         self.history_idx: int = -1
         self._history_draft: str = ""  # simpan draft saat navigasi history
+        self._agent_running: bool = False  # guard: prevent double submit (Windows fix)
 
         # Multi-agent project manager
         from autokeren.multiagent import ProjectManager
@@ -1481,9 +1482,12 @@ class AutokerenTUI(App):
         val = event.value.strip()
         if not val:
             return
+        if self._agent_running:
+            return
 
         input_pane = self.query_one("#input-pane", Input)
         input_pane.value = ""
+        self._agent_running = True
 
         if val.startswith("/"):
             await self.handle_slash_command(val)
@@ -1521,6 +1525,7 @@ class AutokerenTUI(App):
             self.append_chat_message("system", self.t("unknown_cmd", cmd=str(e)))
         finally:
             def _reset_input():
+                self._agent_running = False
                 input_pane = self.query_one("#input-pane", Input)
                 input_pane.disabled = False
                 input_pane.placeholder = self.t("input_placeholder")
@@ -1622,6 +1627,7 @@ class AutokerenTUI(App):
     async def action_cancel(self) -> None:
         """Menghentikan proses AI yang sedang berjalan."""
         self.agent.interrupted = True
+        self._agent_running = False
         self.append_chat_message("system", self.t("interrupted_msg"))
         try:
             input_pane = self.query_one("#input-pane", Input)
