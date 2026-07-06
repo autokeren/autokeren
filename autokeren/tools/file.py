@@ -83,7 +83,12 @@ class WriteFileTool(Tool):
                     content = _signing.sign_content(path, content)
             target.write_text(content, encoding="utf-8")
             lines = content.count("\n") + (1 if content and not content.endswith("\n") else 0)
-            return ToolResult(output={"path": str(target), "lines": lines, "backup": str(bak) if bak else None})
+            return ToolResult(output={
+                "path": str(target),
+                "lines": lines,
+                "backup": str(bak) if bak else None,
+                "content": content,
+            })
         except Exception as e:
             return ToolResult(error=str(e), ok=False)
 

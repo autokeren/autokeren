@@ -361,3 +361,18 @@ class TestPatchFileTool:
         assert result.output["old_string"] == "    print('greeting')"
         assert result.output["new_string"] == "    print('hello world')"
         assert test_file.read_text(encoding="utf-8") == "def hello():\n    print('hello world')\n    return True\n"
+
+
+# ---------------------------------------------------------------------------
+# WriteFileTool
+# ---------------------------------------------------------------------------
+
+
+class TestWriteFileTool:
+    def test_write_file_returns_content(self, tmp_path: Path) -> None:
+        from autokeren.tools.file import WriteFileTool
+        tool = WriteFileTool(tmp_path)
+        result = tool.run(path="hello.py", content="print('hello')")
+        assert result.ok is True
+        assert isinstance(result.output, dict)
+        assert "print('hello')" in result.output["content"]

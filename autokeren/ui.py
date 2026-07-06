@@ -160,9 +160,28 @@ class AgentUI:
             self.console.print(f"  [green]✓[/green] [dim]{summary}[/dim]")
             if name == "patch_file" and isinstance(result.output, dict):
                 self._print_patch_diff(result.output)
+            elif name == "write_file" and isinstance(result.output, dict):
+                self._print_write_file_preview(result.output)
         else:
             err = result.error or "gagal"
             self.console.print(f"  [red]✗[/red] [red]{err}[/red]")
+
+    def _print_write_file_preview(self, output: dict) -> None:
+        content = output.get("content", "")
+        if not content:
+            return
+
+        from rich.markup import escape
+        lines = content.splitlines()
+        max_preview = 20
+        shown_lines = lines[:max_preview]
+
+        for i, line in enumerate(shown_lines, 1):
+            self.console.print(f"  [dim]│[/dim]  {i:4} │+ [green]{escape(line)}[/green]")
+
+        if len(lines) > max_preview:
+            remaining = len(lines) - max_preview
+            self.console.print(f"  [dim]│[/dim]       │ [dim]... (terpotong {remaining} baris lagi)[/dim]")
 
     def _print_patch_diff(self, output: dict) -> None:
         start_line = output.get("start_line", 1)

@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.4] - 2026-07-06
+
+### Added
+- **Inline Write-File Preview Visualization:** Menampilkan visualisasi potongan kode baru/timpa secara langsung (inline) di terminal CLI (`ui.py`) dan TUI (`tui.py`) lengkap dengan nomor baris (maksimal 20 baris pertama) saat file sukses ditulis menggunakan `write_file`.
+
 ## [0.6.3] - 2026-07-06
 
 ### Added
@@ -83,6 +88,7 @@ Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan
 - Indonesian localization untuk seluruh UI text.
 - 18 tools bawaan.
 
+[0.6.4]: https://github.com/autokeren/autokeren/releases/tag/v0.6.4
 [0.6.3]: https://github.com/autokeren/autokeren/releases/tag/v0.6.3
 [0.6.2]: https://github.com/autokeren/autokeren/releases/tag/v0.6.2
 [0.6.1]: https://github.com/autokeren/autokeren/releases/tag/v0.6.1

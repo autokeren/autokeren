@@ -1040,6 +1040,24 @@ class ToolWidget(Static):
                 res.append(f" {line_num:4} │  {line}")
                 line_num += 1
 
+        # Render preview jika tool write_file sukses
+        elif self.status == "success" and self.tool_name == "write_file" and isinstance(self.output_payload, dict):
+            out = self.output_payload
+            content = out.get("content", "")
+            if content:
+                lines = content.splitlines()
+                max_preview = 20
+                shown_lines = lines[:max_preview]
+                for i, line in enumerate(shown_lines, 1):
+                    res.append("\n")
+                    res.append("  │ ", style="dim")
+                    res.append(f" {i:4} │+ {line}", style="green")
+                if len(lines) > max_preview:
+                    remaining = len(lines) - max_preview
+                    res.append("\n")
+                    res.append("  │ ", style="dim")
+                    res.append(f" {' ':4} │  ... (terpotong {remaining} baris lagi)", style="dim")
+
         return res
 
 
