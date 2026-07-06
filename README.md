@@ -18,6 +18,10 @@ autokeren adalah CLI agentic coding yang dirancang khusus untuk stack Cloudflare
 
 - **7 model AI** — kimi-code, kimi-2.6, glm-5.2, glm-flash, llama-4-scout, gemma-4, nemotron dengan fallback otomatis.
 - **PaaS built-in** — deploy aplikasi ke Cloudflare Workers langsung dari terminal, auto D1 + R2 + AI bindings.
+- **Multi-Agent Mode & Auto Spawn** — Jalankan beberapa agent secara paralel via `/project`, atau biarkan agent utama secara dinamis memanggil sub-agent menggunakan tool `spawn_agent`.
+- **MCP Server Support** — Integrasikan tool eksternal pihak ketiga dengan Model Context Protocol (MCP) dan kelola via `/mcp`.
+- **Input History** — Navigasi perintah sebelumnya dengan tombol arah `↑` / `↓` di terminal.
+- **Export Chat** — Export seluruh riwayat percakapan menjadi file `.md` menggunakan perintah `/export`.
 - **Streaming output** — respons token-by-token langsung di terminal.
 - **Permission system** — konfirmasi sebelum menjalankan command berbahaya atau menulis file.
 - **Cross-session memory** — ingatan per-project tersimpan otomatis, dimuat tiap startup.
@@ -145,6 +149,9 @@ Dapat diketik langsung di kotak input chat (mendukung *autocomplete* otomatis me
 | `/q` atau `/quit` | Keluar dari sesi |
 | `/model [nama]` | Ganti model aktif (buka modal pop-up jika nama kosong) |
 | `/lang [kode]` | Ganti bahasa UI (buka modal pop-up jika kode kosong, misal: `/lang en`) |
+| `/export [nama]` | Ekspor percakapan ke file Markdown (default: auto-timestamp) |
+| `/mcp` | Membuka manager interaktif MCP Server (lihat status, list tools, & tambah server baru) |
+| `/project <subcommand>`| Manajemen project Multi-Agent (`new`, `add`, `run`, `status`, `output`, `list`, `switch`) |
 | `/compact` | Ringkas history percakapan, pertahankan N turn terakhir |
 | `/reset` | Reset sesi percakapan saat ini |
 | `/memory` | Tampilkan lokasi dan isi memory per-project |
@@ -155,7 +162,7 @@ Dapat diketik langsung di kotak input chat (mendukung *autocomplete* otomatis me
 
 ## Tools
 
-autokeren membawa 21 tools bawaan dengan permission check dan schema function-calling.
+autokeren membawa 24 tools bawaan dengan permission check dan schema function-calling.
 
 | Tool | Deskripsi |
 |---|---|
@@ -169,6 +176,8 @@ autokeren membawa 21 tools bawaan dengan permission check dan schema function-ca
 | `git_status` | Status working tree git |
 | `git_diff` | Diff git (staged/unstaged) |
 | `git_commit` | Commit perubahan |
+| `git_log` | Riwayat commit git (commit logs) |
+| `git_branch` | Daftar, buat, atau switch git branch |
 | `cf_deploy` | Deploy ke Cloudflare Pages/Workers via wrangler |
 | `cf_build_next` | Build Next.js dengan next-on-pages |
 | `cf_kv` | Baca/tulis Cloudflare KV namespace |
@@ -176,6 +185,7 @@ autokeren membawa 21 tools bawaan dengan permission check dan schema function-ca
 | `create_project` | Buat project PaaS baru (auto D1 + R2 + AI bindings) |
 | `deploy_project` | Deploy code ke project PaaS |
 | `list_projects` | Daftar project PaaS yang sudah dibuat |
+| `spawn_agent` | Spawn sub-agent secara dinamis untuk memparalelkan task |
 | `tmux` | Supervisor long-running task via tmux |
 | `todo` | Kelola todo list multi-step |
 | `remember` | Simpan info ke cross-session memory |
@@ -212,6 +222,12 @@ autokeren:
   compact_tail_turns: 6
   auto_compact: false
   auto_compact_threshold: 0.8
+
+mcp_servers:
+  - name: filesystem
+    enabled: true
+    command: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    env: {}
 ```
 
 ### Environment variables
