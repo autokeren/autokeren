@@ -69,3 +69,5 @@ autokeren/signing.py
 worker.js
 worker.js.bak-*
 toko-*/
+scratch/
+

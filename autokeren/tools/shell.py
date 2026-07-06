@@ -1,12 +1,11 @@
-"""Shell command tool with real-time output streaming via pseudo-TTY."""
+"""Shell command tool with real-time output streaming via pseudo-TTY (Unix) or subprocess (Windows)."""
 from __future__ import annotations
 
 import os
-import pty
 import re
-import select
 import shlex
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Callable
@@ -15,6 +14,12 @@ from autokeren.tools.base import Tool, ToolResult
 from autokeren.utils import is_dangerous_command
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07|\x1b[()][AB0]|\x1b[=>]")
+
+_IS_WINDOWS = sys.platform == "win32"
+
+if not _IS_WINDOWS:
+    import pty  # type: ignore[assignment]
+    import select  # type: ignore[assignment]
 
 
 def _strip_ansi(text: str) -> str:
@@ -66,6 +71,8 @@ class ShellTool(Tool):
         env["PAGER"] = "cat"
 
         try:
+            if _IS_WINDOWS:
+                return self._run_subprocess(command, cwd, env, effective_timeout, stdin, on_output)
             return self._run_pty(command, cwd, env, effective_timeout, stdin, on_output)
         except Exception as e:
             return ToolResult(error=f"{type(e).__name__}: {e}", ok=False)
@@ -139,6 +146,70 @@ class ShellTool(Tool):
                 break
 
         self._close_fd(master_fd)
+        proc.wait()
+
+        output = "\n".join(output_lines)
+        return ToolResult(
+            output=output,
+            error=None if proc.returncode == 0 else f"exit code {proc.returncode}",
+            ok=proc.returncode == 0,
+        )
+
+    def _run_subprocess(
+        self,
+        command: str,
+        cwd: Path,
+        env: dict[str, str],
+        timeout: int,
+        stdin: str | None,
+        on_output: Callable[[str], None] | None,
+    ) -> ToolResult:
+        """Windows fallback: pakai subprocess.Popen tanpa PTY."""
+        proc = subprocess.Popen(
+            command,
+            shell=True,
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            stdin=subprocess.PIPE if stdin else subprocess.DEVNULL,
+            env=env,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
+        )
+
+        if stdin and proc.stdin:
+            try:
+                proc.stdin.write(stdin)
+                proc.stdin.flush()
+            except (OSError, BrokenPipeError):
+                pass
+            if proc.stdin:
+                proc.stdin.close()
+
+        output_lines: list[str] = []
+        deadline = time.time() + timeout
+
+        assert proc.stdout is not None
+        while True:
+            if time.time() > deadline:
+                proc.kill()
+                return ToolResult(error=f"timeout after {timeout}s", ok=False)
+
+            line = proc.stdout.readline()
+            if not line:
+                if proc.poll() is not None:
+                    break
+                time.sleep(0.05)
+                continue
+
+            clean = _strip_ansi(line).rstrip("\r\n")
+            if clean.strip():
+                output_lines.append(clean)
+                if on_output:
+                    on_output(clean)
+
         proc.wait()
 
         output = "\n".join(output_lines)
