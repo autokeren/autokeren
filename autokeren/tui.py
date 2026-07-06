@@ -1486,13 +1486,15 @@ class AutokerenTUI(App):
             return
 
         input_pane = self.query_one("#input-pane", Input)
-        input_pane.value = ""
-        self._agent_running = True
 
         if val.startswith("/"):
+            input_pane.value = ""
             await self.handle_slash_command(val)
             self._focus_input()
             return
+
+        input_pane.value = ""
+        self._agent_running = True
 
         self.append_chat_message("user", val)
         # Simpan ke history input (hindari duplikat berturutan)
