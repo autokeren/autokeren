@@ -1506,16 +1506,16 @@ class AutokerenTUI(App):
         input_pane.placeholder = self.t("thinking_placeholder")
         
         # Jalankan agent loop di background worker thread
-        self.run_worker(self._run_agent_flow(val), thread=True)
+        self.run_worker(lambda: self._run_agent_flow(val), thread=True)
 
-    async def _run_agent_flow(self, user_input: str) -> None:
+    def _run_agent_flow(self, user_input: str) -> None:
         try:
             # Panggil Agent loop
             self.agent.run(user_input)
 
             # Jika Plan Mode aktif dan rencana belum disetujui
             while self.cfg.autokeren.plan_mode and not self.agent.plan_approved:
-                approved = await self.prompt_plan_approval()
+                approved = self.prompt_plan_approval()
                 if approved:
                     self.agent.approve_plan()
                     self.agent.run("")
@@ -1535,7 +1535,7 @@ class AutokerenTUI(App):
                 self.update_status()
             self.call_from_thread(_reset_input)
 
-    async def prompt_plan_approval(self) -> bool:
+    def prompt_plan_approval(self) -> bool:
         evt = threading.Event()
         result = [False]
 
