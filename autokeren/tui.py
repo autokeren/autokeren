@@ -1970,7 +1970,7 @@ class AutokerenTUI(App):
             input_pane = self.query_one("#input-pane", Input)
             input_pane.disabled = True
             input_pane.placeholder = "🔴 TDD loop sedang berjalan..."
-        self.call_from_thread(_disable)
+        _disable()
 
         def _log(msg: str):
             # Kirim output log TDD ke TUI chat window secara live
@@ -1996,7 +1996,7 @@ class AutokerenTUI(App):
                 input_pane.disabled = False
                 input_pane.placeholder = self.t("input_placeholder")
                 input_pane.focus()
-            self.call_from_thread(_enable)
+            _enable()
 
 
 def run_tui(agent: Agent, cfg: Config) -> None:
