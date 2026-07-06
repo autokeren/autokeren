@@ -100,6 +100,8 @@ class TDDEngine:
         resp = self.agent.router.complete([{"role": "user", "content": red_prompt}], max_tokens=2048)
         test_code = self._extract_code(resp.content or "")
         
+        self.log(f"📝 [bold yellow]Unit Test Code:[/bold yellow]\n{test_code}\n")
+
         # Tulis test file ke disk
         test_file.write_text(test_code, encoding="utf-8")
         self.log("[dim]✓ Menulis file test baru.[/dim]\n")
@@ -112,6 +114,8 @@ class TDDEngine:
         ok, log = self.run_tests(env["test_runner"], test_file)
         
         if not ok:
+            err_snippet = "\n".join(log.splitlines()[-12:])
+            self.log(f"📉 [bold red]RED Test Failure Output (Expected):[/bold red]\n{err_snippet}\n")
             self.log("[bold green]✓ RED Status Terverifikasi! Unit test gagal secara alami (tidak ada implementasi).[/bold green]\n")
         else:
             self.log("[yellow]⚠ Peringatan: Test langsung lulus/hijau. RED Agent akan menulis ulang test case yang lebih mendalam.[/yellow]")
@@ -120,11 +124,15 @@ class TDDEngine:
                 {"role": "user", "content": red_prompt + "\nPastikan test kamu menegaskan perilaku yang belum ada sehingga test pasti gagal!"}
             ], max_tokens=2048)
             test_code = self._extract_code(resp.content or "")
+            self.log(f"📝 [bold yellow]Unit Test Code (Retry):[/bold yellow]\n{test_code}\n")
             test_file.write_text(test_code, encoding="utf-8")
             ok, log = self.run_tests(env["test_runner"], test_file)
             if ok:
                 self.log("[red]✗ Kesalahan: Unit test tetap lulus tanpa kode implementasi. Menghentikan alur TDD.[/red]")
                 return False
+            else:
+                err_snippet = "\n".join(log.splitlines()[-12:])
+                self.log(f"📉 [bold red]RED Test Failure Output (Retry Expected):[/bold red]\n{err_snippet}\n")
 
         # ----------------------------------------------------------------------
         # PHASE 2: GREEN (Coder Agent) 🟢
@@ -145,6 +153,7 @@ class TDDEngine:
             
             resp = self.agent.router.complete([{"role": "user", "content": blue_prompt}], max_tokens=2048)
             impl_code = self._extract_code(resp.content or "")
+            self.log(f"💻 [bold green]Implementation Code Attempt {attempt}:[/bold green]\n{impl_code}\n")
             code_file.write_text(impl_code, encoding="utf-8")
 
             # Jalankan test lagi
@@ -153,6 +162,8 @@ class TDDEngine:
                 self.log("[bold green]✓ GREEN Status Tercapai! Unit test berhasil diloloskan dengan sukses.[/bold green]\n")
                 break
             else:
+                err_snippet = "\n".join(log.splitlines()[-12:])
+                self.log(f"❌ [bold red]Test Failed (Attempt {attempt}):[/bold red]\n{err_snippet}\n")
                 self.log(f"[yellow]✗ Gagal meloloskan test pada attempt {attempt}. Mencoba memperbaiki...[/yellow]")
         else:
             self.log("[bold red]✗ Gagal mencapai status GREEN setelah 3 kali percobaan.[/bold red]")
@@ -176,6 +187,7 @@ class TDDEngine:
 
         resp = self.agent.router.complete([{"role": "user", "content": refactor_prompt}], max_tokens=2048)
         refactored_code = self._extract_code(resp.content or "")
+        self.log(f"✨ [bold blue]Refactored Code:[/bold blue]\n{refactored_code}\n")
         
         # Tulis kode hasil refactor
         code_file.write_text(refactored_code, encoding="utf-8")
@@ -189,6 +201,8 @@ class TDDEngine:
             self.log("[bold gold]★ PROSES TDD SELESAI DENGAN SUKSES! ★[/bold gold]")
             return True
         else:
+            err_snippet = "\n".join(log.splitlines()[-12:])
+            self.log(f"❌ [bold red]Refactor Test Failed:[/bold red]\n{err_snippet}\n")
             self.log("[yellow]⚠ Refactor merusak test. Mengembalikan kode ke versi GREEN sebelumnya.[/yellow]")
             code_file.write_text(impl_code, encoding="utf-8")
             return True

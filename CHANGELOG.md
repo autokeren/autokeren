@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.8] - 2026-07-06
+
+### Added
+- **Verbose TDD Execution Logging:** TDD engine sekarang mencetak visualisasi kode unit test, kode implementasi, kode hasil refactor, serta potongan error dari test runner (`pytest`) ke panel obrolan TUI secara real-time. Proses TDD tidak lagi berupa "black box".
+
 ## [0.6.7] - 2026-07-06
 
 ### Fixed
@@ -103,6 +108,7 @@ Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan
 - Indonesian localization untuk seluruh UI text.
 - 18 tools bawaan.
 
+[0.6.8]: https://github.com/autokeren/autokeren/releases/tag/v0.6.8
 [0.6.7]: https://github.com/autokeren/autokeren/releases/tag/v0.6.7
 [0.6.6]: https://github.com/autokeren/autokeren/releases/tag/v0.6.6
 [0.6.5]: https://github.com/autokeren/autokeren/releases/tag/v0.6.5

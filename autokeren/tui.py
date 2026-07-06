@@ -1976,7 +1976,11 @@ class AutokerenTUI(App):
             # Kirim output log TDD ke TUI chat window secara live
             def _append():
                 self.append_chat_message("system", msg)
-            self.call_from_thread(_append)
+            import threading
+            if self._thread_id == threading.get_ident():
+                _append()
+            else:
+                self.call_from_thread(_append)
 
         try:
             engine = TDDEngine(self.agent, str(self.agent.project_root), _log)
