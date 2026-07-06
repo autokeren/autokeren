@@ -131,17 +131,20 @@ Di mode interaktif TUI, Anda dapat menggunakan tombol pintas keyboard (*hotkeys*
 | **`F3`** | Reset Sesi | Mereset seluruh percakapan dan status izin tool |
 | **`F4`** | Salin Respon | Menyalin pesan/jawaban terakhir AI ke clipboard sistem |
 | **`F5`** | Compact | Meringkas riwayat context window percakapan |
+| **`F6`** | Ganti Bahasa | Memunculkan modal dialog interaktif untuk memilih bahasa UI |
+| **`Ctrl+C`**| Batal / Stop | Membatalkan/menghentikan eksekusi proses AI atau tool yang aktif |
 | **`Ctrl+Q`**| Keluar | Keluar dari aplikasi autokeren secara aman |
 
 ### Perintah Slash
 
-Dapat diketik langsung di kotak input chat:
+Dapat diketik langsung di kotak input chat (mendukung *autocomplete* otomatis menggunakan tombol Tab atau Panah Kanan):
 
 | Perintah | Deskripsi |
 |---|---|
 | `/help` | Tampilkan bantuan dan daftar perintah |
 | `/q` atau `/quit` | Keluar dari sesi |
 | `/model [nama]` | Ganti model aktif (buka modal pop-up jika nama kosong) |
+| `/lang [kode]` | Ganti bahasa UI (buka modal pop-up jika kode kosong, misal: `/lang en`) |
 | `/compact` | Ringkas history percakapan, pertahankan N turn terakhir |
 | `/reset` | Reset sesi percakapan saat ini |
 | `/memory` | Tampilkan lokasi dan isi memory per-project |
