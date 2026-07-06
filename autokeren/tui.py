@@ -36,6 +36,8 @@ LANGUAGES = {
 TRANSLATIONS = {
     "en": {
         "user_label": "you",
+        "interrupted_msg": "🛑 AI execution cancelled by user.",
+        "ctrlc_desc": "Cancel/Stop active AI process",
         "welcome_sub": "Type your question below, or press [bold]F1[/bold] for command help.",
         "status_title": "STATUS",
         "model": "Model",
@@ -97,6 +99,8 @@ TRANSLATIONS = {
     },
     "id": {
         "user_label": "kamu",
+        "interrupted_msg": "🛑 Eksekusi AI dibatalkan oleh pengguna.",
+        "ctrlc_desc": "Batalkan/Stop proses AI aktif",
         "welcome_sub": "Ketik pertanyaan kamu di bawah, atau tekan [bold]F1[/bold] untuk bantuan perintah.",
         "status_title": "STATUS",
         "model": "Model",
@@ -158,6 +162,8 @@ TRANSLATIONS = {
     },
     "zh": {
         "user_label": "你",
+        "interrupted_msg": "🛑 用户已取消 AI 执行。",
+        "ctrlc_desc": "取消/停止当前 AI 进程",
         "welcome_sub": "在下方输入您的问题，或按 [bold]F1[/bold] 获取命令帮助。",
         "status_title": "状态",
         "model": "模型",
@@ -219,6 +225,8 @@ TRANSLATIONS = {
     },
     "ja": {
         "user_label": "あなた",
+        "interrupted_msg": "🛑 ユーザーによって AI 実行がキャンセルされました。",
+        "ctrlc_desc": "アクティブな AI プロセスをキャンセル/停止",
         "welcome_sub": "質問を以下に入力するか、[bold]F1[/bold] キーでコマンドのヘルプを表示します。",
         "status_title": "ステータス",
         "model": "モデル",
@@ -280,6 +288,8 @@ TRANSLATIONS = {
     },
     "de": {
         "user_label": "du",
+        "interrupted_msg": "🛑 AI-Ausführung vom Benutzer abgebrochen.",
+        "ctrlc_desc": "Aktiven AI-Prozess abbrechen/stoppen",
         "welcome_sub": "Geben Sie Ihre Frage unten ein oder drücken Sie [bold]F1[/bold] für Befehlshilfe.",
         "status_title": "STATUS",
         "model": "Modell",
@@ -341,6 +351,8 @@ TRANSLATIONS = {
     },
     "ar": {
         "user_label": "أنت",
+        "interrupted_msg": "🛑 تم إلغاء تشغيل الذكاء الاصطناعي بواسطة المستخدم.",
+        "ctrlc_desc": "إلغاء/إيقاف عملية الذكاء الاصطناعي النشطة",
         "welcome_sub": "اكتب سؤالك أدناه، أو اضغط على [bold]F1[/bold] للحصول على مساعدة بشأن الأوامر.",
         "status_title": "الحالة",
         "model": "النموذج",
@@ -402,6 +414,8 @@ TRANSLATIONS = {
     },
     "es": {
         "user_label": "tú",
+        "interrupted_msg": "🛑 Ejecución de IA cancelada por el usuario.",
+        "ctrlc_desc": "Cancelar/Detener proceso de IA activo",
         "welcome_sub": "Escriba su pregunta a continuación o presione [bold]F1[/bold] para obtener ayuda sobre comandos.",
         "status_title": "ESTADO",
         "model": "Modelo",
@@ -463,6 +477,8 @@ TRANSLATIONS = {
     },
     "pt": {
         "user_label": "você",
+        "interrupted_msg": "🛑 Execução de IA cancelada pelo usuário.",
+        "ctrlc_desc": "Cancelar/Parar processo de IA ativo",
         "welcome_sub": "Digite sua pergunta abaixo ou pressione [bold]F1[/bold] para obter ajuda sobre comandos.",
         "status_title": "STATUS",
         "model": "Modelo",
@@ -925,6 +941,7 @@ class AutokerenTUI(App):
         Binding("f4", "copy_last", "Salin Respon"),
         Binding("f5", "compact", "Compact Context"),
         Binding("f6", "lang", "Bahasa / Lang"),
+        Binding("ctrl+c", "cancel", "Batal / Stop"),
         Binding("ctrl+q", "quit", "Keluar"),
     ]
 
@@ -1252,6 +1269,7 @@ class AutokerenTUI(App):
             f"  - [bold]F4[/bold]   : {self.t('f4_desc')}\n"
             f"  - [bold]F5[/bold]   : {self.t('f5_desc')}\n"
             f"  - [bold]F6[/bold]   : {self.t('f6_desc')}\n"
+            f"  - [bold]Ctrl+C[/bold]: {self.t('ctrlc_desc')}\n"
             f"  - [bold]Ctrl+Q[/bold]: {self.t('ctrlq_desc')}\n\n"
             f"{self.t('slash_commands_label')}\n"
             "  - [bold]/model <name>[/bold]: Switch model\n"
@@ -1302,6 +1320,11 @@ class AutokerenTUI(App):
                 self.update_status()
 
         self.push_screen(LanguageSelectScreen(self.active_language), on_select)
+
+    async def action_cancel(self) -> None:
+        """Menghentikan proses AI yang sedang berjalan."""
+        self.agent.interrupted = True
+        self.append_chat_message("system", self.t("interrupted_msg"))
 
     async def action_reset(self) -> None:
         self.agent.reset()

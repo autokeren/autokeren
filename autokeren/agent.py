@@ -37,6 +37,7 @@ class Agent:
         self._max_tool_calls = cfg.autokeren.max_tool_calls  # safety net, 0 = unlimited
         self._last_neuron_remaining: int | None = None
         self._last_neuron_quota: int | None = None
+        self.interrupted = False
 
         # Opt-in UI callbacks (wired by CLI). Default None = no-op.
         self.on_model_start: Callable[[], None] | None = None
@@ -82,19 +83,35 @@ class Agent:
         lang_name = lang_names.get(lang_code, "English")
         self._system_prompt += f"\n\nIMPORTANT: You must respond to the user in {lang_name}."
 
+    def check_interrupt(self) -> None:
+        """Angkat KeyboardInterrupt jika bendera interupsi aktif."""
+        if self.interrupted:
+            self.interrupted = False
+            raise KeyboardInterrupt("Interrupted by user")
 
     def run(self, user_input: str) -> ModelResponse:
         self.context.add_user(user_input)
         for iteration in range(self.cfg.autokeren.max_iterations):
+            try:
+                self.check_interrupt()
+            except KeyboardInterrupt:
+                return ModelResponse(content="[dibatalkan user]")
+
             if self.on_model_start:
                 self.on_model_start()
+
+            def _on_chunk(text: str) -> None:
+                self.check_interrupt()
+                if self.on_chunk:
+                    self.on_chunk(text)
+
             try:
                 resp = self.router.complete(
                     self.context.messages,
                     tools=self.tools.schemas(),
                     max_tokens=self.cfg.cloudflare.max_tokens,
                     temperature=self.cfg.cloudflare.temperature,
-                    on_chunk=self.on_chunk,
+                    on_chunk=_on_chunk,
                 )
             except KeyboardInterrupt:
                 if self.on_model_end:
@@ -123,6 +140,11 @@ class Agent:
 
             self.context.add_assistant(resp)
             for tc in resp.tool_calls:
+                try:
+                    self.check_interrupt()
+                except KeyboardInterrupt:
+                    return ModelResponse(content="[dibatalkan user]")
+
                 self._tool_call_count += 1
                 if self._max_tool_calls > 0 and self._tool_call_count > self._max_tool_calls:
                     limit_msg = ToolResult(error=f"batas tool call tercapai ({self._max_tool_calls}). Selesaikan tanpa tool.", ok=False)
@@ -141,6 +163,7 @@ class Agent:
                     self.on_tool_start(tc.name, tc.arguments)
                 try:
                     def _on_output(line: str, _name: str = tc.name) -> None:
+                        self.check_interrupt()
                         if self.on_tool_output:
                             self.on_tool_output(_name, line)
                     raw_result = self.tools.run(tc.name, tc.arguments, on_output=_on_output)
@@ -151,6 +174,7 @@ class Agent:
                 self.context.add_tool_result(tc.id, tc.name, raw_result.to_dict(), raw_result.ok)
 
         return ModelResponse(content="Mencapai batas iterasi maksimum tanpa jawaban final.")
+
 
     def approve_plan(self) -> None:
         self.plan_approved = True
