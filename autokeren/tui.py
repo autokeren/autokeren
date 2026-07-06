@@ -876,21 +876,21 @@ class AutokerenTUI(App):
     }
     #modal-dialog {
         width: 50;
-        height: 14;
+        height: auto;
         border: double #555555;
         background: $panel;
         padding: 1 2;
     }
     #modal-dialog-perm {
         width: 55;
-        height: 14;
+        height: auto;
         border: double #555555;
         background: $panel;
         padding: 1 2;
     }
     #modal-dialog-approve {
         width: 40;
-        height: 10;
+        height: auto;
         border: double #555555;
         background: $panel;
         padding: 1 2;
@@ -903,10 +903,20 @@ class AutokerenTUI(App):
         text-align: center;
         margin-bottom: 1;
     }
-    #model-list, #perm-list, #approve-list, #lang-list {
-        height: 1fr;
+    #model-list {
+        height: 6;
+    }
+    #lang-list {
+        height: 8;
+    }
+    #perm-list {
+        height: 5;
+    }
+    #approve-list {
+        height: 3;
     }
     """
+
 
     BINDINGS = [
         Binding("f1", "help", "Help"),
