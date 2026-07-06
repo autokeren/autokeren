@@ -33,7 +33,7 @@ autokeren adalah CLI agentic coding yang dirancang khusus untuk stack Cloudflare
 
 ### 1. Dapatkan API Key (gratis)
 
-Daftar di **[developers.autokeren.com](https://developers.autokeren.com)** untuk dapatkan API key gratis. Free tier: 20 request/menit.
+Daftar di **[developers.autokeren.com](https://developers.autokeren.com)** untuk dapatkan API key gratis.
 
 ### 2. Install
 
