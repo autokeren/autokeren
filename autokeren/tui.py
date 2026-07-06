@@ -10,6 +10,7 @@ from textual.containers import Horizontal, VerticalScroll, Container
 from textual.widgets import Static, Input, OptionList
 from textual.screen import ModalScreen
 from textual.binding import Binding
+from textual.events import Resize
 from rich.markdown import Markdown
 from rich.text import Text
 
@@ -835,6 +836,13 @@ class ToolWidget(Static):
         return res
 
 
+class ChatArea(Container):
+    """Container khusus untuk area chat yang mendeteksi perubahan ukuran untuk autoscroll."""
+    def on_resize(self, event: Resize) -> None:
+        if hasattr(self.app, "scroll_chat_to_end"):
+            self.app.scroll_chat_to_end()
+
+
 class AutokerenTUI(App):
     """Aplikasi Full TUI untuk autokeren bergaya Antigravity."""
 
@@ -1008,7 +1016,7 @@ class AutokerenTUI(App):
         yield Horizontal(
             Container(StatusWidget(self.agent, self.cfg), id="status-pane"),
             Container(
-                VerticalScroll(Container(id="chat-area"), id="chat-pane"),
+                VerticalScroll(ChatArea(id="chat-area"), id="chat-pane"),
                 Input(id="input-pane", placeholder=self.t("input_placeholder"), suggester=suggester),
                 id="right-layout"
             )
