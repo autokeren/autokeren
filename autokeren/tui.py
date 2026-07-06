@@ -11,6 +11,8 @@ from textual.widgets import Static, Input, OptionList
 from textual.screen import ModalScreen
 from textual.binding import Binding
 from rich.markdown import Markdown
+from rich.text import Text
+
 
 from autokeren.agent import Agent
 from autokeren.config import Config
@@ -170,7 +172,11 @@ class StatusWidget(Static):
 [bold]M.Calls[/bold] : {self.agent._tool_call_count}/{self.cfg.autokeren.max_tool_calls or 'unlimited'}
 
 [dim]Klik di sini untuk ganti model[/dim]"""
-        self.update(res)
+        try:
+            self.update(Text.from_markup(res))
+        except Exception:
+            self.update(res)
+
 
     async def on_click(self) -> None:
         # Klik pada panel status memicu aksi pemilihan model
@@ -192,12 +198,18 @@ class MessageWidget(Static):
     def update_content(self, new_content: str) -> None:
         self.msg_content = new_content
         if self.role == "user":
-            from rich.markup import escape
-            self.update(f"[bold blue]kamu[/bold blue]: {escape(self.msg_content)}")
+            tx = Text()
+            tx.append("kamu: ", style="bold blue")
+            tx.append(self.msg_content)
+            self.update(tx)
         elif self.role == "system":
-            self.update(f"[bold red]system[/bold red]: {self.msg_content}")
+            try:
+                self.update(Text.from_markup(self.msg_content))
+            except Exception:
+                self.update(self.msg_content)
         else:
             self.update(Markdown(self.msg_content or "..."))
+
 
 
 
@@ -221,19 +233,27 @@ class ToolWidget(Static):
         self.output_lines.append(line)
         self.refresh()
 
-    def render(self) -> str:
-        from rich.markup import escape
-        label = escape(_format_tool_call(self.tool_name, self.arguments))
-        summary = escape(self.result_summary)
+    def render(self) -> Text:
+        res = Text()
+        label = _format_tool_call(self.tool_name, self.arguments)
+        
         if self.status == "running":
-            res = f"  [bold cyan]⏺[/bold cyan] {label}"
+            res.append("  ⏺ ", style="bold cyan")
+            res.append(label)
         elif self.status == "success":
-            res = f"  [green]✓[/green] [dim]{summary}[/dim]"
+            res.append("  ✓ ", style="green")
+            res.append(self.result_summary, style="dim")
         else:
-            res = f"  [red]✗[/red] [red]{summary}[/red]"
+            res.append("  ✗ ", style="red")
+            res.append(self.result_summary, style="red")
+            
         if self.output_lines:
-            res += "\n" + "\n".join(f"  [dim]│[/dim] {escape(line)}" for line in self.output_lines)
+            for line in self.output_lines:
+                res.append("\n")
+                res.append("  │ ", style="dim")
+                res.append(line)
         return res
+
 
 
 
