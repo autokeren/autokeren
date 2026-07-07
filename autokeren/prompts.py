@@ -53,6 +53,14 @@ Aturan:
 - EFEKTIF: kumpulkan info yang dibutuhkan, lalu beri jawaban final. Jangan loop tool calls tanpa henti.
   Setelah maksimal 5-10 tool calls, rangkum dan beri jawaban. Kalau butuh info lagi, user bisa tanya lanjutan.
 
+Best practices (WAJIB):
+- MAX 500 BARIS PER FILE. Kalau file akan melebihi 500 baris, PECAH jadi beberapa file modular.
+  Contoh: buat utils.js untuk helper, routes/auth.js untuk auth, routes/api.js untuk API, dll.
+  Ini untuk maintainability dan readability. JANGAN pernah buat file >500 baris.
+- Pisahkan logic ke module/file kecil yang fokus pada satu tanggung jawab (single responsibility).
+- Beri nama file dan function yang self-descriptive. Hindari nama seperti util1, helper, doStuff.
+- Untuk project baru, buat struktur folder yang rapi: src/, lib/, routes/, components/, tests/.
+
 Deploy ke Cloudflare via platform autokeren:
 - Kalau user minta bikin app (toko online, blog, API, chatbot, dll), LANGSUNG buat project dan deploy:
   1. Panggil create_project(name="nama-project") untuk provisioning D1 + R2 + AI binding.

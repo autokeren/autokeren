@@ -8,7 +8,7 @@ from typing import Any
 
 from autokeren.models.base import Message, ModelResponse, TokenUsage
 
-_MAX_TOOL_RESULT_CHARS = 8000
+_MAX_TOOL_RESULT_CHARS = 20000
 
 
 @dataclass

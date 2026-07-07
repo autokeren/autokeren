@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 import re
+import threading
+import time
 from typing import TYPE_CHECKING, Any
 
 import pyfiglet
@@ -69,6 +71,11 @@ class AgentUI:
         self._last_render_time: float = 0.0
         self.mermaid_render: bool = False
         self._last_mermaid_blocks: list[str] = []
+        self._timer_thread: threading.Thread | None = None
+        self._timer_stop = threading.Event()
+        self._timer_start: float = 0.0
+        self._timer_label: str = "mikir"
+        self._model_name: str = ""
 
     # ------------------------------------------------------------------ #
     # Banner
@@ -92,15 +99,47 @@ class AgentUI:
     # Model thinking + streaming (inline, no panel)
     # ------------------------------------------------------------------ #
 
+    def _start_timer(self, label: str) -> None:
+        self._timer_label = label
+        self._timer_start = time.monotonic()
+        self._timer_stop.clear()
+        self._timer_thread = threading.Thread(target=self._timer_loop, daemon=True)
+        self._timer_thread.start()
+
+    def _stop_timer(self) -> None:
+        self._timer_stop.set()
+        if self._timer_thread:
+            self._timer_thread.join(timeout=0.5)
+            self._timer_thread = None
+
+    def _timer_loop(self) -> None:
+        while not self._timer_stop.is_set():
+            elapsed = time.monotonic() - self._timer_start
+            model_info = f" [dim]{self._model_name}[/dim]" if self._model_name else ""
+            if elapsed < 3:
+                msg = f"[dim]{self._timer_label}[/dim]{model_info}"
+            elif elapsed < 10:
+                msg = f"[dim]{self._timer_label} ({elapsed:.0f}s)[/dim]{model_info}"
+            else:
+                msg = f"[yellow]{self._timer_label} ({elapsed:.0f}s)…[/yellow]{model_info}"
+            if self._status:
+                self._status.update(msg)
+            self._timer_stop.wait(0.5)
+
+    def set_model_name(self, name: str) -> None:
+        self._model_name = name
+
     def on_model_start(self) -> None:
         self._stop_all()
         self._stream_text = ""
         self._did_stream = False
         self._status = self.console.status("[dim]mikir[/dim]", spinner="mikir")
         self._status.start()
+        self._start_timer("mikir")
 
     def on_chunk(self, text: str) -> None:
         if self._status is not None:
+            self._stop_timer()
             self._stop_status()
             self._live = Live(
                 Text(""),
@@ -113,7 +152,6 @@ class AgentUI:
         self._did_stream = True
         self._stream_text += text
         if self._live is not None:
-            import time
             now = time.monotonic()
             if now - self._last_render_time >= 0.08:
                 self._last_render_time = now
@@ -127,6 +165,18 @@ class AgentUI:
     def on_model_end(self, resp: "ModelResponse") -> None:
         self._final_render()
         self._stop_all()
+
+    def on_retry(self, attempt: int, delay: float, msg: str) -> None:
+        self._stop_status()
+        self._stop_timer()
+        if delay > 0:
+            label = f"[yellow]↻ retry #{attempt} ({delay:.0f}s) — {msg}[/yellow]"
+        else:
+            label = f"[yellow]↻ {msg}[/yellow]"
+        self.console.print(f"  {label}")
+        self._status = self.console.status("[dim]mikir[/dim]", spinner="mikir")
+        self._status.start()
+        self._start_timer("mikir")
 
     def show_response(self, resp: "ModelResponse") -> None:
         if not resp.content:
@@ -150,21 +200,25 @@ class AgentUI:
         self._stream_text = ""
         label = _format_tool_call(name, arguments)
         self.console.print(f"  [bold cyan]⏺[/bold cyan] {label}")
-        self._status = self.console.status("  [dim]…[/dim]", spinner="dots")
+        tool_label = _tool_verb(name)
+        self._status = self.console.status(f"  [dim]{tool_label}…[/dim]", spinner="dots")
         self._status.start()
+        self._start_timer(tool_label)
 
     def on_tool_end(self, name: str, result: "ToolResult") -> None:
-        self._stop_status()
+        self._stop_all()
+        elapsed = time.monotonic() - self._timer_start if self._timer_start else 0
+        time_str = f" [dim]({elapsed:.1f}s)[/dim]" if elapsed > 0.5 else ""
         if result.ok:
             summary = _summarize_tool_result(name, result.output)
-            self.console.print(f"  [green]✓[/green] [dim]{summary}[/dim]")
+            self.console.print(f"  [green]✓[/green] [dim]{summary}[/dim]{time_str}")
             if name == "patch_file" and isinstance(result.output, dict):
                 self._print_patch_diff(result.output)
             elif name == "write_file" and isinstance(result.output, dict):
                 self._print_write_file_preview(result.output)
         else:
             err = result.error or "gagal"
-            self.console.print(f"  [red]✗[/red] [red]{err}[/red]")
+            self.console.print(f"  [red]✗[/red] [red]{err}[/red]{time_str}")
 
     def _print_write_file_preview(self, output: dict) -> None:
         content = output.get("content", "")
@@ -364,6 +418,7 @@ class AgentUI:
         self._stop_all()
 
     def _stop_all(self) -> None:
+        self._stop_timer()
         self._stop_status()
         self._stop_live()
 
@@ -413,6 +468,42 @@ def _format_tool_call(name: str, arguments: dict) -> str:
     if key:
         return f"[bold]{name}[/bold]  [dim]{key}[/dim]"
     return f"[bold]{name}[/bold]"
+
+
+_TOOL_VERBS: dict[str, str] = {
+    "write_file": "nulis file",
+    "patch_file": "edit file",
+    "read_file": "baca file",
+    "list_files": "list direktori",
+    "run_shell": "jalankan command",
+    "search_code": "cari kode",
+    "fetch_url": "fetch URL",
+    "git_commit": "git commit",
+    "git_diff": "git diff",
+    "git_status": "git status",
+    "git_log": "git log",
+    "git_branch": "git branch",
+    "cf_deploy": "deploy ke Cloudflare",
+    "cf_build_next": "build Next.js",
+    "cf_kv": "akses KV",
+    "cf_d1": "query D1",
+    "create_project": "buat project",
+    "deploy_project": "deploy project",
+    "list_projects": "list projects",
+    "tmux": "tmux",
+    "camofox": "camofox browser",
+    "remember": "simpan memory",
+    "spawn_agent": "spawn agent",
+    "rewind": "rewind",
+    "genome": "scan genome",
+    "review": "review kode",
+    "research": "riset",
+    "todo": "update todo",
+}
+
+
+def _tool_verb(name: str) -> str:
+    return _TOOL_VERBS.get(name, name)
 
 
 def _key_arg(name: str, arguments: dict) -> str:

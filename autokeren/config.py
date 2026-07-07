@@ -49,7 +49,7 @@ class TimeTravelConfig(BaseModel):
 class ArchitectureGuardianConfig(BaseModel):
     enabled: bool = True
     genome_file: str = ".ak-genome.md"
-    block_duplicates: bool = True
+    block_duplicates: bool = False
     scan_interval: int = 5
 
 

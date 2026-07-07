@@ -100,15 +100,16 @@ class ModelRouter:
         messages: list[Message],
         tools: list[dict] | None = None,
         on_chunk: Callable[[str], None] | None = None,
+        on_retry: Callable[[int, float, str], None] | None = None,
         **params,
     ) -> ModelResponse:
         candidates = self.healthy_models()
         if not candidates:
             raise RuntimeError("all model circuit breakers are open")
         last_error: Exception | None = None
-        for model in candidates:
+        for i, model in enumerate(candidates):
             try:
-                resp = model.complete(messages, tools=tools, on_chunk=on_chunk, **params)
+                resp = model.complete(messages, tools=tools, on_chunk=on_chunk, on_retry=on_retry, **params)
                 self.breakers[model.model_id].record_success()
                 self.usage_total = self.usage_total + resp.usage
                 resp.model_id = model.model_id
@@ -116,6 +117,9 @@ class ModelRouter:
             except CloudflareAIError as e:
                 last_error = e
                 self.breakers[model.model_id].record_failure()
+                if on_retry and i < len(candidates) - 1:
+                    next_model = candidates[i + 1].model_id
+                    on_retry(0, 0.0, f"fallback ke model: {next_model}")
                 continue
         raise last_error or RuntimeError("all models failed")
 

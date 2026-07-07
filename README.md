@@ -280,6 +280,7 @@ Dapat diketik langsung di kotak input chat (mendukung *autocomplete* otomatis me
 | `/ghost kill <id\|all>` | Kill ghost agent |
 | `/research <query>` | Riset ke Reddit + HN + Web |
 | `/research reddit\|hn\|web <q>` | Riset ke source tertentu |
+| `/deploy <deskripsi>` | Bikin app + deploy ke Cloudflare (auto create_project → write_file → deploy) |
 
 ## Tools
 

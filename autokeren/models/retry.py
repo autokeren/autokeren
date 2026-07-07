@@ -55,13 +55,6 @@ class RetryPolicy:
     jitter: bool = True
     retry_on: frozenset[int] = frozenset({408, 429, 500, 502, 503, 504})
 
-    def sleep_for(self, attempt: int) -> float:
-        delay = self.base_delay * (self.exponential_base ** attempt)
-        delay = min(delay, self.max_delay)
-        if self.jitter:
-            delay = delay * (0.5 + random.random() * 0.5)
-        return delay
-
     def should_retry(self, exc: Exception, status: int | None, attempt: int) -> bool:
         if attempt >= self.max_retries:
             return False
@@ -70,6 +63,17 @@ class RetryPolicy:
         if status in self.retry_on:
             return True
         return False
+
+    def sleep_for(self, attempt: int, exc: Exception | None = None) -> float:
+        if exc is not None:
+            retry_after = getattr(exc, "retry_after", None)
+            if retry_after and retry_after > 0:
+                return min(retry_after, self.max_delay)
+        delay = self.base_delay * (self.exponential_base ** attempt)
+        delay = min(delay, self.max_delay)
+        if self.jitter:
+            delay = delay * (0.5 + random.random() * 0.5)
+        return delay
 
 
 T = TypeVar("T")
@@ -96,7 +100,7 @@ def retry_call(
             status = getattr(e, "status", None)
             if not policy.should_retry(e, status, attempt):
                 break
-            delay = policy.sleep_for(attempt)
+            delay = policy.sleep_for(attempt, e)
             if on_retry:
                 on_retry(attempt + 1, delay, e)
             time.sleep(delay)

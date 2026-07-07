@@ -22,7 +22,7 @@ class ReadFileTool(Tool):
         "properties": {
             "path": {"type": "string", "description": "Relative or absolute file path."},
             "offset": {"type": "integer", "description": "1-indexed starting line.", "default": 1},
-            "limit": {"type": "integer", "description": "Max lines to read.", "default": 200},
+            "limit": {"type": "integer", "description": "Max lines to read.", "default": 500},
         },
         "required": ["path"],
     }
@@ -30,7 +30,7 @@ class ReadFileTool(Tool):
     def __init__(self, project_root: Path):
         self.project_root = project_root
 
-    def run(self, path: str, offset: int = 1, limit: int = 200, **_) -> ToolResult:
+    def run(self, path: str, offset: int = 1, limit: int = 500, **_) -> ToolResult:
         target = self._resolve(path)
         blocked, reason = is_sensitive_read_path(target)
         if blocked:

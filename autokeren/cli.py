@@ -164,7 +164,7 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
         if user_input in ("/quit", "/q"):
             break
         if user_input == "/help":
-            console.print("Perintah: /q /status /model /compact /rewind /genome /loop /review /security /spec /ghost /research /reset /memory /permissions /save /resume /sessions /diagram")
+            console.print("Perintah: /q /status /model /compact /deploy /rewind /genome /loop /review /security /spec /ghost /research /reset /memory /permissions /save /resume /sessions /diagram")
             continue
         if user_input == "/model" or user_input.startswith("/model "):
             arg = user_input[6:].strip()
@@ -172,6 +172,7 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
                 from autokeren.models.cloudflare import resolve_model_id
                 resolved = resolve_model_id(arg, agent.router.models[0].auth_mode)
                 if agent.router.switch_model(resolved):
+                    ui.set_model_name(agent.router.current_model_id())
                     console.print(f"[green]Model aktif: {arg}[/green]")
                 else:
                     console.print(f"[red]Model '{arg}' tidak ditemukan.[/red]")
@@ -511,6 +512,31 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
             else:
                 console.print(f"[red]Research gagal:[/red] {res.error}")
             continue
+        if user_input.startswith("/deploy"):
+            arg = user_input[7:].strip()
+            if not arg:
+                console.print("[yellow]Pakai: /deploy <deskripsi app>[/yellow]")
+                console.print("[dim]Contoh: /deploy toko online dengan keranjang dan checkout[/dim]")
+                console.print("[dim]AI akan: create_project → write_file → deploy_project → URL live[/dim]")
+                continue
+            deploy_prompt = (
+                f"User minta deploy app ke Cloudflare: {arg}\n\n"
+                "LANGKAH WAJIB (jangan skip):\n"
+                "1. Panggil create_project(name=\"nama-project-yang-singkat\") untuk provisioning D1+R2+AI.\n"
+                "2. Tulis Worker code ke file lokal pakai write_file(path=\"worker.js\", content=\"...\").\n"
+                "   - MAX 500 BARIS. Kalau app besar, pecah jadi multiple files (utils.js, routes.js, dll).\n"
+                "   - Inline HTML+CSS+JS dalam satu Worker file.\n"
+                "   - Responsive, modern, clean. Bukan HTML basic.\n"
+                "3. Panggil deploy_project(project_id, file_path=\"worker.js\") untuk deploy.\n"
+                "4. Return URL live ke user.\n"
+                "JANGAN inline script ke deploy_project. Tulis ke file dulu."
+            )
+            try:
+                resp = agent.run(deploy_prompt)
+                ui.show_response(resp)
+            except Exception as e:
+                console.print(f"[red]Deploy gagal:[/red] {e}")
+            continue
         if user_input == "/sessions":
             sessions = agent.sessions.list()
             if not sessions:
@@ -657,12 +683,14 @@ def main() -> int:
         ))
 
     ui = AgentUI(console)
+    ui.set_model_name(agent.router.current_model_id())
     agent.on_model_start = ui.on_model_start
     agent.on_model_end = ui.on_model_end
     agent.on_tool_start = ui.on_tool_start
     agent.on_tool_end = ui.on_tool_end
     agent.on_tool_output = ui.on_tool_output
     agent.on_chunk = ui.on_chunk
+    agent.on_retry = ui.on_retry
     agent.permission_callback = ui.confirm_permission
 
     if args.prompt or args.task or args.non_interactive:

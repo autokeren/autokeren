@@ -4,6 +4,31 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.4] - 2026-07-08
+
+### Added
+- **`/deploy` command:** Shortcut untuk bikin app + deploy ke Cloudflare dalam satu command. `/deploy <deskripsi>` → AI auto create_project → write_file → deploy_project → URL live.
+- **Thinking timer + model info:** Spinner "mikir" sekarang tampilkan elapsed time `(5s)` dan nama model aktif. Kuning kalau >10 detik.
+- **Tool execution detail:** Tool status sekarang tampilkan verb (`nulis file…`, `baca file…`, `jalankan command…`) + elapsed time di result.
+- **Retry visibility:** Auto-retry sekarang tampil ke user: `↻ retry #2 (2s) — timeout`. Termasuk model fallback: `↻ fallback ke model: glm-5.2`.
+- **Rate limit env override:** Backend rate limit bisa di-set via env var `RATE_LIMIT_FREE` / `RATE_LIMIT_PRO`.
+- **System prompt best practices:** AI sekarang diinstruksikan untuk max 500 baris per file, pecah ke modular files.
+
+### Fixed
+- **File terpotong:** `read_file` limit 200→500 baris, `to_string` & context 8000→20000 chars. Root cause utama: config user `max_tokens: 4096` (kekecilan, model kehabisan token mid-generation).
+- **Streaming timeout 10 menit:** Read timeout 120s→60s. Sebelumnya 5 retry × 120s = 10 menit stuck.
+- **Guardian terlalu ketat:** `block_duplicates` default `True`→`False` (warn only, tidak block write). Guardian sekarang kirim warning ke context, bukan block.
+- **Model name tidak update:** Pas `/model` switch, nama model di thinking spinner tidak ter-update. Fixed di CLI dan TUI.
+- **Tool name hilang di TUI:** ToolWidget hanya tampilkan `✓ summary` tanpa tool name. Sekarang `✓ read_file summary`.
+- **BE max_tokens clamp:** Backend clamp `max_tokens` ke 16384 (sebelumnya 200000 yang bikin CF Workers AI timeout).
+- **BE rate limit message:** "req/day" → "req/min" (sesuai aktual).
+- **BE AI scanner fallback:** Tambah fallback model (Llama 4 Scout, GLM Flash) kalau Gemma 4 down.
+- **User message canvas:** TUI user message sekarang punya background `#1a1a2e` biar beda dari chat area.
+
+### Changed
+- Rate limit free tier 20→60 req/min, pro tier 100→200 req/min.
+- `max_tokens` default 16384 (realistik untuk CF Workers AI models).
+
 ## [0.8.2] - 2026-07-07
 
 ### Added

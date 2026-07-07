@@ -99,6 +99,7 @@ class Agent:
         self.on_tool_end: Callable[[str, ToolResult], None] | None = None
         self.on_tool_output: Callable[[str, str], None] | None = None
         self.on_chunk: Callable[[str], None] | None = None
+        self.on_retry: Callable[[int, float, str], None] | None = None
         self.permission_callback: Callable[[str, str, dict[str, Any]], bool] | None = None
 
     def _build_system_prompt(self) -> None:
@@ -174,6 +175,7 @@ class Agent:
                     max_tokens=self.cfg.cloudflare.max_tokens,
                     temperature=self.cfg.cloudflare.temperature,
                     on_chunk=_on_chunk,
+                    on_retry=self.on_retry,
                 )
             except KeyboardInterrupt:
                 if self.on_model_end:
@@ -246,6 +248,11 @@ class Agent:
                                 self.on_tool_end(tc.name, blocked_result)
                             self.context.add_tool_result(tc.id, tc.name, blocked_result.to_dict(), False)
                             continue
+                        if guard.warnings:
+                            self.context.messages.append({
+                                "role": "system",
+                                "content": "ℹ️ Guardian warning: " + "; ".join(guard.warnings),
+                            })
                 # Live Enforcement: check rules sebelum write/patch
                 if (
                     self.enforcer

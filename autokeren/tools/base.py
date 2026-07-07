@@ -18,7 +18,7 @@ class ToolResult:
             "error": self.error,
         }
 
-    def to_string(self, max_length: int = 8000) -> str:
+    def to_string(self, max_length: int = 20000) -> str:
         text = str(self.output) if self.output else ""
         if self.error:
             text += f"\nERROR: {self.error}"

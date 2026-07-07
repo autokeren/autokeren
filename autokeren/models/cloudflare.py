@@ -101,10 +101,12 @@ def _extract_partial_args(raw: str) -> dict[str, Any]:
 
 
 class CloudflareAIError(Exception):
-    def __init__(self, message: str, status: int | None = None, response: dict | None = None):
+    def __init__(self, message: str, status: int | None = None, response: dict | None = None,
+                 retry_after: float | None = None):
         super().__init__(message)
         self.status = status
         self.response = response or {}
+        self.retry_after = retry_after
 
 
 @dataclass
@@ -235,7 +237,14 @@ class CloudflareModel:
 
         if r.status_code != 200:
             err_msg = data.get("error", {}).get("message", str(data)) if isinstance(data.get("error"), dict) else str(data)
-            raise CloudflareAIError(f"API error: {err_msg}", status=r.status_code, response=data)
+            retry_after = None
+            ra_header = r.headers.get("Retry-After") or r.headers.get("X-RateLimit-Reset")
+            if ra_header and r.status_code == 429:
+                try:
+                    retry_after = float(ra_header)
+                except (ValueError, TypeError):
+                    pass
+            raise CloudflareAIError(f"API error: {err_msg}", status=r.status_code, response=data, retry_after=retry_after)
 
         return self._parse_openai_response(data, r.headers)
 
@@ -323,6 +332,7 @@ class CloudflareModel:
         messages: list[Message],
         tools: list[dict] | None = None,
         on_chunk: Callable[[str], None] | None = None,
+        on_retry: Callable[[int, float, str], None] | None = None,
         **params,
     ) -> ModelResponse:
         policy = self.retry_policy or RetryPolicy()
@@ -335,7 +345,11 @@ class CloudflareModel:
                     raise
             return self._call_once(messages, tools=tools, **params)
 
-        return retry_call(_call, policy)
+        def _on_retry(attempt: int, delay: float, exc: Exception) -> None:
+            if on_retry:
+                on_retry(attempt, delay, f"{type(exc).__name__}: {exc}")
+
+        return retry_call(_call, policy, on_retry=_on_retry)
 
     def _stream_once(
         self,
@@ -366,11 +380,18 @@ class CloudflareModel:
                 self._openai_endpoint(),
                 headers=self._headers(),
                 json=payload,
-                timeout=self.timeout,
+                timeout=httpx.Timeout(self.timeout, read=60.0, write=30.0),
             ) as r:
                 if r.status_code != 200:
                     body = r.read().decode("utf-8", errors="replace")[:500]
-                    raise CloudflareAIError(f"stream error: {body}", status=r.status_code)
+                    retry_after = None
+                    ra_header = r.headers.get("Retry-After") or r.headers.get("X-RateLimit-Reset")
+                    if ra_header and r.status_code == 429:
+                        try:
+                            retry_after = float(ra_header)
+                        except (ValueError, TypeError):
+                            pass
+                    raise CloudflareAIError(f"stream error: {body}", status=r.status_code, retry_after=retry_after)
 
                 stream_headers = r.headers
 

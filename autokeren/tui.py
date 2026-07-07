@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import threading
 import queue
+import time
 from pathlib import Path
 from typing import Any
 
@@ -578,7 +579,7 @@ TRANSLATIONS = {
 
 
 class ThinkingWidget(Static):
-    """Widget untuk menampilkan animasi 'mikir...'."""
+    """Widget untuk menampilkan animasi 'mikir...' dengan timer + model info."""
 
     @property
     def tui(self) -> AutokerenTUI:
@@ -586,7 +587,10 @@ class ThinkingWidget(Static):
 
     def on_mount(self) -> None:
         self.frame = 0
+        self.start_time = time.monotonic()
+        self.model_name = getattr(self.tui, "_current_model_name", "") or ""
         mikir_text = self.tui.t("mikir")
+        self._mikir_text = mikir_text
         self.frames = [
             f"🤔 [dim]{mikir_text} .  [/dim]",
             f"🤔 [dim]{mikir_text} .. [/dim]",
@@ -595,11 +599,19 @@ class ThinkingWidget(Static):
             f"🤔 [dim]{mikir_text}   .[/dim]",
         ]
         self.update(Text.from_markup(self.frames[0]))
-        self.timer = self.set_interval(0.3, self.next_frame)
+        self.timer = self.set_interval(0.5, self.next_frame)
 
     def next_frame(self) -> None:
         self.frame = (self.frame + 1) % len(self.frames)
-        self.update(Text.from_markup(self.frames[self.frame]))
+        elapsed = time.monotonic() - self.start_time
+        model_part = f" [dim italic]{self.model_name}[/dim italic]" if self.model_name else ""
+        if elapsed < 3:
+            time_part = ""
+        elif elapsed < 10:
+            time_part = f" [dim]({elapsed:.0f}s)[/dim]"
+        else:
+            time_part = f" [yellow]({elapsed:.0f}s)…[/yellow]"
+        self.update(Text.from_markup(f"{self.frames[self.frame]}{time_part}{model_part}"))
 
 
 class ModelSelectScreen(ModalScreen[str]):
@@ -963,9 +975,10 @@ class MessageWidget(Static):
         if self.role == "user":
             tx = Text()
             label = self.tui.t("user_label")
-            tx.append(f"{label}: ", style="bold blue")
-            tx.append(self.msg_content)
+            tx.append(f"{label}: ", style="bold blue on #1a1a2e")
+            tx.append(self.msg_content, style="white on #1a1a2e")
             self.update(tx)
+            self.add_class("user-msg")
         elif self.role == "system":
             try:
                 self.update(Text.from_markup(self.msg_content))
@@ -1007,9 +1020,11 @@ class ToolWidget(Static):
             res.append(label)
         elif self.status == "success":
             res.append("  ✓ ", style="green")
+            res.append(f"{self.tool_name} ", style="bold dim")
             res.append(self.result_summary, style="dim")
         else:
             res.append("  ✗ ", style="red")
+            res.append(f"{self.tool_name} ", style="bold red")
             res.append(self.result_summary, style="red")
             
         if self.output_lines:
@@ -1138,6 +1153,11 @@ class AutokerenTUI(App):
     }
     MessageWidget {
         height: auto;
+        margin: 1 0;
+    }
+    MessageWidget.user-msg {
+        background: #1a1a2e;
+        padding: 0 1;
         margin: 1 0;
     }
     ToolWidget {
@@ -1278,6 +1298,7 @@ class AutokerenTUI(App):
         commands = [
             "/help", "/reset", "/compact", "/permissions", "/memory",
             "/model", "/lang", "/export", "/mcp", "/save", "/resume", "/sessions", "/q", "/quit",
+            "/deploy", "/spec", "/ghost", "/research", "/tdd", "/debug", "/genome", "/rewind", "/review", "/loop", "/security",
             "/project", "/tdd", "/rewind", "/genome", "/loop", "/review", "/security", "/spec", "/ghost", "/research",
         ]
         suggester = SuggestFromList(commands, case_sensitive=False)
@@ -1334,12 +1355,14 @@ class AutokerenTUI(App):
 
     def on_mount(self) -> None:
         # Bind Agent callbacks ke TUI
+        self._current_model_name = self.agent.router.current_model_id()
         self.agent.on_model_start = self.on_model_start
         self.agent.on_model_end = self.on_model_end
         self.agent.on_tool_start = self.on_tool_start
         self.agent.on_tool_end = self.on_tool_end
         self.agent.on_tool_output = self.on_tool_output
         self.agent.on_chunk = self.on_chunk
+        self.agent.on_retry = self.on_retry
         self.agent.permission_callback = self.confirm_permission
 
         # Tampilkan welcome banner
@@ -1451,6 +1474,16 @@ class AutokerenTUI(App):
             self.current_assistant_widget = None
             self.update_status()
         self.call_from_thread(_end)
+
+    def on_retry(self, attempt: int, delay: float, msg: str) -> None:
+        def _retry():
+            if delay > 0:
+                text = f"↻ retry #{attempt} ({delay:.0f}s) — {msg}"
+            else:
+                text = f"↻ {msg}"
+            self.append_chat_message("system", text)
+            self.scroll_chat_to_end()
+        self.call_from_thread(_retry)
 
     def on_tool_start(self, name: str, arguments: dict) -> None:
         def _tool():
@@ -1677,6 +1710,7 @@ class AutokerenTUI(App):
                 from autokeren.models.cloudflare import resolve_model_id
                 resolved = resolve_model_id(chosen_id, self.agent.router.models[0].auth_mode)
                 if self.agent.router.switch_model(resolved):
+                    self._current_model_name = self.agent.router.current_model_id()
                     self.append_chat_message("system", self.t("model_changed", name=chosen_id))
                     self.update_status()
                 else:
@@ -1790,6 +1824,7 @@ class AutokerenTUI(App):
                 from autokeren.models.cloudflare import resolve_model_id
                 resolved = resolve_model_id(arg, self.agent.router.models[0].auth_mode)
                 if self.agent.router.switch_model(resolved):
+                    self._current_model_name = self.agent.router.current_model_id()
                     self.append_chat_message("system", self.t("allowed_tool", name=arg))
                     self.update_status()
                 else:
@@ -1998,6 +2033,26 @@ class AutokerenTUI(App):
                 input_pane.disabled = True
                 input_pane.placeholder = "🔍 researching…"
                 self.run_worker(lambda: self._run_research(query, sources), thread=True)
+        elif cmd == "/deploy":
+            if not arg:
+                self.append_chat_message("system", "[yellow]Pakai: /deploy <deskripsi app>[/yellow]\n[dim]Contoh: /deploy toko online dengan keranjang dan checkout[/dim]")
+            else:
+                deploy_prompt = (
+                    f"User minta deploy app ke Cloudflare: {arg}\n\n"
+                    "LANGKAH WAJIB (jangan skip):\n"
+                    "1. Panggil create_project(name=\"nama-project-yang-singkat\") untuk provisioning D1+R2+AI.\n"
+                    "2. Tulis Worker code ke file lokal pakai write_file(path=\"worker.js\", content=\"...\").\n"
+                    "   - MAX 500 BARIS. Kalau app besar, pecah jadi multiple files.\n"
+                    "   - Inline HTML+CSS+JS dalam satu Worker file.\n"
+                    "   - Responsive, modern, clean.\n"
+                    "3. Panggil deploy_project(project_id, file_path=\"worker.js\") untuk deploy.\n"
+                    "4. Return URL live ke user.\n"
+                    "JANGAN inline script ke deploy_project. Tulis ke file dulu."
+                )
+                self.append_chat_message("user", f"/deploy {arg}")
+                input_pane = self.query_one("#input-pane", Input)
+                input_pane.disabled = True
+                self.run_worker(lambda: self._run_deploy(deploy_prompt), thread=True)
         else:
             self.append_chat_message("system", self.t("unknown_cmd", cmd=cmd))
 
@@ -2254,6 +2309,22 @@ class AutokerenTUI(App):
                 self.call_from_thread(self.append_chat_message, "system", "[yellow]Gagal generate pertanyaan.[/yellow]")
         except Exception as e:
             self.call_from_thread(self.append_chat_message, "system", f"[red]Spec error:[/red] {e}")
+        finally:
+            def _reset():
+                input_pane = self.query_one("#input-pane", Input)
+                input_pane.disabled = False
+                input_pane.placeholder = self.t("input_placeholder")
+                input_pane.focus()
+            self.call_from_thread(_reset)
+
+    def _run_deploy(self, prompt: str) -> None:
+        """Background worker untuk /deploy command."""
+        try:
+            resp = self.agent.run(prompt)
+            if resp.content:
+                self.call_from_thread(self.append_chat_message, "assistant", resp.content)
+        except Exception as e:
+            self.call_from_thread(self.append_chat_message, "system", f"[red]Deploy error:[/red] {e}")
         finally:
             def _reset():
                 input_pane = self.query_one("#input-pane", Input)
