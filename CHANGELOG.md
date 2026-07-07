@@ -4,6 +4,16 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-07-07
+
+### Added
+- **File Explorer (F7):** Toggle folder/file tree di panel kiri TUI. Tekan F7 untuk show/hide, click file → auto `read_file` → isi file tampil di chat. Pakai `DirectoryTree` Textual (lazy-load, tidak scan semua di startup).
+- **AI Deploy Scanner:** Backend API gateway sekarang scan semua deploy pakai AI (Gemma 4 26B) + regex quick-scan. Block phishing, malware (eval/atob), XSS, brand impersonation. Configurable via `SCAN_MODEL` env var.
+
+### Fixed
+- **Windows startup hang:** GenomeScanner ganti `rglob("*")` ke manual walk yang skip ignored dirs. Genome scan jadi lazy (cuma scan saat first write_file/patch_file, bukan di startup).
+- **TUI key conflict:** Up/Down keys cuma trigger input history saat input pane focused, tidak mencuri navigasi dari File Explorer.
+
 ## [0.8.0] - 2026-07-07
 
 ### Added — 9 Vibe Coding Features
@@ -188,6 +198,8 @@ Satu-satunya CLI yang punya 9 fitur ini. Tidak ada di Claude Code, Aider, Cursor
 - Indonesian localization untuk seluruh UI text.
 - 18 tools bawaan.
 
+[0.8.2]: https://github.com/autokeren/autokeren/releases/tag/v0.8.2
+[0.8.1]: https://github.com/autokeren/autokeren/releases/tag/v0.8.1
 [0.8.0]: https://github.com/autokeren/autokeren/releases/tag/v0.8.0
 [0.7.6]: https://github.com/autokeren/autokeren/releases/tag/v0.7.6
 [0.7.5]: https://github.com/autokeren/autokeren/releases/tag/v0.7.5

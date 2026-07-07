@@ -8,7 +8,7 @@ from typing import Any
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalScroll, Container
-from textual.widgets import Static, Input, OptionList
+from textual.widgets import Static, Input, OptionList, DirectoryTree
 from textual.screen import ModalScreen
 from textual.binding import Binding
 from textual.events import Resize
@@ -928,6 +928,20 @@ class StatusWidget(Static):
         await self.tui.action_model()
 
 
+class ProjectFileTree(DirectoryTree):
+    """DirectoryTree untuk project file explorer."""
+
+    def __init__(self, path: str, **kwargs: Any) -> None:
+        super().__init__(path, **kwargs)
+        self.show_root = False
+
+    def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
+        """Saat file dipilih → read_file via agent."""
+        app = self.app
+        if hasattr(app, "_on_file_selected"):
+            app._on_file_selected(str(event.path))
+
+
 class MessageWidget(Static):
     """Widget untuk menampilkan pesan user/assistant/system."""
 
@@ -1084,7 +1098,21 @@ class AutokerenTUI(App):
         width: 32;
         height: 100%;
         border: round #555555;
-        padding: 1 1;
+        padding: 0 1;
+        layout: vertical;
+    }
+    #file-tree-pane {
+        height: 1fr;
+        display: none;
+        border: round #444466;
+        padding: 0;
+        margin-top: 1;
+    }
+    #file-tree {
+        height: 1fr;
+    }
+    #file-tree-pane.visible {
+        display: block;
     }
     #right-layout {
         width: 1fr;
@@ -1174,6 +1202,7 @@ class AutokerenTUI(App):
         Binding("f4", "copy_last", "Salin Respon"),
         Binding("f5", "compact", "Compact Context"),
         Binding("f6", "lang", "Bahasa / Lang"),
+        Binding("f7", "toggle_filetree", "File Explorer"),
         Binding("ctrl+c", "cancel", "Batal / Stop"),
         Binding("ctrl+q", "quit", "Keluar"),
     ]
@@ -1206,6 +1235,7 @@ class AutokerenTUI(App):
         self._history_draft: str = ""  # simpan draft saat navigasi history
         self._agent_running: bool = False  # guard: prevent double submit (Windows fix)
         self.debug_mode: bool = False  # log debugging verbose
+        self._filetree_visible: bool = False  # F7 toggle file explorer
 
         # Multi-agent project manager
         from autokeren.multiagent import ProjectManager
@@ -1247,11 +1277,18 @@ class AutokerenTUI(App):
         commands = [
             "/help", "/reset", "/compact", "/permissions", "/memory",
             "/model", "/lang", "/export", "/mcp", "/save", "/resume", "/sessions", "/q", "/quit",
-            "/project", "/tdd",
+            "/project", "/tdd", "/rewind", "/genome", "/loop", "/review", "/security", "/spec", "/ghost", "/research",
         ]
         suggester = SuggestFromList(commands, case_sensitive=False)
         yield Horizontal(
-            Container(StatusWidget(self.agent, self.cfg), id="status-pane"),
+            Container(
+                StatusWidget(self.agent, self.cfg),
+                Container(
+                    ProjectFileTree(self.agent.project_root, id="file-tree"),
+                    id="file-tree-pane",
+                ),
+                id="status-pane",
+            ),
             Container(
                 VerticalScroll(ChatArea(id="chat-area"), id="chat-pane"),
                 Input(id="input-pane", placeholder=self.t("input_placeholder"), suggester=suggester),
@@ -1269,6 +1306,8 @@ class AutokerenTUI(App):
         except Exception:
             return
         if input_pane.disabled:
+            return
+        if not input_pane.has_focus:
             return
         if event.key == "up":
             if not self.input_history:
@@ -1327,6 +1366,38 @@ class AutokerenTUI(App):
 
         # Jalankan pengecekan update di background worker asinkron
         self.run_worker(self.check_for_updates())
+        self._focus_input()
+
+    def action_toggle_filetree(self) -> None:
+        """F7 — toggle show/hide file explorer di panel kiri."""
+        self._filetree_visible = not self._filetree_visible
+        try:
+            pane = self.query_one("#file-tree-pane")
+            if self._filetree_visible:
+                pane.add_class("visible")
+                tree = self.query_one("#file-tree", DirectoryTree)
+                tree.focus()
+            else:
+                pane.remove_class("visible")
+                self._focus_input()
+        except Exception:
+            pass
+
+    def _on_file_selected(self, file_path: str) -> None:
+        """Saat file di-click di file tree → read_file + tampilkan di chat."""
+        try:
+            rel = str(Path(file_path).relative_to(self.agent.project_root))
+        except ValueError:
+            rel = file_path
+        self.append_chat_message("user", f"📄 baca {rel}")
+        tool = self.agent.tools.get("read_file")
+        if tool:
+            result = tool.run(path=rel)
+            if result.ok:
+                content = result.to_string()
+                self.append_chat_message("system", f"[bold green]📄 {rel}[/bold green]\n```\n{content[:5000]}\n```")
+            else:
+                self.append_chat_message("system", f"[red]Gagal baca file:[/red] {result.error}")
         self._focus_input()
 
     async def check_for_updates(self) -> None:
@@ -1575,6 +1646,7 @@ class AutokerenTUI(App):
             f"  - [bold]F4[/bold]   : {self.t('f4_desc')}\n"
             f"  - [bold]F5[/bold]   : {self.t('f5_desc')}\n"
             f"  - [bold]F6[/bold]   : {self.t('f6_desc')}\n"
+            f"  - [bold]F7[/bold]   : File Explorer (toggle)\n"
             f"  - [bold]↑/↓[/bold]  : {self.t('updown_desc')}\n"
             f"  - [bold]Ctrl+C[/bold]: {self.t('ctrlc_desc')}\n"
             f"  - [bold]Ctrl+Q[/bold]: {self.t('ctrlq_desc')}\n\n"

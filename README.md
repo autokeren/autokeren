@@ -32,6 +32,7 @@ autokeren adalah CLI agentic coding yang dirancang khusus untuk stack Cloudflare
 - **KV/D1/PaaS tools** — baca/tulis KV, query D1, create/deploy project langsung dari agent.
 - **Tmux supervisor** — spawn dan monitor long-running agent yang survive terminal close.
 - **CF Pages/Workers deploy** — helper deploy + build terintegrasi.
+- **File Explorer (F7)** — toggle folder/file tree di panel kiri TUI, click file → auto baca isi.
 
 ## Vibe Coding Features (v0.8.0)
 
@@ -236,7 +237,7 @@ Di mode interaktif TUI, Anda dapat menggunakan tombol pintas keyboard (*hotkeys*
 | **`F5`** | Compact | Meringkas riwayat context window percakapan |
 | **`F6`** | Ganti Bahasa | Memunculkan modal dialog interaktif untuk memilih bahasa UI |
 | **`Ctrl+C`**| Batal / Stop | Membatalkan/menghentikan eksekusi proses AI atau tool yang aktif |
-| **`Ctrl+Q`**| Keluar | Keluar dari aplikasi autokeren secara aman |
+| **`F7`**| File Explorer | Toggle file/folder tree di panel kiri (click file → auto baca) |
 
 ### Perintah Slash
 
