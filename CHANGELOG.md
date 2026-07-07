@@ -4,6 +4,50 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.6] - 2026-07-07
+
+### Fixed
+- **Slash Command Input Stuck:** `_agent_running` guard flag di-set sebelum cek slash command, menyebabkan input ke-block selamanya setelah `/help`, `/model`, dll. Fix: pindahkan setelah slash command check.
+
+## [0.7.5] - 2026-07-07
+
+### Added
+- **Windows PowerShell Install Instructions:** README sekarang punya langkah-langkah install pipx di Windows (pip install → ensurepath → restart → pipx install).
+
+## [0.7.4] - 2026-07-07
+
+### Added
+- **Dynamic AI Language Response:** AI diinstruksikan merespon dalam bahasa yang dipilih user di UI.
+
+## [0.7.3] - 2026-07-07
+
+### Fixed
+- **Mermaid Flicker:** Disable mermaid image rendering by default (config: `mermaid_render: false`). Mermaid blocks sekarang dirender sebagai code block. Ketik `/diagram` untuk render manual.
+- **429 Fallback Bug:** Router ga fallback ke secondary model saat primary kena 429 (rate limit). Sekarang semua error langsung fallback.
+
+## [0.7.2] - 2026-07-07
+
+### Added
+- **Clipboard Paste Detection:** Input panjang (>80 chars) atau multi-line paste ditampilkan sebagai blok kuning dengan char count. User bisa ketik lagi sebelum kirim.
+
+## [0.7.1] - 2026-07-07
+
+### Fixed
+- **Double Render (Streaming):** `Live(transient=True)` menyebabkan content hilang saat streaming selesai, lalu di-render ulang = doble. Fix: `transient=False` + `_final_render()` sebelum stop.
+- **Resume Orphaned Tool Calls:** Session yang di-save di tengah eksekusi punya orphaned tool_calls → API bingung → model looping. Fix: hapus orphaned tool_calls saat resume.
+- **Markdown Streaming Throttle:** Throttle render ke max 1 per 80ms (12fps) untuk kurangi flicker.
+
+## [0.7.0] - 2026-07-07
+
+### Fixed
+- **Windows Support:** `pty` dan `termios` adalah Unix-only. Conditional import + `_run_subprocess()` fallback untuk Windows (subprocess.Popen dengan PIPE).
+- **Windows Input Loop:** `Input.Submitted` bisa fire berkali-kali di Windows sebelum `disabled=True` efektif. Fix: `_agent_running` boolean guard flag.
+- **Max Iterations:** 25→50, system prompt instruct model to converge (jangan loop tool calls tanpa henti).
+- **Max Tool Calls:** Unlimited (0) — batas alami: context window + neuron quota.
+- **Pager Stuck:** `GIT_PAGER=cat` dan `PAGER=cat` di shell environment — prevent stuck pada `git log`, `git diff`.
+- **Animated "mikir" Spinner:** Custom spinner `mikir .` → `mikir ..` → `mikir ...` (350ms interval).
+- **Markdown Streaming:** Streaming sekarang render Markdown (code highlight, heading, bold, list) real-time, bukan plain text.
+
 ## [0.6.8] - 2026-07-06
 
 ### Added
@@ -108,6 +152,13 @@ Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan
 - Indonesian localization untuk seluruh UI text.
 - 18 tools bawaan.
 
+[0.7.6]: https://github.com/autokeren/autokeren/releases/tag/v0.7.6
+[0.7.5]: https://github.com/autokeren/autokeren/releases/tag/v0.7.5
+[0.7.4]: https://github.com/autokeren/autokeren/releases/tag/v0.7.4
+[0.7.3]: https://github.com/autokeren/autokeren/releases/tag/v0.7.3
+[0.7.2]: https://github.com/autokeren/autokeren/releases/tag/v0.7.2
+[0.7.1]: https://github.com/autokeren/autokeren/releases/tag/v0.7.1
+[0.7.0]: https://github.com/autokeren/autokeren/releases/tag/v0.7.0
 [0.6.8]: https://github.com/autokeren/autokeren/releases/tag/v0.6.8
 [0.6.7]: https://github.com/autokeren/autokeren/releases/tag/v0.6.7
 [0.6.6]: https://github.com/autokeren/autokeren/releases/tag/v0.6.6

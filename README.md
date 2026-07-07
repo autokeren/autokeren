@@ -239,7 +239,7 @@ retry:
 
 autokeren:
   plan_mode: false
-  max_iterations: 25
+  max_iterations: 50
   shell_timeout: 180
   shell_allowlist: ["node", "npm", "pnpm", "npx", "git", "wrangler", "python3", "pytest"]
   project_root: "."
@@ -272,7 +272,7 @@ pipx upgrade autokeren
 
 ```
 cli.py ──> tui.py (TUI wrapper) ──> agent.py (core loop) ──> models/ (Cloudflare client + router + retry)
-                                                              tools/ (Tool base + registry + 21 tools)
+                                                              tools/ (Tool base + registry + 24 tools)
                                                               context.py (session memory + token tracking)
                                                               memory.py (cross-session memory)
                                                               session.py (save/resume)
