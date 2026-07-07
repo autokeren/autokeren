@@ -924,7 +924,8 @@ class StatusWidget(Static):
             self.update(res)
 
     async def on_click(self) -> None:
-        # Klik pada panel status memicu aksi pemilihan model
+        if self.tui._agent_running:
+            return
         await self.tui.action_model()
 
 
