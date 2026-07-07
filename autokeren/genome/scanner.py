@@ -39,10 +39,8 @@ class GenomeScanner:
 
     def _detect_modules(self, genome: ProjectGenome) -> None:
         """Detect modules: directories with init files atau top-level code dirs."""
-        for p in sorted(self.root.rglob("*")):
+        for p in sorted(self._walk_skipping_ignored(self.root)):
             if not p.is_dir():
-                continue
-            if any(part in _IGNORED_DIRS for part in p.relative_to(self.root).parts):
                 continue
             rel = p.relative_to(self.root)
             has_init = any((p / init).exists() for init in _INIT_FILES)
@@ -63,6 +61,27 @@ class GenomeScanner:
                     language=language,
                     key_files=key_files,
                 ))
+
+    def _walk_skipping_ignored(self, root: Path, max_depth: int = 4) -> list[Path]:
+        """Walk directory tree, skipping ignored dirs entirely (faster on Windows)."""
+        results: list[Path] = []
+        stack = [(root, 0)]
+        while stack:
+            current, depth = stack.pop()
+            if depth > max_depth:
+                continue
+            try:
+                for entry in current.iterdir():
+                    if entry.is_dir():
+                        if entry.name in _IGNORED_DIRS:
+                            continue
+                        results.append(entry)
+                        stack.append((entry, depth + 1))
+                    else:
+                        results.append(entry)
+            except (PermissionError, OSError):
+                continue
+        return results
 
     def _detect_language(self, dir_path: Path) -> str:
         for f in dir_path.iterdir():

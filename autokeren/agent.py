@@ -62,10 +62,9 @@ class Agent:
         self._guardian_checker: GuardianChecker | None = None
         self._genome_scanner: GenomeScanner | None = None
         self._tool_calls_since_scan = 0
+        self._genome_scanned = False
         if ag.enabled:
             self._genome_scanner = GenomeScanner(Path(project_root))
-            self._genome = self._genome_scanner.scan()
-            self._guardian_checker = GuardianChecker(self._genome, block_duplicates=ag.block_duplicates)
 
         # Loop Breaker
         lb = cfg.autokeren.loop_breaker
@@ -136,6 +135,15 @@ class Agent:
         }
         lang_name = lang_names.get(lang_code, "English")
         self._system_prompt += f"\n\nIMPORTANT: You must respond to the user in {lang_name}."
+
+    def _ensure_genome_scanned(self) -> None:
+        """Lazy genome scan — only scan on first write_file/patch_file, not at startup."""
+        if self._genome_scanned or not self._genome_scanner:
+            return
+        self._genome = self._genome_scanner.scan()
+        ag = self.cfg.autokeren.architecture_guardian
+        self._guardian_checker = GuardianChecker(self._genome, block_duplicates=ag.block_duplicates) if self._genome else None
+        self._genome_scanned = True
 
     def check_interrupt(self) -> None:
         """Angkat KeyboardInterrupt jika bendera interupsi aktif."""
@@ -221,12 +229,13 @@ class Agent:
                 # Architecture Guardian: check sebelum write/patch
                 if (
                     self.guardian_enabled
-                    and self._guardian_checker
+                    and self._genome_scanner
                     and tc.name in ("write_file", "patch_file")
                 ):
+                    self._ensure_genome_scanned()
                     _gpath = tc.arguments.get("path", "")
                     _gcontent = tc.arguments.get("content", tc.arguments.get("new_string", ""))
-                    if _gpath and _gcontent:
+                    if _gpath and _gcontent and self._guardian_checker:
                         guard = self._guardian_checker.check_before_write(_gpath, _gcontent)
                         if guard.blocked:
                             blocked_result = ToolResult(
