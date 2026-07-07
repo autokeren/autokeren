@@ -6,7 +6,11 @@ from autokeren.tools.cloudflare import CloudflareBuildTool, CloudflareDeployTool
 from autokeren.tools.file import ListFilesTool, PatchFileTool, ReadFileTool, WriteFileTool
 from autokeren.tools.git import GitBranchTool, GitCommitTool, GitDiffTool, GitLogTool, GitStatusTool
 from autokeren.tools.project import CreateProjectTool, DeployProjectTool, ListProjectsTool
+from autokeren.tools.genome import GenomeTool
 from autokeren.tools.remember import RememberTool
+from autokeren.tools.research import ResearchTool
+from autokeren.tools.review import ReviewTool
+from autokeren.tools.rewind import RewindTool
 from autokeren.tools.search import SearchCodeTool
 from autokeren.tools.shell import ShellTool
 from autokeren.tools.spawn_agent import SpawnAgentTool
@@ -42,4 +46,8 @@ __all__ = [
     "DeployProjectTool",
     "ListProjectsTool",
     "SpawnAgentTool",
+    "RewindTool",
+    "GenomeTool",
+    "ReviewTool",
+    "ResearchTool",
 ]

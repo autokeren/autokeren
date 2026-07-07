@@ -1819,6 +1819,112 @@ class AutokerenTUI(App):
                 logging.getLogger().setLevel(logging.WARNING)
             status = "AKTIF" if self.debug_mode else "NON-AKTIF"
             self.append_chat_message("system", f"[blue]Mode Debug {status}. Error traceback akan ditampilkan lebih detail jika terjadi masalah internal. Cek autokeren-debug.log.[/blue]")
+        elif cmd == "/spec":
+            from autokeren.spec import SpecPlanner
+            if not hasattr(self.agent, "_spec_planner"):
+                self.agent._spec_planner = SpecPlanner(router=self.agent.router, num_questions=self.cfg.autokeren.spec_driven.num_questions)  # type: ignore[attr-defined]
+            sp = self.agent._spec_planner  # type: ignore[attr-defined]
+            if not arg:
+                self.append_chat_message("system", "/spec <request> | answer <text> | generate | show | progress")
+            elif arg.startswith("answer "):
+                text = arg[7:]
+                if sp.session:
+                    nxt = sp.session.answer(text)
+                    if nxt:
+                        self.append_chat_message("system", f"[cyan]Q{sp.session.current}:[/cyan] {nxt}")
+                    else:
+                        self.append_chat_message("system", "[green]Interview selesai. Ketik /spec generate untuk buat plan.[/green]")
+                else:
+                    self.append_chat_message("system", "[yellow]Belum ada interview. Ketik /spec <request>.[/yellow]")
+            elif arg == "generate":
+                plan = sp.generate_plan()
+                if plan:
+                    plan.save(Path(self.agent.project_root))
+                    self.append_chat_message("system", f"[green]Plan disimpan: plan.md + technical-plan.md ({len(plan.steps)} steps)[/green]")
+                else:
+                    self.append_chat_message("system", "[yellow]Interview belum selesai.[/yellow]")
+            elif arg == "show":
+                if sp.plan:
+                    self.append_chat_message("system", sp.plan.plan_md[:2000])
+                else:
+                    self.append_chat_message("system", "[dim]Belum ada plan.[/dim]")
+            elif arg == "progress":
+                if sp.plan:
+                    self.append_chat_message("system", f"Progress: {sp.plan.progress:.0f}% ({len(sp.plan.completed_steps)}/{len(sp.plan.steps)} steps)")
+                else:
+                    self.append_chat_message("system", "[dim]Belum ada plan.[/dim]")
+            else:
+                self.append_chat_message("user", f"/spec {arg}")
+                self.append_chat_message("system", "[dim]📋 Menyiapkan interview…[/dim]")
+                input_pane = self.query_one("#input-pane", Input)
+                input_pane.disabled = True
+                input_pane.placeholder = "📋 menyiapkan interview…"
+                self.run_worker(lambda: self._run_spec_interview(arg), thread=True)
+        elif cmd == "/ghost":
+            from autokeren.ghost import GhostManager
+            if not hasattr(self.agent, "_ghost_manager"):
+                gc = self.cfg.autokeren.ghost_agent
+                self.agent._ghost_manager = GhostManager(  # type: ignore[attr-defined]
+                    project_root=self.agent.project_root,
+                    max_agents=gc.max_background,
+                    prefix=gc.tmux_prefix,
+                )
+            gm = self.agent._ghost_manager  # type: ignore[attr-defined]
+            if not arg:
+                self.append_chat_message("system", "/ghost <task> | list | show <id> | kill <id>|all")
+            elif arg == "list":
+                agents = gm.list_agents()
+                if not agents:
+                    self.append_chat_message("system", "[dim]Tidak ada ghost agent.[/dim]")
+                else:
+                    for a in agents:
+                        gm.check_status(a.id)
+                        self.append_chat_message("system", f"  #{a.id} [{a.status}] {a.task[:60]} ({a.runtime:.0f}s)")
+            elif arg.startswith("show "):
+                aid = int(arg[5:].strip()) if arg[5:].strip().isdigit() else 0
+                output = gm.get_output(aid)
+                if output:
+                    self.append_chat_message("system", output[-2000:])
+                else:
+                    self.append_chat_message("system", "[dim]Tidak ada output.[/dim]")
+            elif arg.startswith("kill "):
+                target = arg[5:].strip()
+                if target == "all":
+                    for a in gm.list_agents():
+                        gm.kill(a.id)
+                    self.append_chat_message("system", "[green]Semua ghost agent di-kill.[/green]")
+                elif target.isdigit():
+                    gm.kill(int(target))
+                    self.append_chat_message("system", f"[green]Ghost #{target} di-kill.[/green]")
+            else:
+                try:
+                    info = gm.spawn(arg)
+                    self.append_chat_message("system", f"[green]Ghost Agent #{info.id} di-spawn: {arg[:60]}[/green]")
+                except Exception as e:
+                    self.append_chat_message("system", f"[red]Spawn gagal:[/red] {e}")
+        elif cmd == "/research":
+            if not self.cfg.autokeren.research.enabled:
+                self.append_chat_message("system", "[yellow]Research tool tidak diaktifkan.[/yellow]")
+            elif not arg:
+                self.append_chat_message("system", "/research <query> | reddit <q> | hn <q> | web <q>")
+            else:
+                sources: list[str] | None = None
+                query = arg
+                if arg.startswith("reddit "):
+                    sources = ["reddit"]
+                    query = arg[7:]
+                elif arg.startswith("hn "):
+                    sources = ["hackernews"]
+                    query = arg[3:]
+                elif arg.startswith("web "):
+                    sources = ["web"]
+                    query = arg[4:]
+                self.append_chat_message("user", f"/research {arg}")
+                self.append_chat_message("system", f"[dim]🔍 Researching: {query}…[/dim]")
+                input_pane = self.query_one("#input-pane", Input)
+                input_pane.disabled = True
+                input_pane.placeholder = "🔍 researching…"
+                self.run_worker(lambda: self._run_research(query, sources), thread=True)
         else:
             self.append_chat_message("system", self.t("unknown_cmd", cmd=cmd))
 
@@ -2028,6 +2134,60 @@ class AutokerenTUI(App):
                 input_pane.placeholder = self.t("input_placeholder")
                 input_pane.focus()
             _enable()
+
+    def _run_research(self, query: str, sources: list[str] | None) -> None:
+        """Background worker untuk /research command."""
+        try:
+            from autokeren.tools.research import ResearchTool
+            rc = self.cfg.autokeren.research
+            tool = ResearchTool(
+                router=self.agent.router,
+                max_results=rc.max_results,
+                max_depth=rc.max_depth,
+                summarize=rc.summarize,
+                min_comment_score=rc.min_comment_score,
+            )
+            res = tool.run(query=query, sources=sources, depth=rc.max_depth)
+            if res.ok:
+                self.call_from_thread(self.append_chat_message, "system", res.to_string()[:5000])
+            else:
+                self.call_from_thread(self.append_chat_message, "system", f"[red]Research gagal:[/red] {res.error}")
+        except Exception as e:
+            self.call_from_thread(self.append_chat_message, "system", f"[red]Research error:[/red] {e}")
+        finally:
+            def _reset():
+                input_pane = self.query_one("#input-pane", Input)
+                input_pane.disabled = False
+                input_pane.placeholder = self.t("input_placeholder")
+                input_pane.focus()
+            self.call_from_thread(_reset)
+
+    def _run_spec_interview(self, request: str) -> None:
+        """Background worker untuk /spec <request> — start interview."""
+        try:
+            from autokeren.spec import SpecPlanner
+            if not hasattr(self.agent, "_spec_planner"):
+                self.agent._spec_planner = SpecPlanner(router=self.agent.router, num_questions=self.cfg.autokeren.spec_driven.num_questions)  # type: ignore[attr-defined]
+            sp = self.agent._spec_planner  # type: ignore[attr-defined]
+            session = sp.start_interview(request)
+            if session and session.questions:
+                msg = (
+                    f"[green]📋 Interview dimulai: {len(session.questions)} pertanyaan.[/green]\n"
+                    f"[cyan]Q1:[/cyan] {session.questions[0]}\n"
+                    f"[dim]Jawab dengan: /spec answer <jawaban>[/dim]"
+                )
+                self.call_from_thread(self.append_chat_message, "system", msg)
+            else:
+                self.call_from_thread(self.append_chat_message, "system", "[yellow]Gagal generate pertanyaan.[/yellow]")
+        except Exception as e:
+            self.call_from_thread(self.append_chat_message, "system", f"[red]Spec error:[/red] {e}")
+        finally:
+            def _reset():
+                input_pane = self.query_one("#input-pane", Input)
+                input_pane.disabled = False
+                input_pane.placeholder = self.t("input_placeholder")
+                input_pane.focus()
+            self.call_from_thread(_reset)
 
 
 def run_tui(agent: Agent, cfg: Config) -> None:

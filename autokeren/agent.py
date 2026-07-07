@@ -4,9 +4,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
+from autokeren.checkpoints import CheckpointManager
 from autokeren.config import Config
 from autokeren.context import SessionContext
+from autokeren.enforcer import EnforcementEngine
+from autokeren.genome import GuardianChecker, GenomeScanner, ProjectGenome
+from autokeren.loop import LoopBreaker, PatternDetector
 from autokeren.memory import MemoryManager
+from autokeren.security_guard import SecurityScanner
 from autokeren.models.base import ModelResponse
 from autokeren.models.router import ModelRouter
 from autokeren.prompts import build_system_prompt
@@ -38,6 +43,55 @@ class Agent:
         self._last_neuron_remaining: int | None = None
         self._last_neuron_quota: int | None = None
         self.interrupted = False
+
+        # Time-Travel checkpoints
+        tt = cfg.autokeren.time_travel
+        self.checkpoints: CheckpointManager | None = None
+        if tt.enabled:
+            self.checkpoints = CheckpointManager(
+                project_root=Path(project_root),
+                session_id="default",
+                max_checkpoints=tt.max_checkpoints,
+                auto_checkpoint=tt.auto_checkpoint,
+            )
+
+        # Architecture Guardian
+        ag = cfg.autokeren.architecture_guardian
+        self.guardian_enabled = ag.enabled
+        self._genome: ProjectGenome | None = None
+        self._guardian_checker: GuardianChecker | None = None
+        self._genome_scanner: GenomeScanner | None = None
+        self._tool_calls_since_scan = 0
+        if ag.enabled:
+            self._genome_scanner = GenomeScanner(Path(project_root))
+            self._genome = self._genome_scanner.scan()
+            self._guardian_checker = GuardianChecker(self._genome, block_duplicates=ag.block_duplicates)
+
+        # Loop Breaker
+        lb = cfg.autokeren.loop_breaker
+        self.loop_breaker: LoopBreaker | None = None
+        self._pattern_detector: PatternDetector | None = None
+        if lb.enabled:
+            self.loop_breaker = LoopBreaker(
+                max_repeats=lb.max_repeats,
+                auto_switch_model=lb.auto_switch_model,
+                auto_clear_context=lb.auto_clear_context,
+            )
+            self._pattern_detector = PatternDetector()
+
+        # Vibe-Security Guard
+        vs = cfg.autokeren.vibe_security
+        self.security_scanner: SecurityScanner | None = None
+        if vs.enabled:
+            self.security_scanner = SecurityScanner(checks=vs.checks)
+
+        # Live Architecture Enforcement
+        le = cfg.autokeren.live_enforcement
+        self.enforcer: EnforcementEngine | None = None
+        if le.enabled:
+            rules_path = Path(project_root) / le.rules_file
+            if rules_path.exists():
+                self.enforcer = EnforcementEngine(rules_path)
 
         # Opt-in UI callbacks (wired by CLI). Default None = no-op.
         self.on_model_start: Callable[[], None] | None = None
@@ -164,6 +218,49 @@ class Agent:
                         continue
                 if self.on_tool_start:
                     self.on_tool_start(tc.name, tc.arguments)
+                # Architecture Guardian: check sebelum write/patch
+                if (
+                    self.guardian_enabled
+                    and self._guardian_checker
+                    and tc.name in ("write_file", "patch_file")
+                ):
+                    _gpath = tc.arguments.get("path", "")
+                    _gcontent = tc.arguments.get("content", tc.arguments.get("new_string", ""))
+                    if _gpath and _gcontent:
+                        guard = self._guardian_checker.check_before_write(_gpath, _gcontent)
+                        if guard.blocked:
+                            blocked_result = ToolResult(
+                                error=f"⚠️ ARCHITECTURE GUARDIAN BLOCKED:\n{guard.reason}\n\nSaran: {guard.suggestion}",
+                                ok=False,
+                            )
+                            if self.on_tool_end:
+                                self.on_tool_end(tc.name, blocked_result)
+                            self.context.add_tool_result(tc.id, tc.name, blocked_result.to_dict(), False)
+                            continue
+                # Live Enforcement: check rules sebelum write/patch
+                if (
+                    self.enforcer
+                    and tc.name in ("write_file", "patch_file")
+                ):
+                    _epath = tc.arguments.get("path", "")
+                    _econtent = tc.arguments.get("content", tc.arguments.get("new_string", ""))
+                    if _epath and _econtent:
+                        enfo = self.enforcer.check_before_write(_epath, _econtent)
+                        if enfo.blocked:
+                            block_msgs = [v.message for v in enfo.violations if v.action == "block"]
+                            blocked_result = ToolResult(
+                                error="⛔ LIVE ENFORCEMENT BLOCKED:\n" + "\n".join(f"  • {m}" for m in block_msgs),
+                                ok=False,
+                            )
+                            if self.on_tool_end:
+                                self.on_tool_end(tc.name, blocked_result)
+                            self.context.add_tool_result(tc.id, tc.name, blocked_result.to_dict(), False)
+                            continue
+                _before_snap: dict[str, str | None] | None = None
+                if self.checkpoints and self.checkpoints.auto_checkpoint and tc.name in ("write_file", "patch_file"):
+                    _path = tc.arguments.get("path", "")
+                    if _path:
+                        _before_snap = self.checkpoints.snapshot_files([_path])
                 try:
                     def _on_output(line: str, _name: str = tc.name) -> None:
                         self.check_interrupt()
@@ -174,6 +271,73 @@ class Agent:
                     raw_result = ToolResult(error="dibatalkan user", ok=False)
                 if self.on_tool_end:
                     self.on_tool_end(tc.name, raw_result)
+                # Loop Breaker: track errors
+                if self.loop_breaker and not raw_result.ok:
+                    lb_action = self.loop_breaker.track_error(
+                        error=raw_result.error or str(raw_result.to_dict()),
+                        tool_name=tc.name,
+                        context={"args": tc.arguments},
+                    )
+                    if lb_action.action == "break":
+                        self.context.messages.append({
+                            "role": "system",
+                            "content": lb_action.suggestion,
+                        })
+                        if lb_action.switch_model:
+                            self.router.swap_models()
+                        if lb_action.clear_context:
+                            self.compact()
+                        self.loop_breaker.reset()
+                # Pattern Detector: track all tool calls
+                if self._pattern_detector:
+                    from autokeren.loop.patterns import ToolCallEntry
+                    self._pattern_detector.track(ToolCallEntry(
+                        name=tc.name,
+                        args=tc.arguments,
+                        success=raw_result.ok,
+                        message="",
+                    ))
+                    pat = self._pattern_detector.detect()
+                    if pat.detected:
+                        self.context.messages.append({
+                            "role": "system",
+                            "content": f"⚠️ PATTERN DETECTED: {pat.pattern} — {pat.detail}. Coba pendekatan berbeda.",
+                        })
+                        self._pattern_detector.reset()
+                if self.checkpoints and self.checkpoints.auto_checkpoint:
+                    self.checkpoints.save(
+                        tool_name=tc.name,
+                        tool_args=tc.arguments,
+                        tool_result=raw_result.to_dict(),
+                        tool_ok=raw_result.ok,
+                        before_snapshot=_before_snap,
+                    )
+                # Vibe-Security: scan after write
+                if (
+                    self.security_scanner
+                    and tc.name in ("write_file", "patch_file")
+                    and raw_result.ok
+                ):
+                    _sec_path = tc.arguments.get("path", "")
+                    _sec_content = tc.arguments.get("content", tc.arguments.get("new_string", ""))
+                    if _sec_path and _sec_content:
+                        findings = self.security_scanner.scan(_sec_path, _sec_content)
+                        if findings:
+                            critical = [f for f in findings if f.severity == "CRITICAL"]
+                            if critical:
+                                warn_text = SecurityScanner.format_findings(findings)
+                                self.context.messages.append({
+                                    "role": "system",
+                                    "content": f"🛡️ SECURITY ALERT:\n{warn_text}\n\nFix critical issues sebelum lanjut.",
+                                })
+                # Architecture Guardian: auto-rescan genome
+                if self.guardian_enabled and self._genome_scanner and tc.name in ("write_file", "patch_file"):
+                    self._tool_calls_since_scan += 1
+                    ag_cfg = self.cfg.autokeren.architecture_guardian
+                    if self._tool_calls_since_scan >= ag_cfg.scan_interval:
+                        self._genome = self._genome_scanner.scan()
+                        self._guardian_checker = GuardianChecker(self._genome, block_duplicates=ag_cfg.block_duplicates)
+                        self._tool_calls_since_scan = 0
                 self.context.add_tool_result(tc.id, tc.name, raw_result.to_dict(), raw_result.ok)
 
         return ModelResponse(content="Mencapai batas iterasi maksimum tanpa jawaban final.")

@@ -71,3 +71,6 @@ worker.js.bak-*
 toko-*/
 scratch/
 
+# Time-Travel checkpoints
+.ak-checkpoints/
+

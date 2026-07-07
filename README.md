@@ -33,6 +33,80 @@ autokeren adalah CLI agentic coding yang dirancang khusus untuk stack Cloudflare
 - **Tmux supervisor** — spawn dan monitor long-running agent yang survive terminal close.
 - **CF Pages/Workers deploy** — helper deploy + build terintegrasi.
 
+## Vibe Coding Features (v0.8.0)
+
+9 fitur original yang tidak ada di CLI coding tool manapun (Claude Code, Aider, Cursor, opencode, Cline):
+
+### Time-Travel `/rewind`
+Undo tool calls dan restore codebase ke checkpoint sebelumnya. Auto-checkpoint setelah setiap write/patch.
+```bash
+/rewind        # undo 1 tool call
+/rewind 3      # undo 3 tool calls
+/rewind list   # lihat semua checkpoint
+```
+
+### Architecture Guardian
+Scan project genome (modules, functions, dependencies), block duplikat function/module sebelum ditulis.
+```bash
+/genome         # lihat project genome
+/genome rescan  # rescan project
+/genome check   # cek duplikat
+```
+
+### Loop Breaker
+Deteksi agent stuck di loop (same error, apology loop, file thrashing). Auto-swap model.
+```bash
+/loop status    # lihat error history
+/loop reset     # reset tracker
+/loop break     # manual break — swap model + reset
+```
+
+### Cross-Model Auto-Review
+Review diff dengan model dari vendor berbeda untuk catch blind spots.
+```bash
+/review         # review unstaged diff
+/review staged  # review staged diff
+```
+
+### Vibe-Security Guard
+Scan otomatis setiap file write untuk secrets, SQLi, XSS, forbidden code.
+```bash
+/security           # scan semua file
+/security app.py    # scan file tertentu
+```
+
+### Live Architecture Enforcement
+Rules-based enforcement via `.ak-rules.yaml` — max file lines, forbidden patterns, import restrictions.
+
+### Spec-Driven Auto-Planning
+AI interview user dengan 20 pertanyaan, generate plan.md + technical-plan.md.
+```bash
+/spec build a REST API     # mulai interview
+/spec answer jawaban saya   # jawab pertanyaan
+/spec generate              # generate plan
+/spec show                  # lihat plan
+/spec progress              # lihat progress
+```
+
+### Ghost Agent
+Spawn background agent di tmux untuk parallel work.
+```bash
+/ghost fix bug di login.py  # spawn ghost agent
+/ghost list                 # lihat semua ghost agent
+/ghost show 1               # lihat output ghost #1
+/ghost kill 1               # kill ghost #1
+/ghost kill all             # kill semua
+```
+
+### Research Tool
+Deep research ke Reddit, Hacker News, dan Web. Fetch threads + comments, LLM rangkum.
+```bash
+/research python coding tools     # cari semua sources
+/research reddit asyncio tips     # cari Reddit saja
+/research hn AI coding CLI        # cari HN saja
+/research web best practices      # cari web saja
+```
+
 ## Cara Mulai
 
 ### 1. Dapatkan API Key (gratis)
@@ -175,19 +249,40 @@ Dapat diketik langsung di kotak input chat (mendukung *autocomplete* otomatis me
 | `/model [nama]` | Ganti model aktif (buka modal pop-up jika nama kosong) |
 | `/lang [kode]` | Ganti bahasa UI (buka modal pop-up jika kode kosong, misal: `/lang en`) |
 | `/export [nama]` | Ekspor percakapan ke file Markdown (default: auto-timestamp) |
-| `/mcp` | Membuka manager interaktif MCP Server (lihat status, list tools, & tambah server baru) |
-| `/project <subcommand>`| Manajemen project Multi-Agent (`new`, `add`, `run`, `status`, `output`, `list`, `switch`) |
-| `/compact` | Ringkas history percakapan, pertahankan N turn terakhir |
+| `/mcp` | Membuka manager interaktif MCP Server |
+| `/project <subcommand>`| Manajemen project Multi-Agent |
+| `/compact` | Ringkas history percakapan |
 | `/reset` | Reset sesi percakapan saat ini |
-| `/memory` | Tampilkan lokasi dan isi memory per-project |
-| `/permissions` | Tampilkan daftar tool yang diizinkan untuk sesi ini |
+| `/memory` | Tampilkan isi memory per-project |
+| `/permissions` | Tampilkan daftar tool yang diizinkan |
 | `/save [nama]` | Simpan sesi saat ini |
 | `/resume <nama\|id>` | Lanjutkan sesi tersimpan |
 | `/sessions` | Daftar semua sesi tersimpan |
+| `/rewind [N]` | Undo N tool calls, restore ke checkpoint |
+| `/rewind list` | Lihat semua checkpoint |
+| `/genome` | Lihat project genome (modules, functions) |
+| `/genome rescan` | Rescan project genome |
+| `/genome check` | Cek duplikat function |
+| `/loop status` | Lihat error history loop breaker |
+| `/loop reset` | Reset loop breaker tracker |
+| `/loop break` | Manual break — swap model + reset |
+| `/review [staged]` | Cross-model review diff |
+| `/security [file]` | Scan security issues |
+| `/spec <request>` | Mulai spec interview |
+| `/spec answer <text>` | Jawab pertanyaan interview |
+| `/spec generate` | Generate plan.md + technical-plan.md |
+| `/spec show` | Tampilkan plan |
+| `/spec progress` | Lihat progress plan |
+| `/ghost <task>` | Spawn background ghost agent |
+| `/ghost list` | Lihat semua ghost agent |
+| `/ghost show <id>` | Lihat output ghost agent |
+| `/ghost kill <id\|all>` | Kill ghost agent |
+| `/research <query>` | Riset ke Reddit + HN + Web |
+| `/research reddit\|hn\|web <q>` | Riset ke source tertentu |
 
 ## Tools
 
-autokeren membawa 24 tools bawaan dengan permission check dan schema function-calling.
+autokeren membawa 28 tools bawaan dengan permission check dan schema function-calling.
 
 | Tool | Deskripsi |
 |---|---|
@@ -214,6 +309,11 @@ autokeren membawa 24 tools bawaan dengan permission check dan schema function-ca
 | `tmux` | Supervisor long-running task via tmux |
 | `todo` | Kelola todo list multi-step |
 | `remember` | Simpan info ke cross-session memory |
+| `rewind` | Undo tool calls, restore ke checkpoint |
+| `genome` | Lihat/rescan project architecture genome |
+| `review` | Cross-model code review |
+| `research` | Deep research ke Reddit, HN, dan Web |
+| `camofox` | Browser automation via Camofox |
 
 ## Konfigurasi
 
@@ -247,6 +347,45 @@ autokeren:
   compact_tail_turns: 6
   auto_compact: false
   auto_compact_threshold: 0.8
+  # Vibe coding features (v0.8.0+)
+  time_travel:
+    enabled: true
+    max_checkpoints: 50
+    auto_checkpoint: true
+  architecture_guardian:
+    enabled: true
+    block_duplicates: true
+    scan_interval: 5
+  loop_breaker:
+    enabled: true
+    max_repeats: 3
+    auto_switch_model: true
+  cross_model_review:
+    enabled: true
+    reviewer_model: "auto"
+    auto_review: false
+  vibe_security:
+    enabled: true
+    scan_on_write: true
+    block_on_critical: true
+  live_enforcement:
+    enabled: true
+    rules_file: ".ak-rules.yaml"
+    block_on_violation: true
+  spec_driven:
+    enabled: true
+    num_questions: 20
+    auto_generate: true
+  ghost_agent:
+    enabled: true
+    max_background: 3
+    tmux_prefix: "ak-ghost"
+  research:
+    enabled: true
+    sources: ["reddit", "hackernews", "web"]
+    max_results: 10
+    max_depth: 3
+    summarize: true
 
 mcp_servers:
   - name: filesystem

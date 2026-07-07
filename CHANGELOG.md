@@ -4,6 +4,42 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-07-07
+
+### Added — 9 Vibe Coding Features
+
+Satu-satunya CLI yang punya 9 fitur ini. Tidak ada di Claude Code, Aider, Cursor, opencode, atau Cline.
+
+#### Phase 1 — Core Differentiators
+- **Time-Travel `/rewind`:** Undo tool calls dan restore codebase ke checkpoint sebelumnya. Auto-checkpoint setelah setiap write_file/patch_file. Slash: `/rewind N`, `/rewind list`.
+- **Architecture Guardian:** Scan project genome (modules, functions, dependencies), block pembuatan duplikat function/module sebelum write. Slash: `/genome`, `/genome rescan`, `/genome check`.
+- **Loop Breaker:** Deteksi agent stuck di loop (same error N kali, same tool+args, apology loop). Auto-swap model, inject system message. Slash: `/loop status`, `/loop reset`, `/loop break`.
+
+#### Phase 2 — Quality & Safety
+- **Cross-Model Auto-Review:** Review code diff dengan model dari vendor berbeda (kimi↔glm) untuk catch blind spots. Slash: `/review`, `/review staged`.
+- **Vibe-Security Guard:** Scan otomatis setiap file write untuk secrets, SQLi, XSS, forbidden code (eval). Block pada CRITICAL findings. Slash: `/security`, `/security <file>`.
+- **Live Architecture Enforcement:** Rules-based enforcement via `.ak-rules.yaml` — max file lines, forbidden patterns, import restrictions. Block sebelum write.
+
+#### Phase 3 — Productivity
+- **Spec-Driven Auto-Planning:** AI interview user dengan 20 pertanyaan clarifying, generate `plan.md` + `technical-plan.md`, track progress per step. Slash: `/spec <request>`, `/spec answer <text>`, `/spec generate`, `/spec show`, `/spec progress`.
+- **Ghost Agent:** Spawn background agent di tmux session terpisah untuk parallel work. `--non-interactive --task "..."` CLI mode untuk ghost agent. Slash: `/ghost <task>`, `/ghost list`, `/ghost show <id>`, `/ghost kill <id>|all`.
+
+#### Phase 4 — Research
+- **Research Tool:** Deep research ke Reddit (.json API), Hacker News (Algolia API), dan Web (DuckDuckGo). Fetch threads + comments, LLM summarize jadi laporan riset. Slash: `/research <query>`, `/research reddit|hn|web <query>`.
+
+### Changed
+- **Version bump:** 0.7.6 → 0.8.0
+- **Config:** 6 config section baru: `time_travel`, `architecture_guardian`, `loop_breaker`, `cross_model_review`, `vibe_security`, `live_enforcement`, `spec_driven`, `ghost_agent`, `research`.
+- **Agent loop:** Hooks untuk auto-checkpoint, guardian check, enforcer check, loop detection, security scan, pattern detection terintegrasi di `agent.py`.
+- **TUI:** Semua 9 slash command baru tersedia di TUI mode (`tui.py`).
+- **CLI:** Argumen baru `--non-interactive` dan `--task` untuk ghost agent mode.
+- **Tools:** Tool baru terdaftar: `rewind`, `genome`, `review`, `research`.
+
+### Stats
+- **163 tests** (was 130, +33 new tests across 3 features)
+- **75 source files** type-checked dengan mypy strict
+- **0 ruff errors, 0 mypy errors**
+
 ## [0.7.6] - 2026-07-07
 
 ### Fixed
@@ -152,6 +188,7 @@ Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan
 - Indonesian localization untuk seluruh UI text.
 - 18 tools bawaan.
 
+[0.8.0]: https://github.com/autokeren/autokeren/releases/tag/v0.8.0
 [0.7.6]: https://github.com/autokeren/autokeren/releases/tag/v0.7.6
 [0.7.5]: https://github.com/autokeren/autokeren/releases/tag/v0.7.5
 [0.7.4]: https://github.com/autokeren/autokeren/releases/tag/v0.7.4

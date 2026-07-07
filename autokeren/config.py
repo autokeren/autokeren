@@ -40,6 +40,74 @@ class RetryConfig(BaseModel):
     circuit_open_seconds: int = 30
 
 
+class TimeTravelConfig(BaseModel):
+    enabled: bool = True
+    max_checkpoints: int = 50
+    auto_checkpoint: bool = True
+
+
+class ArchitectureGuardianConfig(BaseModel):
+    enabled: bool = True
+    genome_file: str = ".ak-genome.md"
+    block_duplicates: bool = True
+    scan_interval: int = 5
+
+
+class LoopBreakerConfig(BaseModel):
+    enabled: bool = True
+    max_repeats: int = 3
+    auto_switch_model: bool = True
+    auto_clear_context: bool = False
+
+
+class CrossModelReviewConfig(BaseModel):
+    enabled: bool = True
+    reviewer_model: str = "auto"
+    auto_review: bool = False
+    auto_fix: bool = True
+
+
+class VibeSecurityConfig(BaseModel):
+    enabled: bool = True
+    scan_on_write: bool = True
+    block_on_critical: bool = True
+    checks: list[str] = Field(default_factory=lambda: ["secrets", "sqli", "xss", "forbidden"])
+
+
+class LiveEnforcementConfig(BaseModel):
+    enabled: bool = True
+    rules_file: str = ".ak-rules.yaml"
+    block_on_violation: bool = True
+
+
+class SpecDrivenConfig(BaseModel):
+    enabled: bool = True
+    num_questions: int = 20
+    auto_generate: bool = True
+    plan_file: str = "plan.md"
+    technical_file: str = "technical-plan.md"
+
+
+class GhostAgentConfig(BaseModel):
+    enabled: bool = True
+    max_background: int = 3
+    tmux_prefix: str = "ak-ghost"
+    branch_isolation: bool = True
+    auto_notify: bool = True
+    log_dir: str = ".ak-ghost-logs"
+
+
+class ResearchConfig(BaseModel):
+    enabled: bool = True
+    sources: list[str] = Field(default_factory=lambda: ["reddit", "hackernews", "web"])
+    max_results: int = 10
+    max_depth: int = 3
+    summarize: bool = True
+    min_comment_score: int = 2
+    browser_integration: bool = False
+    browser_url: str = "http://localhost:9377"
+
+
 class AutokerenConfig(BaseModel):
     plan_mode: bool = False
     max_iterations: int = 50
@@ -52,10 +120,18 @@ class AutokerenConfig(BaseModel):
     auto_compact_threshold: float = 0.8
     memory_enabled: bool = True
     auto_save_session: bool = False
-    max_tool_calls: int = 0  # 0 = unlimited (batas alami: context window + neuron quota)
-    mermaid_render: bool = False  # render mermaid sebagai image (false = code block only)
-    language: str = ""            # kode bahasa preferensi, contoh: "en", "id". Kosong = auto-detect.
-
+    max_tool_calls: int = 0
+    mermaid_render: bool = False
+    language: str = ""
+    time_travel: TimeTravelConfig = Field(default_factory=TimeTravelConfig)
+    architecture_guardian: ArchitectureGuardianConfig = Field(default_factory=ArchitectureGuardianConfig)
+    loop_breaker: LoopBreakerConfig = Field(default_factory=LoopBreakerConfig)
+    cross_model_review: CrossModelReviewConfig = Field(default_factory=CrossModelReviewConfig)
+    vibe_security: VibeSecurityConfig = Field(default_factory=VibeSecurityConfig)
+    live_enforcement: LiveEnforcementConfig = Field(default_factory=LiveEnforcementConfig)
+    spec_driven: SpecDrivenConfig = Field(default_factory=SpecDrivenConfig)
+    ghost_agent: GhostAgentConfig = Field(default_factory=GhostAgentConfig)
+    research: ResearchConfig = Field(default_factory=ResearchConfig)
 
 
 class CamofoxConfig(BaseModel):
