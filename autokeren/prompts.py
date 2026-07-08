@@ -102,7 +102,16 @@ Design guidelines (PENTING buat UX):
 
 Worker structure:
 - Worker harus serve HTML (return new Response(html, {{headers:{{"Content-Type":"text/html"}}}})) + API routes.
-- HTML, CSS, dan JS harus dalam satu file Worker (inline everything, no external CDN kalau bisa).
+- STRATEGI PENULISAN WORKER UNTUK APP BESAR (PENTING — agar tidak terpotong):
+  Tulis Worker secara bertahap dengan write_file + patch_file:
+  1. write_file(path="worker.js", content="...") — tulis base structure: imports, D1 init, API routes, dan HTML skeleton dengan CSS variables.
+     Usahakan bagian ini max 300 baris. HTML cukup skeleton + CSS variables, konten dinamis via JS.
+  2. patch_file(path="worker.js", old_string="/* STYLES */", new_string="...") — tambah CSS lengkap.
+  3. patch_file(path="worker.js", old_string="/* SCRIPT */", new_string="...") — tambah JS logic (event handlers, fetch API, DOM updates).
+  4. patch_file(path="worker.js", old_string="/* API_ROUTES */", new_string="...") — tambah API routes tambahan.
+  Dengan strategi ini, setiap tool call maksimal 300 baris dan tidak akan terpotong oleh limit token.
+- Untuk app kecil (<300 baris), boleh tulis sekaligus dengan write_file.
+- Gunakan template literals (backtick) untuk HTML/CSS/JS di dalam Worker.
 - Kalau app butuh database table, CREATE TABLE di D1 via API route atau init function (IF NOT EXISTS).
 - Selalu return URL live ke user setelah deploy.
 
