@@ -25,7 +25,7 @@ class CloudflareConfig(BaseModel):
     api_token: str = ""
     primary_model: str = "kimi-code"
     secondary_model: str = "kimi-2.6"
-    max_tokens: int = 16384
+    max_tokens: int = 8192
     temperature: float = 0.3
     timeout: float = 120.0
 
