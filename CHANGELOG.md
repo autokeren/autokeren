@@ -4,6 +4,23 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.5] - 2026-07-08
+
+### Fixed
+- **Worker full-stack terpotong:** System prompt sekarang instruksikan AI tulis Worker bertahap — `write_file` base structure (max 300 baris), lalu `patch_file` untuk tambah CSS/JS/API routes via placeholder (`/* STYLES */`, `/* SCRIPT */`). Bukan lagi "inline everything in one file" yang bikin terpotong oleh limit token.
+- **Rate limit handling:** CLI sekarang baca `Retry-After` header dari BE pas kena 429, dan tunggu sesuai sebelum retry. Retry policy honor `retry_after` dari server.
+- **Model name tidak update:** Pas `/model` switch di TUI, `_current_model_name` tidak di-update. Fixed di CLI, TUI `/model`, dan TUI model select screen.
+
+### Changed
+- `/deploy` command prompt updated: instruksikan AI tulis Worker bertahap (write + patch), bukan sekaligus.
+- Rate limit free tier 20→60 req/min, pro tier 100→200 req/min.
+- Rate limit bisa di-set via env var `RATE_LIMIT_FREE` / `RATE_LIMIT_PRO` di BE.
+- BE `max_tokens` hard cap 16384 (clamped di dispatch.ts).
+- BE AI deploy scanner tambah fallback models (Llama 4 Scout, GLM Flash).
+- TUI user message punya background `#1a1a2e` biar beda dari chat area.
+- TUI ToolWidget tampilkan tool name di success/error state (`✓ read_file summary`).
+- Thinking spinner tampilkan timer + model name (`mikir (5s) kimi-code`).
+
 ## [0.8.4] - 2026-07-08
 
 ### Added
