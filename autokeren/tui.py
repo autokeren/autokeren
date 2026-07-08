@@ -1786,25 +1786,50 @@ class AutokerenTUI(App):
         self.append_chat_message("system", self.t("reset_success"))
         self.update_status()
 
-    def _copy_text(self, text: str) -> None:
-        """Copy text to system clipboard using pyperclip or subprocess fallback."""
+    def _copy_text(self, text: str) -> bool:
+        """Copy text to system clipboard. Returns True on success.
+
+        Tries pyperclip → xclip → xsel → wl-copy → pbcopy.
+        Returns False if no clipboard available (e.g. headless VPS over SSH).
+        """
         if not text:
-            return
+            return False
+
         if _HAS_PYPERCLIP and pyperclip is not None:
-            pyperclip.copy(text)
-            return
-        # Fallback untuk Linux tanpa pyperclip
+            try:
+                pyperclip.copy(text)
+                return True
+            except Exception:
+                pass
+
         import shutil
         import subprocess
 
-        if shutil.which("xclip"):
-            subprocess.run(["xclip", "-selection", "clipboard"], input=text.encode(), check=False)
-        elif shutil.which("xsel"):
-            subprocess.run(["xsel", "--clipboard", "--input"], input=text.encode(), check=False)
-        elif shutil.which("wl-copy"):
-            subprocess.run(["wl-copy"], input=text.encode(), check=False)
-        else:
-            raise RuntimeError("Tidak ada clipboard utility (pyperclip/xclip/xsel/wl-copy).")
+        for cmd_args in (
+            ["xclip", "-selection", "clipboard"],
+            ["xsel", "--clipboard", "--input"],
+            ["wl-copy"],
+            ["pbcopy"],
+        ):
+            if shutil.which(cmd_args[0]):
+                try:
+                    subprocess.run(cmd_args, input=text.encode(), check=True, capture_output=True, timeout=5)
+                    return True
+                except Exception:
+                    continue
+
+        return False
+
+    def _save_to_temp_file(self, text: str) -> str:
+        """Save text to a temp file and return the path. For VPS/SSH fallback."""
+        import tempfile
+        import os
+
+        fd, path = tempfile.mkstemp(suffix=".txt", prefix="autokeren_copy_")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.chmod(path, 0o644)
+        return path
 
     def _find_copyable_message(self, selector: str) -> str | None:
         """Cari pesan yang bisa di-copy berdasarkan selector: 'last' atau nomor indeks positif."""
@@ -1833,13 +1858,16 @@ class AutokerenTUI(App):
         if not text:
             self.append_chat_message("system", self.t("no_last_msg"))
             return
-        try:
-            self._copy_text(text)
+        if self._copy_text(text):
             self.append_chat_message("system", self.t("last_copied"))
-        except Exception as e:
-            # Fallback: tampilkan isi pesan supaya user tetap bisa copy manual
-            self.append_chat_message("system", self.t("copy_fail", error=str(e)))
-            self.append_chat_message("system", "[dim]--- Content ---[/dim]\n" + text)
+        else:
+            path = self._save_to_temp_file(text)
+            self.append_chat_message(
+                "system",
+                f"[yellow]Clipboard tidak tersedia (VPS/SSH).[/yellow]\n"
+                f"Tersimpan ke: [bold]{path}[/bold]\n"
+                f"Copy manual: [dim]cat {path}[/dim]",
+            )
 
     async def action_compact(self) -> None:
         self.append_chat_message("system", self.t("compacting"))
@@ -1945,14 +1973,17 @@ class AutokerenTUI(App):
             selector = arg.strip() if arg.strip() else "last"
             text = self._find_copyable_message(selector)
             if text is None:
-                self.append_chat_message("system", f"[red]Pesan dengan indeks '{selector}' tidak ditemukan.[/red]\nGunakan: /copy last atau /copy <index>. Indeks bisa dilihat di /sessions atau /export.")
+                self.append_chat_message("system", f"[red]Pesan dengan indeks '{selector}' tidak ditemukan.[/red]\nGunakan: /copy last atau /copy <index>.")
+            elif self._copy_text(text):
+                self.append_chat_message("system", self.t("last_copied"))
             else:
-                try:
-                    self._copy_text(text)
-                    self.append_chat_message("system", self.t("last_copied"))
-                except Exception as e:
-                    self.append_chat_message("system", self.t("copy_fail", error=str(e)))
-                    self.append_chat_message("system", "[dim]--- Content ---[/dim]\n" + text)
+                path = self._save_to_temp_file(text)
+                self.append_chat_message(
+                    "system",
+                    f"[yellow]Clipboard tidak tersedia (VPS/SSH).[/yellow]\n"
+                    f"Tersimpan ke: [bold]{path}[/bold]\n"
+                    f"Copy manual: [dim]cat {path}[/dim]",
+                )
         elif cmd == "/export":
             msgs = [m for m in self.agent.context.messages if m.get("role") in ("user", "assistant")]
             if not msgs:

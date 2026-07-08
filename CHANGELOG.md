@@ -4,6 +4,12 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.10] - 2026-07-08
+
+### Fixed
+- **`/copy` dan F4 di VPS/SSH:** Clipboard tidak tersedia di headless VPS (no X11/Wayland). Sekarang jika clipboard gagal, teks otomatis disimpan ke file temp (`/tmp/autokeren_copy_*.txt`) dan path ditampilkan. User bisa `cat <path>` untuk copy manual dari SSH client.
+- **`_copy_text()` return bool:** Sebelumnya raise exception, sekarang return `True`/`False` supaya caller bisa handle fallback dengan bersih.
+
 ## [0.8.9] - 2026-07-08
 
 ### Added
