@@ -265,6 +265,7 @@ Dapat diketik langsung di kotak input chat (mendukung *autocomplete* otomatis me
 | `/model [nama]` | Ganti model aktif (buka modal pop-up jika nama kosong) |
 | `/lang [kode]` | Ganti bahasa UI (buka modal pop-up jika kode kosong, misal: `/lang en`) |
 | `/export [nama]` | Ekspor percakapan ke file Markdown (default: auto-timestamp) |
+| `/copy [last\|N]` | Salin pesan ke clipboard (`last` = pesan terakhir, `N` = indeks pesan) |
 | `/mcp` | Membuka manager interaktif MCP Server |
 | `/project <subcommand>`| Manajemen project Multi-Agent |
 | `/compact` | Ringkas history percakapan |

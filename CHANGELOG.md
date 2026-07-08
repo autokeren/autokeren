@@ -4,6 +4,15 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.9] - 2026-07-08
+
+### Added
+- **Copy to clipboard (`/copy` command):** Slash command baru `/copy [last|N]` untuk menyalin pesan ke clipboard sistem. `/copy last` menyalin pesan terakhir, `/copy 3` menyalin pesan indeks ke-3. Fallback: jika clipboard utility tidak tersedia, teks ditampilkan di chat untuk copy manual.
+- **Clipboard dependency:** Tambah `pyperclip>=1.8.0` ke dependencies untuk cross-platform clipboard support (Linux xclip/xsel/wl-copy, macOS pbcopy, Windows clip.exe).
+
+### Fixed
+- **F4 (Salin Respon) broken:** Method `copy_to_clipboard` tidak ada implementasinya. Sekarang menggunakan `_copy_text()` dengan pyperclip + subprocess fallback.
+
 ## [0.8.8] - 2026-07-08
 
 ### Fixed

@@ -16,6 +16,14 @@ from textual.events import Resize
 from rich.markdown import Markdown
 from rich.text import Text
 
+try:
+    import pyperclip
+
+    _HAS_PYPERCLIP = True
+except Exception:
+    pyperclip = None  # type: ignore
+    _HAS_PYPERCLIP = False
+
 from autokeren.agent import Agent
 from autokeren.config import Config
 from autokeren.models.base import ModelResponse
@@ -1300,6 +1308,7 @@ class AutokerenTUI(App):
             "/model", "/lang", "/export", "/mcp", "/save", "/resume", "/sessions", "/q", "/quit",
             "/deploy", "/spec", "/ghost", "/research", "/tdd", "/debug", "/genome", "/rewind", "/review", "/loop", "/security",
             "/project", "/tdd", "/rewind", "/genome", "/loop", "/review", "/security", "/spec", "/ghost", "/research",
+            "/copy",
         ]
         suggester = SuggestFromList(commands, case_sensitive=False)
         yield Horizontal(
@@ -1688,6 +1697,7 @@ class AutokerenTUI(App):
             "  - [bold]/model <name>[/bold]  : Switch model\n"
             "  - [bold]/lang <code2>[/bold]  : Switch TUI language\n"
             "  - [bold]/export [file][/bold]  : Export chat to Markdown file\n"
+            "  - [bold]/copy [last|N][/bold]  : Copy message to clipboard (last or by index)\n"
             "  - [bold]/compact[/bold]       : Compact context history\n"
             "  - [bold]/reset[/bold]         : Reset conversation session\n"
             "  - [bold]/permissions[/bold]   : Check allowed tools\n"
@@ -1776,21 +1786,60 @@ class AutokerenTUI(App):
         self.append_chat_message("system", self.t("reset_success"))
         self.update_status()
 
-    async def action_copy_last(self) -> None:
-        last_assistant_msg = None
-        for msg in reversed(self.agent.context.messages):
-            if msg.get("role") == "assistant" and msg.get("content"):
-                last_assistant_msg = msg["content"]
-                break
-        
-        if last_assistant_msg:
-            try:
-                self.copy_to_clipboard(last_assistant_msg)
-                self.append_chat_message("system", self.t("last_copied"))
-            except Exception as e:
-                self.append_chat_message("system", self.t("copy_fail", error=str(e)))
+    def _copy_text(self, text: str) -> None:
+        """Copy text to system clipboard using pyperclip or subprocess fallback."""
+        if not text:
+            return
+        if _HAS_PYPERCLIP and pyperclip is not None:
+            pyperclip.copy(text)
+            return
+        # Fallback untuk Linux tanpa pyperclip
+        import shutil
+        import subprocess
+
+        if shutil.which("xclip"):
+            subprocess.run(["xclip", "-selection", "clipboard"], input=text.encode(), check=False)
+        elif shutil.which("xsel"):
+            subprocess.run(["xsel", "--clipboard", "--input"], input=text.encode(), check=False)
+        elif shutil.which("wl-copy"):
+            subprocess.run(["wl-copy"], input=text.encode(), check=False)
         else:
+            raise RuntimeError("Tidak ada clipboard utility (pyperclip/xclip/xsel/wl-copy).")
+
+    def _find_copyable_message(self, selector: str) -> str | None:
+        """Cari pesan yang bisa di-copy berdasarkan selector: 'last' atau nomor indeks positif."""
+        messages = [
+            (idx, msg)
+            for idx, msg in enumerate(self.agent.context.messages)
+            if msg.get("role") in ("assistant", "user", "tool") and msg.get("content")
+        ]
+        if not messages:
+            return None
+
+        if selector == "last":
+            return messages[-1][1].get("content")
+
+        try:
+            idx = int(selector)
+            for stored_idx, msg in messages:
+                if stored_idx == idx:
+                    return msg.get("content")
+        except ValueError:
+            pass
+        return None
+
+    async def action_copy_last(self) -> None:
+        text = self._find_copyable_message("last")
+        if not text:
             self.append_chat_message("system", self.t("no_last_msg"))
+            return
+        try:
+            self._copy_text(text)
+            self.append_chat_message("system", self.t("last_copied"))
+        except Exception as e:
+            # Fallback: tampilkan isi pesan supaya user tetap bisa copy manual
+            self.append_chat_message("system", self.t("copy_fail", error=str(e)))
+            self.append_chat_message("system", "[dim]--- Content ---[/dim]\n" + text)
 
     async def action_compact(self) -> None:
         self.append_chat_message("system", self.t("compacting"))
@@ -1892,6 +1941,18 @@ class AutokerenTUI(App):
                 for s in sessions:
                     lines.append(f"  - [cyan]{s['id']}[/cyan] [bold]{s['name']}[/bold] ({s['messages']} msg)")
                 self.append_chat_message("system", "\n".join(lines))
+        elif cmd == "/copy":
+            selector = arg.strip() if arg.strip() else "last"
+            text = self._find_copyable_message(selector)
+            if text is None:
+                self.append_chat_message("system", f"[red]Pesan dengan indeks '{selector}' tidak ditemukan.[/red]\nGunakan: /copy last atau /copy <index>. Indeks bisa dilihat di /sessions atau /export.")
+            else:
+                try:
+                    self._copy_text(text)
+                    self.append_chat_message("system", self.t("last_copied"))
+                except Exception as e:
+                    self.append_chat_message("system", self.t("copy_fail", error=str(e)))
+                    self.append_chat_message("system", "[dim]--- Content ---[/dim]\n" + text)
         elif cmd == "/export":
             msgs = [m for m in self.agent.context.messages if m.get("role") in ("user", "assistant")]
             if not msgs:

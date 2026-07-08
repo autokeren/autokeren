@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "autokeren"
-version = "0.8.8"
+version = "0.8.9"
 description = "Cloudflare-first agentic coding CLI untuk developer Indonesia dan global"
 readme = "README.md"
 license = {text = "MIT"}
@@ -47,6 +47,7 @@ dependencies = [
     "strictyaml>=1.7",
     "pyfiglet>=1.0",
     "textual>=0.50.0",
+    "pyperclip>=1.8.0",
 ]
 
 
