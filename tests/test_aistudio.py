@@ -134,9 +134,21 @@ class TestAIStudioIntegration(unittest.TestCase):
     def test_router_initialization_aistudio(self):
         router = ModelRouter(cfg=self.cfg)
         self.assertEqual(len(router.models), 2)
+        # Resolved model IDs
         self.assertEqual(router.models[0].model_id, "gemini-1.5-flash")
         self.assertEqual(router.models[1].model_id, "gemini-1.5-pro")
         self.assertEqual(router.models[0].__class__.__name__, "AIStudioModel")
+
+    def test_model_id_resolution(self):
+        # Should resolve Cloudflare model IDs to Gemini model IDs
+        model1 = AIStudioModel(model_id="kimi-code", api_key="test_key")
+        self.assertEqual(model1.model_id, "gemini-1.5-pro")
+
+        model2 = AIStudioModel(model_id="kimi-2.6", api_key="test_key")
+        self.assertEqual(model2.model_id, "gemini-1.5-flash")
+
+        model3 = AIStudioModel(model_id="gemini-1.5-flash", api_key="test_key")
+        self.assertEqual(model3.model_id, "gemini-1.5-flash")
 
 
 if __name__ == "__main__":

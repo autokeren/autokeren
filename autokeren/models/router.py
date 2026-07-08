@@ -177,7 +177,7 @@ class ModelRouter:
                 self.breakers[model.model_id].record_failure()
                 if on_retry and i < len(candidates) - 1:
                     next_model = candidates[i + 1].model_id
-                    on_retry(0, 0.0, f"fallback ke model: {next_model}")
+                    on_retry(0, 0.0, f"Error: {e} | fallback ke model: {next_model}")
                 continue
         raise last_error or RuntimeError("all models failed")
 

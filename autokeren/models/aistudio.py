@@ -97,12 +97,26 @@ def fetch_aistudio_models(cfg) -> list[dict[str, Any]]:
     ]
 
 
+def resolve_aistudio_model_id(model_id: str) -> str:
+    """Map Cloudflare/platform aliases to valid Gemini model IDs in AI Studio."""
+    model_lower = model_id.lower()
+    if "gemini" in model_lower:
+        return model_id
+    # Default mappings
+    if "pro" in model_lower or "code" in model_lower:
+        return "gemini-1.5-pro"
+    return "gemini-1.5-flash"
+
+
 @dataclass
 class AIStudioModel:
     model_id: str
     api_key: str
     timeout: float = 120.0
     auth_mode: str = "aistudio"
+
+    def __post_init__(self):
+        self.model_id = resolve_aistudio_model_id(self.model_id)
 
     def complete(
         self,
@@ -169,9 +183,11 @@ class AIStudioModel:
                 })
             else:
                 gemini_role = "model" if role == "assistant" else "user"
+                # Gemini API tidak mengizinkan string kosong dalam part text
+                text_content = content if content else " "
                 contents.append({
                     "role": gemini_role,
-                    "parts": [{"text": content}]
+                    "parts": [{"text": text_content}]
                 })
 
         # Gabungkan role berurutan agar mematuhi aturan strict alternation (user -> model -> user)
