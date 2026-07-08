@@ -144,7 +144,7 @@ class AIStudioModel:
                         {
                             "functionResponse": {
                                 "name": msg.get("name") or "",
-                                "response": {"content": content}
+                                "response": {"result": content}
                             }
                         }
                     ]
