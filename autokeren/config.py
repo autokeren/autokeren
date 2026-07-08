@@ -15,9 +15,10 @@ def _config_path() -> Path:
 
 
 class AuthConfig(BaseModel):
-    mode: str = "platform"  # "platform" (default, pakai developers.autokeren.com) atau "direct" (pakai CF sendiri)
+    mode: str = "platform"  # "platform" (default), "direct" (CF sendiri), "antigravity" (Google Antigravity), atau "aistudio" (Google AI Studio)
     api_key: str = ""       # ak_live_... dari developers.autokeren.com
     base_url: str = "https://api.developers.autokeren.com"
+    gemini_api_key: str = "" # API Key untuk Google AI Studio
 
 
 class CloudflareConfig(BaseModel):
@@ -170,6 +171,7 @@ def load_config(path: Path | None = None) -> Config:
     cfg.cloudflare.account_id = cfg.cloudflare.account_id or os.environ.get("CLOUDFLARE_ACCOUNT_ID") or os.environ.get("CF_ACCOUNT_ID", "")
     cfg.cloudflare.api_token = cfg.cloudflare.api_token or os.environ.get("CLOUDFLARE_API_TOKEN") or os.environ.get("CLOUDFLARE_API_KEY") or os.environ.get("CF_API_TOKEN", "")
     cfg.auth.api_key = cfg.auth.api_key or os.environ.get("AUTOKEREN_API_KEY") or os.environ.get("AK_API_KEY", "")
+    cfg.auth.gemini_api_key = cfg.auth.gemini_api_key or os.environ.get("GEMINI_API_KEY") or ""
     return cfg
 
 

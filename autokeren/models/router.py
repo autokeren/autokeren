@@ -6,7 +6,7 @@ from typing import Any, Callable
 
 from autokeren.config import Config
 from autokeren.models.base import Message, ModelResponse, TokenUsage
-from autokeren.models.cloudflare import CloudflareAIError, CloudflareModel
+from autokeren.models.cloudflare import CloudflareModel
 from autokeren.models.retry import CircuitBreaker
 from autokeren.utils import redact
 
@@ -14,27 +14,52 @@ from autokeren.utils import redact
 @dataclass
 class ModelRouter:
     cfg: Config
-    models: list[CloudflareModel] = field(default_factory=list)
+    models: list[Any] = field(default_factory=list)
     breakers: dict[str, CircuitBreaker] = field(default_factory=dict)
     usage_total: TokenUsage = field(default_factory=TokenUsage)
 
     def __post_init__(self):
         if not self.models:
-            base = CloudflareModel.from_config(self.cfg)
-            primary = base
-            from autokeren.models.cloudflare import resolve_model_id
-            secondary_model_id = resolve_model_id(self.cfg.cloudflare.secondary_model, base.auth_mode)
-            secondary = CloudflareModel(
-                account_id=base.account_id,
-                api_token=base.api_token,
-                api_key=base.api_key,
-                model_id=secondary_model_id,
-                base_url=base.base_url,
-                timeout=base.timeout,
-                retry_policy=base.retry_policy,
-                auth_mode=base.auth_mode,
-            )
-            self.models = [primary, secondary]
+            if self.cfg.auth.mode == "antigravity":
+                from autokeren.models.antigravity import AntigravityModel
+                primary = AntigravityModel(
+                    model_id=self.cfg.cloudflare.primary_model,
+                    timeout=self.cfg.cloudflare.timeout,
+                )
+                secondary = AntigravityModel(
+                    model_id=self.cfg.cloudflare.secondary_model,
+                    timeout=self.cfg.cloudflare.timeout,
+                )
+                self.models = [primary, secondary]
+            elif self.cfg.auth.mode == "aistudio":
+                from autokeren.models.aistudio import AIStudioModel
+                primary = AIStudioModel(
+                    model_id=self.cfg.cloudflare.primary_model,
+                    api_key=self.cfg.auth.gemini_api_key,
+                    timeout=self.cfg.cloudflare.timeout,
+                )
+                secondary = AIStudioModel(
+                    model_id=self.cfg.cloudflare.secondary_model,
+                    api_key=self.cfg.auth.gemini_api_key,
+                    timeout=self.cfg.cloudflare.timeout,
+                )
+                self.models = [primary, secondary]
+            else:
+                base = CloudflareModel.from_config(self.cfg)
+                primary = base
+                from autokeren.models.cloudflare import resolve_model_id
+                secondary_model_id = resolve_model_id(self.cfg.cloudflare.secondary_model, base.auth_mode)
+                secondary = CloudflareModel(
+                    account_id=base.account_id,
+                    api_token=base.api_token,
+                    api_key=base.api_key,
+                    model_id=secondary_model_id,
+                    base_url=base.base_url,
+                    timeout=base.timeout,
+                    retry_policy=base.retry_policy,
+                    auth_mode=base.auth_mode,
+                )
+                self.models = [primary, secondary]
         for m in self.models:
             self.breakers.setdefault(m.model_id, CircuitBreaker(
                 failure_threshold=self.cfg.retry.circuit_failure_threshold,
@@ -63,24 +88,57 @@ class ModelRouter:
         if self.set_primary(model_id):
             return True
 
+        if self.cfg.auth.mode == "antigravity":
+            from autokeren.models.antigravity import AntigravityModel
+            new_agy_model = AntigravityModel(
+                model_id=model_id,
+                timeout=self.cfg.cloudflare.timeout,
+            )
+            self.models.insert(0, new_agy_model)
+            self.breakers.setdefault(model_id, CircuitBreaker(
+                failure_threshold=self.cfg.retry.circuit_failure_threshold,
+                open_seconds=float(self.cfg.retry.circuit_open_seconds),
+            ))
+            if len(self.models) > 5:
+                self.models = self.models[:5]
+            return True
+        elif self.cfg.auth.mode == "aistudio":
+            from autokeren.models.aistudio import AIStudioModel
+            new_ai_model = AIStudioModel(
+                model_id=model_id,
+                api_key=self.cfg.auth.gemini_api_key,
+                timeout=self.cfg.cloudflare.timeout,
+            )
+            self.models.insert(0, new_ai_model)
+            self.breakers.setdefault(model_id, CircuitBreaker(
+                failure_threshold=self.cfg.retry.circuit_failure_threshold,
+                open_seconds=float(self.cfg.retry.circuit_open_seconds),
+            ))
+            if len(self.models) > 5:
+                self.models = self.models[:5]
+            return True
+
         base = self.models[0]
-        from autokeren.models.cloudflare import resolve_model_id
-        resolved = resolve_model_id(model_id, base.auth_mode)
-        new_model = CloudflareModel(
-            account_id=base.account_id,
-            api_token=base.api_token,
-            api_key=base.api_key,
-            model_id=resolved,
-            base_url=base.base_url,
-            timeout=base.timeout,
-            retry_policy=base.retry_policy,
-            auth_mode=base.auth_mode,
-        )
-        self.models.insert(0, new_model)
-        self.breakers.setdefault(resolved, CircuitBreaker(
-            failure_threshold=self.cfg.retry.circuit_failure_threshold,
-            open_seconds=float(self.cfg.retry.circuit_open_seconds),
-        ))
+        # Pastikan base bertipe CloudflareModel untuk attribute access
+        from autokeren.models.cloudflare import CloudflareModel
+        if isinstance(base, CloudflareModel):
+            from autokeren.models.cloudflare import resolve_model_id
+            resolved = resolve_model_id(model_id, base.auth_mode)
+            cf_model = CloudflareModel(
+                account_id=base.account_id,
+                api_token=base.api_token,
+                api_key=base.api_key,
+                model_id=resolved,
+                base_url=base.base_url,
+                timeout=base.timeout,
+                retry_policy=base.retry_policy,
+                auth_mode=base.auth_mode,
+            )
+            self.models.insert(0, cf_model)
+            self.breakers.setdefault(resolved, CircuitBreaker(
+                failure_threshold=self.cfg.retry.circuit_failure_threshold,
+                open_seconds=float(self.cfg.retry.circuit_open_seconds),
+            ))
         if len(self.models) > 5:
             self.models = self.models[:5]
         return True
@@ -114,7 +172,7 @@ class ModelRouter:
                 self.usage_total = self.usage_total + resp.usage
                 resp.model_id = model.model_id
                 return resp
-            except CloudflareAIError as e:
+            except Exception as e:
                 last_error = e
                 self.breakers[model.model_id].record_failure()
                 if on_retry and i < len(candidates) - 1:

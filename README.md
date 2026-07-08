@@ -190,6 +190,14 @@ autokeren -m glm "refactor fungsi ini"
 autokeren -m kimi "tulis unit test untuk modul tools"
 ```
 
+### Mode Google AI Studio (Gemini API)
+
+autokeren mendukung pemanggilan model langsung ke Google AI Studio dengan API Key Anda sendiri. Cukup jalankan:
+```bash
+autokeren --aistudio
+```
+Jika API Key belum diset, Anda akan diminta memasukkannya secara interaktif dan akan disimpan secara otomatis ke `config.yaml`. Anda juga bisa menggunakan environment variable `GEMINI_API_KEY`.
+
 ### Deploy aplikasi
 
 ```bash
@@ -322,8 +330,12 @@ autokeren membawa 28 tools bawaan dengan permission check dan schema function-ca
 Konfigurasi disimpan di `~/.config/autokeren/config.yaml`.
 
 ```yaml
-cloudflare:
+auth:
+  mode: "platform"       # "platform" (default), "direct", atau "aistudio"
   api_key: ""            # API key dari developers.autokeren.com
+  gemini_api_key: ""     # API Key Google AI Studio (hanya untuk mode "aistudio")
+
+cloudflare:
   primary_model: "kimi-code"
   secondary_model: "glm-5.2"
   max_tokens: 16384
@@ -401,6 +413,7 @@ mcp_servers:
 | Variable | Deskripsi |
 |---|---|
 | `AUTOKEREN_API_KEY` | API key dari developers.autokeren.com (override config) |
+| `GEMINI_API_KEY` | API key Google AI Studio (Gemini API) |
 | `AUTOKEREN_CONFIG_DIR` | Direktori konfigurasi custom (default `~/.config/autokeren`) |
 
 ## Update

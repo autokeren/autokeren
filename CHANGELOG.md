@@ -4,6 +4,12 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.7] - 2026-07-08
+
+### Added
+- **Google AI Studio Integration (`--aistudio`):** Dukungan native untuk model-model Google AI Studio (Gemini API) menggunakan API Key pribadi. Dilengkapi dengan auto-fetch model list langsung dari endpoint Google, streaming SSE, parameter generationConfig, dan penanganan format tools/function calling secara otomatis.
+- **Auto-setup API Key:** Pengecekan otomatis untuk API Key Google AI Studio lewat env var `GEMINI_API_KEY` dan prompt interaktif penyimpanan key ke `config.yaml`.
+
 ## [0.8.6] - 2026-07-08
 
 ### Fixed

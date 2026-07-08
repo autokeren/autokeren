@@ -131,9 +131,10 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
         console.print("[yellow]Warning: API key belum diisi. Jalankan autokeren --login.[/yellow]")
     elif cfg.auth.mode == "direct" and (not cfg.cloudflare.account_id or not cfg.cloudflare.api_token):
         console.print("[yellow]Warning: Cloudflare account_id/api_token belum diisi. Jalankan autokeren --init.[/yellow]")
+    elif cfg.auth.mode == "aistudio" and not cfg.auth.gemini_api_key:
+        console.print("[yellow]Warning: Gemini API key belum diisi. Set GEMINI_API_KEY env var atau update config.yaml.[/yellow]")
     else:
-        mode_label = "platform" if cfg.auth.mode == "platform" else "direct"
-        console.print(f"[dim]Auth: {mode_label}[/dim]")
+        console.print(f"[dim]Auth: {cfg.auth.mode}[/dim]")
     if agent.memory.exists():
         console.print(f"[dim]Memory: {agent.memory.line_count()} baris[/dim]")
     sessions = agent.sessions.list()
@@ -169,18 +170,28 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
         if user_input == "/model" or user_input.startswith("/model "):
             arg = user_input[6:].strip()
             if arg:
-                from autokeren.models.cloudflare import resolve_model_id
-                resolved = resolve_model_id(arg, agent.router.models[0].auth_mode)
+                if cfg.auth.mode in ("antigravity", "aistudio"):
+                    resolved = arg
+                else:
+                    from autokeren.models.cloudflare import resolve_model_id
+                    resolved = resolve_model_id(arg, getattr(agent.router.models[0], "auth_mode", "direct"))
                 if agent.router.switch_model(resolved):
                     ui.set_model_name(agent.router.current_model_id())
                     console.print(f"[green]Model aktif: {arg}[/green]")
                 else:
                     console.print(f"[red]Model '{arg}' tidak ditemukan.[/red]")
             else:
-                from autokeren.models.cloudflare import fetch_available_models
+                if cfg.auth.mode == "antigravity":
+                    from autokeren.models.antigravity import fetch_antigravity_models
+                    all_models = fetch_antigravity_models()
+                elif cfg.auth.mode == "aistudio":
+                    from autokeren.models.aistudio import fetch_aistudio_models
+                    all_models = fetch_aistudio_models(cfg)
+                else:
+                    from autokeren.models.cloudflare import fetch_available_models
+                    all_models = fetch_available_models(cfg)
+                
                 from autokeren.selector import select_option
-
-                all_models = fetch_available_models(cfg)
                 current = agent.router.current_model_id()
                 for m in all_models:
                     m["active"] = m["id"] == current
@@ -188,8 +199,11 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
                 idx = select_option(all_models, title="Pilih Model", console=console)
                 if idx is not None:
                     chosen = all_models[idx]["id"]
-                    from autokeren.models.cloudflare import resolve_model_id
-                    resolved = resolve_model_id(chosen, agent.router.models[0].auth_mode)
+                    if cfg.auth.mode in ("antigravity", "aistudio"):
+                        resolved = chosen
+                    else:
+                        from autokeren.models.cloudflare import resolve_model_id
+                        resolved = resolve_model_id(chosen, getattr(agent.router.models[0], "auth_mode", "direct"))
                     agent.router.switch_model(resolved)
                     console.print(f"[green]Model aktif: {all_models[idx]['name']} ({chosen})[/green]")
                 else:
@@ -599,6 +613,8 @@ def main() -> int:
     parser.add_argument("--project-root", default=".", help="Project root path")
     parser.add_argument("--workspace", "-w", dest="project_root", help="Alias for --project-root")
     parser.add_argument("--model", "-m", help="Override primary model (alias atau @cf/... ID)")
+    parser.add_argument("--agy", action="store_true", help="Otomatis gunakan Google Antigravity backend")
+    parser.add_argument("--aistudio", action="store_true", help="Otomatis gunakan Google AI Studio backend")
     parser.add_argument("--non-interactive", action="store_true", help="Run single task, no REPL (for ghost agent)")
     parser.add_argument("--task", help="Task untuk non-interactive mode")
     parser.add_argument("prompt", nargs="?", help="Single prompt to run non-interactively")
@@ -654,14 +670,38 @@ def main() -> int:
             return 1
 
     cfg = load_config(Path(args.config)) if args.config else ensure_config()
+    if args.agy:
+        from autokeren.models.google_auth import verify_or_login
+        if not verify_or_login(console):
+            return 1
+        cfg.auth.mode = "antigravity"
+        if not args.model:
+            cfg.cloudflare.primary_model = "Gemini 3.5 Flash (Low)"
+    elif args.aistudio:
+        if not cfg.auth.gemini_api_key:
+            console.print("\n[bold yellow]🔑 SETUP GOOGLE AI STUDIO (GEMINI API)[/bold yellow]")
+            console.print("API Key tidak ditemukan di config atau env var GEMINI_API_KEY.")
+            key = Prompt.ask("Masukkan API Key Google AI Studio Anda").strip()
+            if not key:
+                console.print("[red]API Key tidak boleh kosong.[/red]")
+                return 1
+            cfg.auth.gemini_api_key = key
+            save_config(cfg)
+            console.print("[green]✓ API Key disimpan ke config.yaml![/green]")
+        cfg.auth.mode = "aistudio"
+        if not args.model:
+            cfg.cloudflare.primary_model = "gemini-1.5-flash"
     if args.plan:
         cfg.autokeren.plan_mode = True
     if args.model:
-        from autokeren.models.cloudflare import resolve_model_id
-        if cfg.auth.mode == "platform":
-            cfg.cloudflare.primary_model = resolve_model_id(args.model, "platform")
-        else:
+        if cfg.auth.mode in ("antigravity", "aistudio"):
             cfg.cloudflare.primary_model = args.model
+        else:
+            from autokeren.models.cloudflare import resolve_model_id
+            if cfg.auth.mode == "platform":
+                cfg.cloudflare.primary_model = resolve_model_id(args.model, "platform")
+            else:
+                cfg.cloudflare.primary_model = args.model
 
     project_root = Path(args.project_root).expanduser().resolve()
     memory = MemoryManager(str(project_root))

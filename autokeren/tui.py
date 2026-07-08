@@ -1255,7 +1255,7 @@ class AutokerenTUI(App):
         self.history_idx: int = -1
         self._history_draft: str = ""  # simpan draft saat navigasi history
         self._agent_running: bool = False  # guard: prevent double submit (Windows fix)
-        self.debug_mode: bool = False  # log debugging verbose
+        self.debug_mode: bool = True  # log debugging verbose (diaktifkan default untuk tracing e2e)
         self._filetree_visible: bool = False  # F7 toggle file explorer
 
         # Multi-agent project manager
@@ -1701,14 +1701,24 @@ class AutokerenTUI(App):
         self.append_chat_message("system", help_text)
 
     async def action_model(self) -> None:
-        from autokeren.models.cloudflare import fetch_available_models
-        all_models = fetch_available_models(self.cfg)
+        if self.cfg.auth.mode == "antigravity":
+            from autokeren.models.antigravity import fetch_antigravity_models
+            all_models = fetch_antigravity_models()
+        elif self.cfg.auth.mode == "aistudio":
+            from autokeren.models.aistudio import fetch_aistudio_models
+            all_models = fetch_aistudio_models(self.cfg)
+        else:
+            from autokeren.models.cloudflare import fetch_available_models
+            all_models = fetch_available_models(self.cfg)
         current_model = self.agent.router.current_model_id()
 
         def on_select(chosen_id: str | None) -> None:
             if chosen_id:
-                from autokeren.models.cloudflare import resolve_model_id
-                resolved = resolve_model_id(chosen_id, self.agent.router.models[0].auth_mode)
+                if self.cfg.auth.mode in ("antigravity", "aistudio"):
+                    resolved = chosen_id
+                else:
+                    from autokeren.models.cloudflare import resolve_model_id
+                    resolved = resolve_model_id(chosen_id, getattr(self.agent.router.models[0], "auth_mode", "direct"))
                 if self.agent.router.switch_model(resolved):
                     self._current_model_name = self.agent.router.current_model_id()
                     self.append_chat_message("system", self.t("model_changed", name=chosen_id))
@@ -1821,11 +1831,14 @@ class AutokerenTUI(App):
             if not arg:
                 await self.action_model()
             else:
-                from autokeren.models.cloudflare import resolve_model_id
-                resolved = resolve_model_id(arg, self.agent.router.models[0].auth_mode)
+                if self.cfg.auth.mode in ("antigravity", "aistudio"):
+                    resolved = arg
+                else:
+                    from autokeren.models.cloudflare import resolve_model_id
+                    resolved = resolve_model_id(arg, getattr(self.agent.router.models[0], "auth_mode", "direct"))
                 if self.agent.router.switch_model(resolved):
                     self._current_model_name = self.agent.router.current_model_id()
-                    self.append_chat_message("system", self.t("allowed_tool", name=arg))
+                    self.append_chat_message("system", self.t("model_changed", name=arg))
                     self.update_status()
                 else:
                     self.append_chat_message("system", f"[red]Model '{arg}' not found.[/red]")
