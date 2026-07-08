@@ -690,7 +690,7 @@ def main() -> int:
             console.print("[green]✓ API Key disimpan ke config.yaml![/green]")
         cfg.auth.mode = "aistudio"
         if not args.model:
-            cfg.cloudflare.primary_model = "gemini-1.5-flash"
+            cfg.cloudflare.primary_model = "gemini-3.5-flash"
     if args.plan:
         cfg.autokeren.plan_mode = True
     if args.model:

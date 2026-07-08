@@ -26,6 +26,7 @@ class ToolCall:
     id: str
     name: str
     arguments: dict[str, Any]
+    thought: str | None = None
 
 
 @dataclass

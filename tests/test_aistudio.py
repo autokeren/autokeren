@@ -14,8 +14,8 @@ class TestAIStudioIntegration(unittest.TestCase):
         self.cfg = Config()
         self.cfg.auth.mode = "aistudio"
         self.cfg.auth.gemini_api_key = "mock_key_123"
-        self.cfg.cloudflare.primary_model = "gemini-1.5-flash"
-        self.cfg.cloudflare.secondary_model = "gemini-1.5-pro"
+        self.cfg.cloudflare.primary_model = "gemini-3.5-flash"
+        self.cfg.cloudflare.secondary_model = "gemini-3.5-pro"
 
     @patch("httpx.get")
     def test_fetch_aistudio_models_success(self, mock_get):
@@ -25,14 +25,14 @@ class TestAIStudioIntegration(unittest.TestCase):
         mock_response.json.return_value = {
             "models": [
                 {
-                    "name": "models/gemini-1.5-flash",
+                    "name": "models/gemini-3.5-flash",
                     "displayName": "Gemini 1.5 Flash",
                     "description": "Flash model",
                     "inputTokenLimit": 1048576,
                     "supportedGenerationMethods": ["generateContent", "countTokens"]
                 },
                 {
-                    "name": "models/gemini-1.5-pro",
+                    "name": "models/gemini-3.5-pro",
                     "displayName": "Gemini 1.5 Pro",
                     "description": "Pro model",
                     "inputTokenLimit": 2097152,
@@ -51,10 +51,10 @@ class TestAIStudioIntegration(unittest.TestCase):
         
         # Should filter out embedding-001 since it doesn't support generateContent
         self.assertEqual(len(models), 2)
-        self.assertEqual(models[0]["id"], "gemini-1.5-flash")
+        self.assertEqual(models[0]["id"], "gemini-3.5-flash")
         self.assertEqual(models[0]["name"], "Gemini 1.5 Flash")
         self.assertEqual(models[0]["provider"], "Google AI Studio")
-        self.assertEqual(models[1]["id"], "gemini-1.5-pro")
+        self.assertEqual(models[1]["id"], "gemini-3.5-pro")
 
     @patch("httpx.get")
     def test_fetch_aistudio_models_failure_fallback(self, mock_get):
@@ -64,7 +64,7 @@ class TestAIStudioIntegration(unittest.TestCase):
         
         # Should return fallback models
         self.assertGreater(len(models), 0)
-        self.assertEqual(models[0]["id"], "gemini-1.5-flash")
+        self.assertEqual(models[0]["id"], "gemini-3.5-flash")
         self.assertEqual(models[0]["provider"], "Google AI Studio")
 
     @patch("httpx.post")
@@ -135,20 +135,20 @@ class TestAIStudioIntegration(unittest.TestCase):
         router = ModelRouter(cfg=self.cfg)
         self.assertEqual(len(router.models), 2)
         # Resolved model IDs
-        self.assertEqual(router.models[0].model_id, "gemini-1.5-flash")
-        self.assertEqual(router.models[1].model_id, "gemini-1.5-pro")
+        self.assertEqual(router.models[0].model_id, "gemini-3.5-flash")
+        self.assertEqual(router.models[1].model_id, "gemini-3.5-pro")
         self.assertEqual(router.models[0].__class__.__name__, "AIStudioModel")
 
     def test_model_id_resolution(self):
         # Should resolve Cloudflare model IDs to Gemini model IDs
         model1 = AIStudioModel(model_id="kimi-code", api_key="test_key")
-        self.assertEqual(model1.model_id, "gemini-1.5-pro")
+        self.assertEqual(model1.model_id, "gemini-3.5-pro")
 
         model2 = AIStudioModel(model_id="kimi-2.6", api_key="test_key")
-        self.assertEqual(model2.model_id, "gemini-1.5-flash")
+        self.assertEqual(model2.model_id, "gemini-3.5-flash")
 
-        model3 = AIStudioModel(model_id="gemini-1.5-flash", api_key="test_key")
-        self.assertEqual(model3.model_id, "gemini-1.5-flash")
+        model3 = AIStudioModel(model_id="gemini-3.5-flash", api_key="test_key")
+        self.assertEqual(model3.model_id, "gemini-3.5-flash")
 
 
 if __name__ == "__main__":
