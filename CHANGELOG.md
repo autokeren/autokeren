@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.6] - 2026-07-08
+
+### Fixed
+- **CF error 3040 (max output exceeded):** `max_tokens` 16384→8192. CF Workers AI models max ~8K output tokens. BE clamp juga 8192. Strategi tulis Worker bertahap (write + patch) makin penting.
+
 ## [0.8.5] - 2026-07-08
 
 ### Fixed
