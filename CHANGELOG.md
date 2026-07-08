@@ -4,6 +4,15 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.8] - 2026-07-08
+
+### Fixed
+- **Gemini 3.5 `thought_signature` error:** Saat tool result dikirim ulang ke history, Gemini 3.5 menolak native `functionCall` karena missing `thought_signature`. Solusi: flatten riwayat tool calls menjadi plain text (`[TOOL_CALL name=...]` / `[TOOL_RESULT name=...]`) sebelum dikirim ke API. Native function calling tetap dipakai pada turn saat model merespons. Model Gemini 1.5 tidak terkena masalah ini dan tetap native.
+- **Default model AI Studio:** `gemini-1.5-flash` → `gemini-3.5-flash` agar sejalan dengan model terbaru yang didukung AI Studio integration.
+
+### Changed
+- Update `tests/test_aistudio.py` ekspektasi model ID ke `gemini-3.5-flash`/`gemini-3.5-pro`.
+
 ## [0.8.7] - 2026-07-08
 
 ### Added

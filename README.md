@@ -228,6 +228,13 @@ Agent akan otomatis create project, tulis kode, dan deploy ke Cloudflare Workers
 | `gemma-4` | Google Gemma 4 |
 | `nemotron` | NVIDIA Nemotron |
 
+Jalur tambahan:
+
+| Alias | Model |
+|---|---|
+| `gemini-3.5-flash` | Google Gemini 3.5 Flash via AI Studio (`--aistudio`) |
+| `gemini-3.5-pro` | Google Gemini 3.5 Pro via AI Studio (`--aistudio`) |
+
 Pilih dengan `-m <alias>`. Default: `kimi-code` dengan fallback ke `glm-5.2`.
 
 ## Commands & Shortcuts
