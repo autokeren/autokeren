@@ -17,11 +17,11 @@ from rich.markdown import Markdown
 from rich.text import Text
 
 try:
-    import pyperclip
+    import pyperclip  # type: ignore
 
     _HAS_PYPERCLIP = True
 except Exception:
-    pyperclip = None  # type: ignore
+    pyperclip = None
     _HAS_PYPERCLIP = False
 
 from autokeren.agent import Agent
@@ -1154,10 +1154,13 @@ class AutokerenTUI(App):
         padding-bottom: 2;
     }
     #input-pane {
-        height: 5;
+        height: 3;
+        min-height: 3;
+        max-height: 10;
         width: 100%;
         border: round #555555;
         margin: 0;
+        padding: 0 1;
     }
     MessageWidget {
         height: auto;
@@ -1355,6 +1358,38 @@ class AutokerenTUI(App):
                 input_pane.text = self.input_history[-(self.history_idx + 1)]
             input_pane.cursor_location = (input_pane.document.line_count - 1, 0)
             event.prevent_default()
+        # Enter biasa: Kirim pesan. Shift+Enter: Sisipkan baris baru (default behavior TextArea).
+        elif event.key == "enter":
+            event.prevent_default()
+            event.stop()
+            val = input_pane.text.strip()
+            if val:
+                input_pane.text = ""
+                self.run_worker(self.action_submit_text(val))
+
+    async def action_submit_text(self, val: str) -> None:
+        """Submit text dari TextArea ke Agent."""
+        try:
+            input_pane = self.query_one("#input-pane", TextArea)
+        except Exception:
+            return
+        if self._agent_running:
+            return
+
+        if val.startswith("/"):
+            self.run_worker(self.handle_slash_command(val))
+            self._focus_input()
+            return
+
+        self._agent_running = True
+        self.append_chat_message("user", val)
+        if not self.input_history or self.input_history[-1] != val:
+            self.input_history.append(val)
+        self.history_idx = -1
+        self._history_draft = ""
+        input_pane.disabled = True
+
+        self.run_worker(lambda: self._run_agent_flow(val), thread=True)
 
     async def action_submit_input(self) -> None:
         """Submit text dari TextArea. Dipicu oleh Ctrl+Enter."""
@@ -1365,26 +1400,8 @@ class AutokerenTUI(App):
         val = input_pane.text.strip()
         if not val:
             return
-        if self._agent_running:
-            return
-
-        if val.startswith("/"):
-            input_pane.text = ""
-            await self.handle_slash_command(val)
-            self._focus_input()
-            return
-
         input_pane.text = ""
-        self._agent_running = True
-
-        self.append_chat_message("user", val)
-        if not self.input_history or self.input_history[-1] != val:
-            self.input_history.append(val)
-        self.history_idx = -1
-        self._history_draft = ""
-        input_pane.disabled = True
-
-        self.run_worker(lambda: self._run_agent_flow(val), thread=True)
+        await self.action_submit_text(val)
 
     def on_mount(self) -> None:
         # Bind Agent callbacks ke TUI

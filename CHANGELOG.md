@@ -4,6 +4,12 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2] - 2026-07-09
+
+### Fixed
+- **Enter key submit fix on other systems:** Ubah tombol default kirim pesan di `TextArea` menggunakan **Enter** biasa (dan **Shift+Enter** / **Ctrl+Enter** untuk new line). Memperbaiki bugs di komputer lain yang sebelumnya bermasalah/kembali menjadi newline default.
+- Memaksa pengosongan teks input area instan sinkron untuk menghindari race conditions.
+
 ## [0.9.1] - 2026-07-09
 
 ### Fixed
