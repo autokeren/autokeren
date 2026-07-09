@@ -4,20 +4,25 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.10] - 2026-07-08
-
-### Fixed
-- **`/copy` dan F4 di VPS/SSH:** Clipboard tidak tersedia di headless VPS (no X11/Wayland). Sekarang jika clipboard gagal, teks otomatis disimpan ke file temp (`/tmp/autokeren_copy_*.txt`) dan path ditampilkan. User bisa `cat <path>` untuk copy manual dari SSH client.
-- **`_copy_text()` return bool:** Sebelumnya raise exception, sekarang return `True`/`False` supaya caller bisa handle fallback dengan bersih.
-
-## [0.8.9] - 2026-07-08
+## [0.9.0] - 2026-07-09
 
 ### Added
-- **Copy to clipboard (`/copy` command):** Slash command baru `/copy [last|N]` untuk menyalin pesan ke clipboard sistem. `/copy last` menyalin pesan terakhir, `/copy 3` menyalin pesan indeks ke-3. Fallback: jika clipboard utility tidak tersedia, teks ditampilkan di chat untuk copy manual.
-- **Clipboard dependency:** Tambah `pyperclip>=1.8.0` ke dependencies untuk cross-platform clipboard support (Linux xclip/xsel/wl-copy, macOS pbcopy, Windows clip.exe).
+- **Multi-line input:** Input box sekarang menggunakan `TextArea` (bukan `Input` single-line). Mendukung multi-line, paste teks panjang, dan unlimited karakter.
+  - `Enter` = newline (baru)
+  - `Ctrl+Enter` = kirim pesan
+  - `Alt+Up` / `Alt+Down` = navigasi history input
+- **`/copy [last|N]` command:** Salin pesan ke clipboard. Fallback ke file temp di VPS/SSH.
+- **`pyperclip` dependency:** Cross-platform clipboard support.
 
 ### Fixed
-- **F4 (Salin Respon) broken:** Method `copy_to_clipboard` tidak ada implementasinya. Sekarang menggunakan `_copy_text()` dengan pyperclip + subprocess fallback.
+- **F4 (Salin Respon) broken:** Method `copy_to_clipboard` tidak ada implementasinya. Sekarang pakai `_copy_text()` dengan fallback chain: pyperclip → xclip → xsel → wl-copy → pbcopy → save to temp file.
+- **Gemini 3.5 `thought_signature` error:** Flatten tool call history ke plain text untuk model thinking (Gemini 3.5/3.0). Native function calling tetap dipakai pada turn saat model merespons.
+- **Windows PermissionError di genome scanner:** `iterdir()` pada junction/symlink Windows (misal `Application Data`) menyebabkan `PermissionError`. Sekarang semua pemanggilan `iterdir()` di scanner dibungkus try/except `(PermissionError, OSError)`.
+
+### Changed
+- Default model AI Studio: `gemini-1.5-flash` → `gemini-3.5-flash`.
+- History navigation: `Up/Down` → `Alt+Up/Alt+Down` (karena Up/Down sekarang untuk cursor di TextArea).
+- Input suggester (autocomplete slash command) dihapus karena TextArea tidak mendukung `SuggestFromList`.
 
 ## [0.8.8] - 2026-07-08
 

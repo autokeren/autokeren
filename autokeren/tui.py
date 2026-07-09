@@ -9,7 +9,7 @@ from typing import Any
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalScroll, Container
-from textual.widgets import Static, Input, OptionList, DirectoryTree
+from textual.widgets import Static, Input, OptionList, DirectoryTree, TextArea
 from textual.screen import ModalScreen
 from textual.binding import Binding
 from textual.events import Resize
@@ -1154,7 +1154,7 @@ class AutokerenTUI(App):
         padding-bottom: 2;
     }
     #input-pane {
-        height: 3;
+        height: 5;
         width: 100%;
         border: round #555555;
         margin: 0;
@@ -1233,6 +1233,7 @@ class AutokerenTUI(App):
         Binding("f6", "lang", "Bahasa / Lang"),
         Binding("f7", "toggle_filetree", "File Explorer"),
         Binding("ctrl+c", "cancel", "Batal / Stop"),
+        Binding("ctrl+enter", "submit_input", "Kirim Pesan"),
         Binding("ctrl+q", "quit", "Keluar"),
     ]
 
@@ -1302,15 +1303,6 @@ class AutokerenTUI(App):
         return "en"
 
     def compose(self) -> ComposeResult:
-        from textual.suggester import SuggestFromList
-        commands = [
-            "/help", "/reset", "/compact", "/permissions", "/memory",
-            "/model", "/lang", "/export", "/mcp", "/save", "/resume", "/sessions", "/q", "/quit",
-            "/deploy", "/spec", "/ghost", "/research", "/tdd", "/debug", "/genome", "/rewind", "/review", "/loop", "/security",
-            "/project", "/tdd", "/rewind", "/genome", "/loop", "/review", "/security", "/spec", "/ghost", "/research",
-            "/copy",
-        ]
-        suggester = SuggestFromList(commands, case_sensitive=False)
         yield Horizontal(
             Container(
                 StatusWidget(self.agent, self.cfg),
@@ -1322,45 +1314,77 @@ class AutokerenTUI(App):
             ),
             Container(
                 VerticalScroll(ChatArea(id="chat-area"), id="chat-pane"),
-                Input(id="input-pane", placeholder=self.t("input_placeholder"), suggester=suggester),
+                TextArea(id="input-pane", soft_wrap=True, show_line_numbers=False),
                 id="right-layout"
             )
         )
 
     def on_key(self, event: object) -> None:
-        """Handle navigasi history input dengan tombol Up/Down."""
+        """Handle navigasi history input dengan Alt+Up/Alt+Down."""
         from textual.events import Key
         if not isinstance(event, Key):
             return
         try:
-            input_pane = self.query_one("#input-pane", Input)
+            input_pane = self.query_one("#input-pane", TextArea)
         except Exception:
             return
         if input_pane.disabled:
             return
         if not input_pane.has_focus:
             return
-        if event.key == "up":
+        # Alt+Up: history sebelumnya
+        if event.key == "alt+up":
             if not self.input_history:
                 return
             if self.history_idx == -1:
-                self._history_draft = input_pane.value
+                self._history_draft = input_pane.text
             next_idx = min(self.history_idx + 1, len(self.input_history) - 1)
             if next_idx != self.history_idx:
                 self.history_idx = next_idx
-                input_pane.value = self.input_history[-(self.history_idx + 1)]
-                input_pane.cursor_position = len(input_pane.value)
+                input_pane.text = self.input_history[-(self.history_idx + 1)]
+                input_pane.cursor_location = (input_pane.document.line_count - 1, 0)
             event.prevent_default()
-        elif event.key == "down":
+        # Alt+Down: history berikutnya
+        elif event.key == "alt+down":
             if self.history_idx == -1:
                 return
             self.history_idx -= 1
             if self.history_idx == -1:
-                input_pane.value = self._history_draft
+                input_pane.text = self._history_draft
             else:
-                input_pane.value = self.input_history[-(self.history_idx + 1)]
-            input_pane.cursor_position = len(input_pane.value)
+                input_pane.text = self.input_history[-(self.history_idx + 1)]
+            input_pane.cursor_location = (input_pane.document.line_count - 1, 0)
             event.prevent_default()
+
+    async def action_submit_input(self) -> None:
+        """Submit text dari TextArea. Dipicu oleh Ctrl+Enter."""
+        try:
+            input_pane = self.query_one("#input-pane", TextArea)
+        except Exception:
+            return
+        val = input_pane.text.strip()
+        if not val:
+            return
+        if self._agent_running:
+            return
+
+        if val.startswith("/"):
+            input_pane.text = ""
+            await self.handle_slash_command(val)
+            self._focus_input()
+            return
+
+        input_pane.text = ""
+        self._agent_running = True
+
+        self.append_chat_message("user", val)
+        if not self.input_history or self.input_history[-1] != val:
+            self.input_history.append(val)
+        self.history_idx = -1
+        self._history_draft = ""
+        input_pane.disabled = True
+
+        self.run_worker(lambda: self._run_agent_flow(val), thread=True)
 
     def on_mount(self) -> None:
         # Bind Agent callbacks ke TUI
@@ -1582,7 +1606,7 @@ class AutokerenTUI(App):
     def _focus_input(self) -> None:
         """Kembalikan fokus kursor ke input box."""
         try:
-            self.query_one("#input-pane", Input).focus()
+            self.query_one("#input-pane", TextArea).focus()
         except Exception:
             pass
 
@@ -1592,36 +1616,6 @@ class AutokerenTUI(App):
     # ------------------------------------------------------------------ #
     # Input Submission Handler
     # ------------------------------------------------------------------ #
-
-    async def on_input_submitted(self, event: Input.Submitted) -> None:
-        val = event.value.strip()
-        if not val:
-            return
-        if self._agent_running:
-            return
-
-        input_pane = self.query_one("#input-pane", Input)
-
-        if val.startswith("/"):
-            input_pane.value = ""
-            await self.handle_slash_command(val)
-            self._focus_input()
-            return
-
-        input_pane.value = ""
-        self._agent_running = True
-
-        self.append_chat_message("user", val)
-        # Simpan ke history input (hindari duplikat berturutan)
-        if not self.input_history or self.input_history[-1] != val:
-            self.input_history.append(val)
-        self.history_idx = -1
-        self._history_draft = ""
-        input_pane.disabled = True
-        input_pane.placeholder = self.t("thinking_placeholder")
-        
-        # Jalankan agent loop di background worker thread
-        self.run_worker(lambda: self._run_agent_flow(val), thread=True)
 
     def _run_agent_flow(self, user_input: str) -> None:
         try:
@@ -1648,9 +1642,9 @@ class AutokerenTUI(App):
         finally:
             def _reset_input():
                 self._agent_running = False
-                input_pane = self.query_one("#input-pane", Input)
+                input_pane = self.query_one("#input-pane", TextArea)
                 input_pane.disabled = False
-                input_pane.placeholder = self.t("input_placeholder")
+                
                 input_pane.focus()
                 self.update_status()
             self.call_from_thread(_reset_input)
@@ -1753,7 +1747,7 @@ class AutokerenTUI(App):
                 self.append_chat_message("system", f"Language changed to: [bold]{LANGUAGES[chosen_code]}[/bold]")
                 
                 # Update placeholder input
-                self.query_one("#input-pane", Input).placeholder = self.t("input_placeholder")
+                self.query_one("#input-pane", TextArea).placeholder = self.t("input_placeholder")
                 self.update_status()
             self._focus_input()
 
@@ -1765,9 +1759,9 @@ class AutokerenTUI(App):
         self._agent_running = False
         self.append_chat_message("system", self.t("interrupted_msg"))
         try:
-            input_pane = self.query_one("#input-pane", Input)
+            input_pane = self.query_one("#input-pane", TextArea)
             input_pane.disabled = False
-            input_pane.placeholder = self.t("input_placeholder")
+            
             input_pane.focus()
         except Exception:
             pass
@@ -1935,7 +1929,7 @@ class AutokerenTUI(App):
                     self.append_chat_message("system", f"Language changed to: [bold]{LANGUAGES[code]}[/bold]")
                     
                     # Update placeholder input
-                    self.query_one("#input-pane", Input).placeholder = self.t("input_placeholder")
+                    self.query_one("#input-pane", TextArea).placeholder = self.t("input_placeholder")
                     self.update_status()
                 else:
                     self.append_chat_message("system", f"[red]Language code '{arg}' not supported. Available: {', '.join(LANGUAGES.keys())}[/red]")
@@ -2069,7 +2063,7 @@ class AutokerenTUI(App):
             else:
                 self.append_chat_message("user", f"/spec {arg}")
                 self.append_chat_message("system", "[dim]📋 Menyiapkan interview…[/dim]")
-                input_pane = self.query_one("#input-pane", Input)
+                input_pane = self.query_one("#input-pane", TextArea)
                 input_pane.disabled = True
                 input_pane.placeholder = "📋 menyiapkan interview…"
                 self.run_worker(lambda: self._run_spec_interview(arg), thread=True)
@@ -2134,7 +2128,7 @@ class AutokerenTUI(App):
                     query = arg[4:]
                 self.append_chat_message("user", f"/research {arg}")
                 self.append_chat_message("system", f"[dim]🔍 Researching: {query}…[/dim]")
-                input_pane = self.query_one("#input-pane", Input)
+                input_pane = self.query_one("#input-pane", TextArea)
                 input_pane.disabled = True
                 input_pane.placeholder = "🔍 researching…"
                 self.run_worker(lambda: self._run_research(query, sources), thread=True)
@@ -2158,7 +2152,7 @@ class AutokerenTUI(App):
                     "JANGAN inline script ke deploy_project. Tulis ke file dulu."
                 )
                 self.append_chat_message("user", f"/deploy {arg}")
-                input_pane = self.query_one("#input-pane", Input)
+                input_pane = self.query_one("#input-pane", TextArea)
                 input_pane.disabled = True
                 self.run_worker(lambda: self._run_deploy(deploy_prompt), thread=True)
         else:
@@ -2336,7 +2330,7 @@ class AutokerenTUI(App):
 
         # Disable input field selama proses TDD berjalan
         def _disable():
-            input_pane = self.query_one("#input-pane", Input)
+            input_pane = self.query_one("#input-pane", TextArea)
             input_pane.disabled = True
             input_pane.placeholder = "🔴 TDD loop sedang berjalan..."
         _disable()
@@ -2365,9 +2359,9 @@ class AutokerenTUI(App):
         finally:
             # Aktifkan kembali input field
             def _enable():
-                input_pane = self.query_one("#input-pane", Input)
+                input_pane = self.query_one("#input-pane", TextArea)
                 input_pane.disabled = False
-                input_pane.placeholder = self.t("input_placeholder")
+                
                 input_pane.focus()
             _enable()
 
@@ -2392,9 +2386,9 @@ class AutokerenTUI(App):
             self.call_from_thread(self.append_chat_message, "system", f"[red]Research error:[/red] {e}")
         finally:
             def _reset():
-                input_pane = self.query_one("#input-pane", Input)
+                input_pane = self.query_one("#input-pane", TextArea)
                 input_pane.disabled = False
-                input_pane.placeholder = self.t("input_placeholder")
+                
                 input_pane.focus()
             self.call_from_thread(_reset)
 
@@ -2419,9 +2413,9 @@ class AutokerenTUI(App):
             self.call_from_thread(self.append_chat_message, "system", f"[red]Spec error:[/red] {e}")
         finally:
             def _reset():
-                input_pane = self.query_one("#input-pane", Input)
+                input_pane = self.query_one("#input-pane", TextArea)
                 input_pane.disabled = False
-                input_pane.placeholder = self.t("input_placeholder")
+                
                 input_pane.focus()
             self.call_from_thread(_reset)
 
@@ -2435,9 +2429,9 @@ class AutokerenTUI(App):
             self.call_from_thread(self.append_chat_message, "system", f"[red]Deploy error:[/red] {e}")
         finally:
             def _reset():
-                input_pane = self.query_one("#input-pane", Input)
+                input_pane = self.query_one("#input-pane", TextArea)
                 input_pane.disabled = False
-                input_pane.placeholder = self.t("input_placeholder")
+                
                 input_pane.focus()
             self.call_from_thread(_reset)
 

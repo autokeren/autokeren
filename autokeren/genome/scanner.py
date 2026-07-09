@@ -42,9 +42,13 @@ class GenomeScanner:
         for p in sorted(self._walk_skipping_ignored(self.root)):
             if not p.is_dir():
                 continue
+            try:
+                entries = list(p.iterdir())
+            except (PermissionError, OSError):
+                continue
             rel = p.relative_to(self.root)
             has_init = any((p / init).exists() for init in _INIT_FILES)
-            has_code = any(p.suffix in _CODE_EXTENSIONS for p in p.iterdir() if p.is_file())
+            has_code = any(e.suffix in _CODE_EXTENSIONS for e in entries if e.is_file())
             if has_init or (has_code and len(rel.parts) <= 3):
                 mod_name = str(rel).replace("/", ".").replace("\\", ".")
                 if not mod_name or mod_name == ".":
@@ -52,7 +56,7 @@ class GenomeScanner:
                 language = self._detect_language(p)
                 key_files = [
                     str(f.relative_to(self.root))
-                    for f in sorted(p.iterdir())
+                    for f in sorted(entries)
                     if f.is_file() and f.suffix in _CODE_EXTENSIONS
                 ][:10]
                 genome.modules.append(Module(
@@ -84,7 +88,11 @@ class GenomeScanner:
         return results
 
     def _detect_language(self, dir_path: Path) -> str:
-        for f in dir_path.iterdir():
+        try:
+            entries = list(dir_path.iterdir())
+        except (PermissionError, OSError):
+            return "unknown"
+        for f in entries:
             if f.suffix == ".py":
                 return "python"
             if f.suffix in (".ts", ".tsx"):
