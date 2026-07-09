@@ -4,6 +4,20 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.3] - 2026-07-09
+
+### Changed
+- **Kembali ke single-line `Input`:** Widget input box dikembalikan dari `TextArea` (multi-line) ke `Input` (single-line). Enter langsung kirim pesan tanpa konflik dengan behavior newline TextArea.
+  - `Enter` = kirim pesan (kembali seperti v0.8.8)
+  - `↑` / `↓` = navigasi history input
+  - Autocomplete slash command (`SuggestFromList`) kembali aktif
+- **Restore fitur yang hilang akibat revert tidak sengaja:** Dukungan AI Studio / Antigravity auth mode di `/model` dialog & slash command, `on_retry` callback, `_current_model_name` tracking, dan `getattr` safety guard pada `auth_mode`.
+
+### Fixed
+- **Enter tidak respon pada TextArea:** Pada v0.9.2, handler Enter di `on_key` level App tidak reliably menangkap event karena TextArea menelan Enter untuk insert newline. Sekarang pakai `on_input_submitted` (native Input) yang stabil.
+- **`_reset_input` & `action_cancel`:** Placeholder input box tidak dikembalikan setelah agent selesai/dibatalkan — sekarang di-reset ke `input_placeholder`.
+- **`/model` selalu ke Cloudflare:** Revert sebelumnya menghapus branching `auth.mode == "aistudio"` — sekarang dikembalikan.
+
 ## [0.9.2] - 2026-07-09
 
 ### Fixed
