@@ -100,7 +100,7 @@ echo "🔍 Cek ruff..."
 ruff check . --quiet || { echo "❌ ruff gagal"; exit 1; }
 
 echo "🔍 Cek mypy..."
-mypy autokeren --quiet || { echo "❌ mypy gagal"; exit 1; }
+mypy autokeren || { echo "❌ mypy gagal"; exit 1; }
 
 # ── Commit + tag ──────────────────────────────────────────────────────
 git add autokeren/__init__.py pyproject.toml CHANGELOG.md

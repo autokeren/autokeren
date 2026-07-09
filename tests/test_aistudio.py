@@ -150,6 +150,80 @@ class TestAIStudioIntegration(unittest.TestCase):
         model3 = AIStudioModel(model_id="gemini-3.5-flash", api_key="test_key")
         self.assertEqual(model3.model_id, "gemini-3.5-flash")
 
+    def test_parse_text_tool_calls_single(self):
+        from autokeren.models.aistudio import _parse_text_tool_calls
+
+        content = '[TOOL_CALL name=list_files]\n{"path": "src", "recursive": true}'
+        cleaned, calls = _parse_text_tool_calls(content)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0].name, "list_files")
+        self.assertEqual(calls[0].arguments, {"path": "src", "recursive": True})
+
+    def test_parse_text_tool_calls_with_surrounding_text(self):
+        from autokeren.models.aistudio import _parse_text_tool_calls
+
+        content = (
+            "Saya akan membaca file tersebut.\n"
+            '[TOOL_CALL name=read_file]\n{"path": "main.py"}\n'
+            "Lalu analisis."
+        )
+        cleaned, calls = _parse_text_tool_calls(content)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0].name, "read_file")
+        self.assertEqual(calls[0].arguments, {"path": "main.py"})
+        self.assertIn("Saya akan", cleaned)
+        self.assertIn("Lalu analisis", cleaned)
+
+    def test_parse_text_tool_calls_multiple(self):
+        from autokeren.models.aistudio import _parse_text_tool_calls
+
+        content = (
+            '[TOOL_CALL name=list_files]\n{"path": "."}\n'
+            '[TOOL_CALL name=read_file]\n{"path": "README.md"}'
+        )
+        cleaned, calls = _parse_text_tool_calls(content)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0].name, "list_files")
+        self.assertEqual(calls[1].name, "read_file")
+
+    def test_parse_text_tool_calls_none(self):
+        from autokeren.models.aistudio import _parse_text_tool_calls
+
+        content = "Halo, ini pesan biasa tanpa tool call."
+        cleaned, calls = _parse_text_tool_calls(content)
+        self.assertEqual(len(calls), 0)
+        self.assertEqual(cleaned, content)
+
+    @patch("httpx.post")
+    def test_aistudio_fallback_text_tool_call(self, mock_post):
+        """Model output [TOOL_CALL] sebagai text → harus ter-parse jadi ToolCall."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {"text": '[TOOL_CALL name=list_files]\n{"path": "src", "recursive": true}'}
+                        ]
+                    }
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 5,
+                "candidatesTokenCount": 10,
+                "totalTokenCount": 15,
+            },
+        }
+        mock_post.return_value = mock_response
+
+        model = AIStudioModel(model_id="gemini-3.5-flash", api_key="test_key")
+        resp = model.complete(messages=[{"role": "user", "content": "list files"}])
+
+        self.assertEqual(len(resp.tool_calls), 1)
+        self.assertEqual(resp.tool_calls[0].name, "list_files")
+        self.assertEqual(resp.tool_calls[0].arguments, {"path": "src", "recursive": True})
+
 
 if __name__ == "__main__":
     unittest.main()

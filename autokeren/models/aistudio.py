@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -103,6 +104,49 @@ def resolve_aistudio_model_id(model_id: str) -> str:
     if "pro" in model_lower or "code" in model_lower:
         return "gemini-3.5-pro"
     return "gemini-3.5-flash"
+
+
+_TOOL_CALL_TEXT_RE = re.compile(r"\[TOOL_CALL\s+name=(\w+)\]\s*")
+
+
+def _parse_text_tool_calls(content: str) -> tuple[str | None, list[ToolCall]]:
+    """Fallback: deteksi [TOOL_CALL name=...] di text content model.
+
+    Gemini kadang meniru format flattened history dan output tool call
+    sebagai text biasa alih-alih native functionCall. Parser ini menangkap
+    pattern tersebut dan konversi jadi ToolCall asli agar agent loop tetap
+    mengeksekusinya.
+
+    Returns (cleaned_content, tool_calls). Jika tidak ada pattern, return
+    content asli dan list kosong.
+    """
+    matches = list(_TOOL_CALL_TEXT_RE.finditer(content))
+    if not matches:
+        return content, []
+
+    tool_calls: list[ToolCall] = []
+    cleaned_parts: list[str] = []
+    decoder = json.JSONDecoder()
+    pos = 0
+
+    for i, m in enumerate(matches):
+        cleaned_parts.append(content[pos:m.start()])
+        name = m.group(1).strip()
+        args_start = m.end()
+
+        try:
+            args, end_idx = decoder.raw_decode(content, args_start)
+            pos = end_idx
+        except json.JSONDecodeError:
+            next_marker = content.find("[TOOL_CALL", args_start)
+            pos = next_marker if next_marker != -1 else len(content)
+            args = {"raw": content[args_start:pos].strip()}
+
+        tool_calls.append(ToolCall(id=f"call_{i}", name=name, arguments=args, thought=None))
+
+    cleaned_parts.append(content[pos:])
+    cleaned = "\n".join(p for p in cleaned_parts if p.strip()).strip()
+    return (cleaned if cleaned else None), tool_calls
 
 
 @dataclass
@@ -358,8 +402,16 @@ class AIStudioModel:
                     total_tokens = meta_usage.get("totalTokenCount", total_tokens)
 
             content = "".join(full_content_parts)
+
+            if not tool_calls and content:
+                content, parsed_calls = _parse_text_tool_calls(content)
+                if parsed_calls:
+                    tool_calls = parsed_calls
+                    if on_chunk and content:
+                        pass
+
             if not completion_tokens:
-                completion_tokens = len(content.split())
+                completion_tokens = len((content or "").split())
             if not total_tokens:
                 total_tokens = prompt_tokens + completion_tokens
 
