@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.4] - 2026-07-11
+
+### Changed
+- feat: tambahkan visual panel diskusi/debat multi-agent real-time di TUI
+
 ## [0.11.3] - 2026-07-11
 
 ### Changed
