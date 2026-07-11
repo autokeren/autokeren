@@ -4,15 +4,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-# ── Sensitive paths ──────────────────────────────────────────────────────
-
-_SENSITIVE_READ_PATTERNS = [
+# ── Hard block: selalu ditolak, tidak bisa di-override ──────────────────
+# File-file ini TIDAK PERNAH boleh diakses agent (private keys, SSH, cloud creds)
+_HARD_READ_PATTERNS = [
     ".ssh/",
-    ".env",
-    "config.yaml",
-    "config.yml",
-    "credentials",
-    "credentials.json",
     ".aws/credentials",
     ".aws/config",
     ".gnupg/",
@@ -24,6 +19,21 @@ _SENSITIVE_READ_PATTERNS = [
     ".key",
     ".pfx",
     ".p12",
+    ".git-credentials",
+    ".kube/config",
+    ".pgpass",
+    "firebase-adminsdk",
+    "service-account",
+]
+
+# ── Soft block: minta izin user terlebih dahulu ──────────────────────────
+# File-file ini sensitif tapi user kadang perlu akses di project sendiri
+_SOFT_READ_PATTERNS = [
+    ".env",
+    "config.yaml",
+    "config.yml",
+    "credentials",
+    "credentials.json",
     "keystore",
     ".npmrc",
     ".pypirc",
@@ -32,12 +42,11 @@ _SENSITIVE_READ_PATTERNS = [
     "secret",
     "token",
     "oauth",
-    "service-account",
-    "firebase-adminsdk",
-    ".git-credentials",
-    ".kube/config",
-    ".pgpass",
 ]
+
+# Legacy alias (union dari keduanya, untuk backward compat)
+_SENSITIVE_READ_PATTERNS = _HARD_READ_PATTERNS + _SOFT_READ_PATTERNS
+
 
 _SENSITIVE_WRITE_PATTERNS = [
     ".ssh/",
@@ -129,12 +138,12 @@ _EXFIL_PATTERNS: list[tuple[str, str]] = [
 ]
 
 
-def is_sensitive_read_path(path: Path) -> tuple[bool, str]:
-    """Check if path is sensitive and should be blocked from reading."""
+def is_hard_sensitive_read_path(path: Path) -> tuple[bool, str]:
+    """Hard block: path yang TIDAK PERNAH boleh dibaca agent, tidak bisa di-override."""
     str_path = str(path).lower()
     home = str(Path.home()).lower()
 
-    for pattern in _SENSITIVE_READ_PATTERNS:
+    for pattern in _HARD_READ_PATTERNS:
         if pattern in str_path:
             return True, f"blocked: sensitive file ({pattern})"
         if pattern in str_path.replace(home, "~"):
@@ -145,6 +154,28 @@ def is_sensitive_read_path(path: Path) -> tuple[bool, str]:
         return True, "blocked: autokeren config directory"
 
     return False, ""
+
+
+def is_soft_sensitive_read_path(path: Path) -> tuple[bool, str]:
+    """Soft block: path yang sensitif tapi bisa diakses setelah izin user."""
+    str_path = str(path).lower()
+    home = str(Path.home()).lower()
+
+    for pattern in _SOFT_READ_PATTERNS:
+        if pattern in str_path:
+            return True, f"sensitive file ({pattern}) — perlu izin"
+        if pattern in str_path.replace(home, "~"):
+            return True, f"sensitive file ({pattern}) — perlu izin"
+
+    return False, ""
+
+
+def is_sensitive_read_path(path: Path) -> tuple[bool, str]:
+    """Backward-compat: return True jika path masuk hard ATAU soft block."""
+    blocked, reason = is_hard_sensitive_read_path(path)
+    if blocked:
+        return True, reason
+    return is_soft_sensitive_read_path(path)
 
 
 def is_sensitive_write_path(path: Path) -> tuple[bool, str]:

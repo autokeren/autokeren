@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from autokeren.security import is_sensitive_read_path, is_sensitive_write_path
+from autokeren.security import (
+    is_hard_sensitive_read_path,
+    is_soft_sensitive_read_path,
+    is_sensitive_write_path,
+)
 from autokeren.tools.base import Tool, ToolResult
 from autokeren.utils import make_backup
 
@@ -30,11 +34,23 @@ class ReadFileTool(Tool):
     def __init__(self, project_root: Path):
         self.project_root = project_root
 
+    def needs_permission(self, path: str = "", **_) -> bool:  # type: ignore[override]
+        target = self._resolve(path)
+        is_soft, _msg = is_soft_sensitive_read_path(target)
+        return is_soft
+
+    def permission_desc(self, path: str = "", **_) -> str:  # type: ignore[override]
+        target = self._resolve(path)
+        _flag, reason = is_soft_sensitive_read_path(target)
+        return f"membaca file sensitif: {path}\n({reason})"
+
     def run(self, path: str, offset: int = 1, limit: int = 500, **_) -> ToolResult:
         target = self._resolve(path)
-        blocked, reason = is_sensitive_read_path(target)
-        if blocked:
+        # Hard block: selalu ditolak
+        hard_blocked, reason = is_hard_sensitive_read_path(target)
+        if hard_blocked:
             return ToolResult(error=reason, ok=False)
+        # Soft block sudah ditangani via needs_permission — kalau sampai sini, user sudah approve
         if not target.exists():
             return ToolResult(error=f"file not found: {path}", ok=False)
         try:
