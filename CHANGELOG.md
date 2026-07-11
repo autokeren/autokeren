@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.10] - 2026-07-11
+
+### Changed
+- feat: real-time sidebar (auto-refresh) dengan ghost agents dan todo list
+
 ## [0.10.9] - 2026-07-11
 
 ### Changed
