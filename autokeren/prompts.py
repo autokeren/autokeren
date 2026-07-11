@@ -35,8 +35,20 @@ def build_system_prompt(
 
     memory_section = f"\n\n## memory (dari session sebelumnya)\n{memory}" if memory else ""
 
+    metadata_section = ""
+    try:
+        from autokeren.kanban.db import KanbanDB
+        db = KanbanDB(project_root)
+        meta = db.get_all_metadata()
+        if meta:
+            meta_lines = [f"- **{k.replace('_', ' ').title()}**: {v}" for k, v in meta.items()]
+            metadata_section = "\n\n## Metadata Proyek (SQLite)\n" + "\n".join(meta_lines)
+    except Exception:
+        pass
+
     return f"""Kamu autokeren v{_VERSION}, agent coding otonom yang berjalan di {project_root}.
 Tugas kamu: bantu build, debug, dan deploy kode. Kamu punya akses tool: {tool_names}.
+{metadata_section}
 
 Aturan:
 - Selalu pikir step by step.

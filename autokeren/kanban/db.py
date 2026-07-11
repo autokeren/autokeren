@@ -29,7 +29,64 @@ class KanbanDB:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS project_metadata (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                );
+            """)
             conn.commit()
+
+        if not self.get_all_metadata():
+            self._auto_seed_metadata()
+
+    def set_metadata(self, key: str, value: str) -> None:
+        query = """
+            INSERT INTO project_metadata (key, value)
+            VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value
+        """
+        with self._get_connection() as conn:
+            conn.execute(query, (key, value))
+            conn.commit()
+
+    def get_metadata(self, key: str, default: str = "") -> str:
+        query = "SELECT value FROM project_metadata WHERE key = ?"
+        with self._get_connection() as conn:
+            row = conn.execute(query, (key,)).fetchone()
+            return row["value"] if row else default
+
+    def get_all_metadata(self) -> dict[str, str]:
+        query = "SELECT key, value FROM project_metadata"
+        with self._get_connection() as conn:
+            rows = conn.execute(query).fetchall()
+            return {r["key"]: r["value"] for r in rows}
+
+    def _auto_seed_metadata(self) -> None:
+        path = self.project_root.resolve()
+        name = path.name or "default"
+        
+        stacks = []
+        if (path / "package.json").exists():
+            stacks.append("Node.js")
+        if (path / "requirements.txt").exists() or (path / "pyproject.toml").exists() or (path / "setup.py").exists():
+            stacks.append("Python")
+        if (path / "go.mod").exists():
+            stacks.append("Go")
+        if (path / "Cargo.toml").exists():
+            stacks.append("Rust")
+        if (path / "wrangler.toml").exists() or (path / "wrangler.json").exists():
+            stacks.append("Cloudflare Workers")
+        tech_stack = ", ".join(stacks) if stacks else "Unknown"
+
+        self.set_metadata("project_name", name)
+        self.set_metadata("project_path", str(path))
+        self.set_metadata("tech_stack", tech_stack)
+        self.set_metadata("frontend_link", "http://localhost:3000")
+        self.set_metadata("backend_link", "http://localhost:8787")
+        self.set_metadata("runbook_install", "npm install")
+        self.set_metadata("runbook_run", "npm run dev")
+        self.set_metadata("runbook_test", "npm test")
 
     def add_task(
         self,

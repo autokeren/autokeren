@@ -51,3 +51,16 @@ def test_kanban_tool_execution(tmp_path: Path) -> None:
     res = tool.run(action="update", title="Test")
     assert res.ok is False
     assert "task_id" in res.error
+
+    # 8. Test metadata actions
+    res = tool.run(action="set_metadata", meta_key="test_key", meta_value="test_val")
+    assert res.ok is True
+    assert "test_key" in res.output
+
+    res = tool.run(action="get_metadata", meta_key="test_key")
+    assert res.ok is True
+    assert "test_key: test_val" in res.output
+
+    res = tool.run(action="list_metadata")
+    assert res.ok is True
+    assert "test_key" in res.output
