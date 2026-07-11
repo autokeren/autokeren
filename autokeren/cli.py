@@ -91,6 +91,11 @@ def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegist
         reg.register(CreateProjectTool(cfg))
         reg.register(DeployProjectTool(cfg))
         reg.register(ListProjectsTool(cfg))
+
+    # Load dynamic tools from .ak-tools/
+    from autokeren.tools.dynamic_loader import load_dynamic_tools
+    load_dynamic_tools(project_root, reg, cfg, memory)
+
     return reg
 
 
