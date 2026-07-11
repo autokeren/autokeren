@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.2] - 2026-07-11
+
+### Changed
+- feat: tambahkan aturan otonom Kanban dan Multi-Agent delegation ke system prompt
+
 ## [0.11.1] - 2026-07-11
 
 ### Changed
