@@ -63,6 +63,7 @@ type StatusUpdateMsg struct {
 	NeuronsQuota     int
 	Todos            []TodoItem
 	KanbanTasks      []KanbanTask
+	Version          string
 }
 
 // PermissionConfirmReq mewakili request izin masuk yang harus direspon balik
@@ -373,6 +374,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Sidebar.NeuronsQuota = msg.NeuronsQuota
 		m.Sidebar.Todos = msg.Todos
 		m.KanbanTasks = msg.KanbanTasks
+		m.Sidebar.Version = msg.Version
 
 	case PeriodicTickMsg:
 		m.Sidebar.GhostAgents = msg.GhostAgents
@@ -387,6 +389,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Sidebar.NeuronsQuota = parsed.NeuronsQuota
 			m.Sidebar.Todos = parsed.Todos
 			m.KanbanTasks = parsed.KanbanTasks
+			m.Sidebar.Version = parsed.Version
 		}
 		return m, m.pollPeriodicCmd()
 
@@ -1396,6 +1399,13 @@ func (m MainModel) switchModelCmd(modelID string) tea.Cmd {
 }
 
 func parseStatusReply(statusReply map[string]interface{}, projectRoot string) StatusUpdateMsg {
+	version, _ := statusReply["version"].(string)
+	if version != "" && !strings.HasPrefix(version, "v") {
+		version = "v" + version
+	}
+	if version == "" {
+		version = "v0.11.13" // fallback
+	}
 	modelName := "?"
 	if mStatus, ok := statusReply["model_status"].(map[string]interface{}); ok {
 		if active, ok := mStatus["models"].([]interface{}); ok && len(active) > 0 {
@@ -1486,6 +1496,7 @@ func parseStatusReply(statusReply map[string]interface{}, projectRoot string) St
 		NeuronsQuota:     neuronsQuota,
 		Todos:            todos,
 		KanbanTasks:      kanbanTasks,
+		Version:          version,
 	}
 }
 

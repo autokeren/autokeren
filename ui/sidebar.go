@@ -26,6 +26,7 @@ type SidebarModel struct {
 	CurrentTask      string
 	GhostAgents      []*ghost.GhostAgentInfo
 	Todos            []TodoItem
+	Version          string
 }
 
 func NewSidebarModel() SidebarModel {
@@ -33,6 +34,7 @@ func NewSidebarModel() SidebarModel {
 		ModelName:     "—",
 		ProjectName:   "—",
 		ContextWindow: 262144,
+		Version:       "v0.11.13",
 	}
 }
 
@@ -54,12 +56,7 @@ func (m SidebarModel) View() string {
 		barInnerW = 3
 	}
 
-	// ── Styles ──
-	brandStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#38BDF8")).
-		Width(w - 4).
-		Align(lipgloss.Center)
+
 
 	labelStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#374151"))
@@ -95,7 +92,16 @@ func (m SidebarModel) View() string {
 	var sb strings.Builder
 
 	// Brand
-	sb.WriteString(brandStyle.Render("autokeren") + "\n")
+	redStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444")).Bold(true)
+	whiteStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
+	grayStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280"))
+
+	if w >= 40 {
+		sb.WriteString(redStyle.Render("▄▀▄ █ █ █ ▄▀▄ █▄▀ █▀ █▀▄ █▀ █▄ █") + "\n")
+		sb.WriteString(whiteStyle.Render("█▄█ █▄█ █ █▄█ █ █ █▄ █ █ █▄ █ ▀█") + "  " + grayStyle.Render(m.Version) + "\n")
+	} else {
+		sb.WriteString(redStyle.Render("AUTO") + whiteStyle.Render("KEREN") + "  " + grayStyle.Render(m.Version) + "\n")
+	}
 	sb.WriteString(divider + "\n\n")
 
 	// Project

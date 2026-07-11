@@ -547,6 +547,7 @@ class Agent:
         )
 
     def status(self) -> dict[str, Any]:
+        from autokeren import __version__
         todo_tool = self.tools.get("todo")
         todos = []
         if todo_tool and hasattr(todo_tool, "get_todos"):
@@ -566,6 +567,7 @@ class Agent:
             "context": self.context.summary(),
             "todos": todos,
             "kanban_tasks": kanban_tasks,
+            "version": __version__,
         }
 
     def run_autonomous(self, goal: str, context: str = "") -> dict[str, Any]:

@@ -74,6 +74,9 @@ scratch/
 # Time-Travel checkpoints
 .ak-checkpoints/
 
+# Dynamic tools directory (runtime)
+.ak-tools/
+
 # SQLite databases
 *.db
 .ak-kanban.db
