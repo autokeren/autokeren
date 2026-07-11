@@ -624,6 +624,7 @@ def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
     import os
     import sys
     import shutil
+    import platform
     import subprocess
     from pathlib import Path
 
@@ -631,38 +632,70 @@ def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
     cache_dir = Path.home() / ".cache" / "autokeren" / "bin"
     ak_bin = cache_dir / ("ak.exe" if os.name == "nt" else "ak")
 
-    # Jika biner belum ada, coba compile
+    # 1. Cek apakah biner di cache sudah ada
     if not ak_bin.exists():
-        go_path = shutil.which("go")
-        if not go_path:
-            return False  # Tidak ada Go compiler, langsung fallback
-        
-        # Cari source Go di site-packages
-        package_dir = Path(__file__).parent
-        go_src_dir = package_dir / "go"
-        
-        # Jika tidak ada source Go di site-packages (misal development mode biasa di repo),
-        # coba cari di root direktori repo
-        if not go_src_dir.exists():
-            go_src_dir = package_dir.parent
-            if not (go_src_dir / "main.go").exists():
-                return False
-
         cache_dir.mkdir(parents=True, exist_ok=True)
-        try:
-            # Jalankan go build
-            subprocess.run(
-                [go_path, "build", "-o", str(ak_bin), "main.go"],
-                cwd=str(go_src_dir),
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        except Exception:
-            return False  # Gagal kompilasi, fallback
+        
+        # 2. Coba muat biner pre-built dari package folder 'bin'
+        package_dir = Path(__file__).parent
+        os_name = platform.system().lower()
+        arch = platform.machine().lower()
+        
+        prebuilt_name = ""
+        if os_name == "windows":
+            if "amd64" in arch or "x86_64" in arch:
+                prebuilt_name = "ak-windows-amd64.exe"
+        elif os_name == "linux":
+            if "amd64" in arch or "x86_64" in arch:
+                prebuilt_name = "ak-linux-amd64"
+        elif os_name == "darwin":
+            if "arm64" in arch or "aarch64" in arch:
+                prebuilt_name = "ak-darwin-arm64"
+            elif "amd64" in arch or "x86_64" in arch:
+                prebuilt_name = "ak-darwin-amd64"
+
+        prebuilt_path = package_dir / "bin" / prebuilt_name if prebuilt_name else None
+        
+        # Jika pre-built tidak ditemukan di package_dir/bin (misalnya karena development mode),
+        # coba cek di root repo /autokeren/bin/
+        if prebuilt_path and not prebuilt_path.exists():
+            prebuilt_path = package_dir.parent / "autokeren" / "bin" / prebuilt_name
+
+        # Jika biner prebuilt ada, salin ke cache_dir
+        if prebuilt_path and prebuilt_path.exists():
+            try:
+                shutil.copy2(str(prebuilt_path), str(ak_bin))
+                # Set permission executable di Linux/macOS
+                if os.name != "nt":
+                    os.chmod(str(ak_bin), 0o755)
+            except Exception:
+                pass
+
+        # 3. Jika salinan prebuilt gagal atau tidak ada, coba compile lokal (fallback)
+        if not ak_bin.exists():
+            go_path = shutil.which("go")
+            if go_path:
+                go_src_dir = package_dir / "go"
+                if not go_src_dir.exists():
+                    go_src_dir = package_dir.parent
+                    if not (go_src_dir / "main.go").exists():
+                        return False
+
+                try:
+                    subprocess.run(
+                        [go_path, "build", "-ldflags=-s -w", "-o", str(ak_bin), "main.go"],
+                        cwd=str(go_src_dir),
+                        check=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                except Exception:
+                    return False
+            else:
+                return False  # Tidak ada Go compiler, dan tidak ada prebuilt, fallback ke Python TUI
 
     if ak_bin.exists():
-        # Jalankan biner Go. Gunakan os.execvp agar menggantikan proses Python saat ini secara instan
+        # Jalankan biner Go. Gunakan os.execvp agar menggantikan proses Python secara instan
         argv = [str(ak_bin)] + sys_argv[1:]
         try:
             os.execvp(str(ak_bin), argv)
