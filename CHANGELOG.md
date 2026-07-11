@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.14] - 2026-07-12
+
+### Changed
+- menambahkan responsive red-white Indonesian flag header dengan versi di sidebar
+
 ## [0.11.13] - 2026-07-12
 
 ### Changed
