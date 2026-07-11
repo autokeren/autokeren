@@ -108,6 +108,25 @@ Deep research ke Reddit, Hacker News, dan Web. Fetch threads + comments, LLM ran
 /research web best practices      # cari web saja
 ```
 
+## AGI Evolution & Self-Healing (v0.11.0+)
+
+Membawa Autokeren CLI menuju level otonom sejati dengan 5 fitur kecerdasan buatan mandiri:
+
+### 1. Continuous Lifelong Daemon & Observer
+Mempunyai `SystemObserver` (asynchronous background thread) yang berjalan secara offline untuk memantau perubahan/penghapusan file kode Anda serta melakukan tailing log error kritis secara real-time. Jika terdeteksi anomali atau error fatal, observer secara otomatis memicu proses perbaikan otonom (*auto-diagnose*).
+
+### 2. Self-Evolution / Auto-Refactoring Loop
+Jika agen mendeteksi kegagalan berulang pada pemanggilan tool, sistem akan memicu `run_self_improvement` untuk merefaktor file Python tool yang rusak secara otonom, memvalidasinya dengan unit test pytest baru, dan melakukan *hot-reload* memuat ulang registry tool secara instan.
+
+### 3. Local TF-IDF Semantic Memory
+Pencarian semantik berkinerja tinggi yang berjalan 100% lokal di mesin Anda menggunakan Vector Space Model (VSM) dengan pembobotan TF-IDF dan Cosine Similarity pada SQLite database (`memory.db`). Tidak perlu API key berbayar untuk kalkulasi embedding!
+
+### 4. Interactive Kanban TUI Board (`Ctrl+K`)
+Kelola task list Anda secara visual langsung di terminal. Papan Kanban interaktif (Todo, In Progress, Done) disinkronkan secara real-time dengan SQLite lokal. Cukup tekan **`Ctrl+K`** untuk berpindah layar kapan saja.
+
+### 5. Live Multi-Agent Debate View (`Ctrl+D`)
+Pantau hasil diskusi, koordinasi, dan log pengerjaan tugas dari beberapa Ghost Agent yang berjalan di background secara real-time. Cukup tekan **`Ctrl+D`** untuk beralih ke panel debat.
+
 ## Cara Mulai
 
 ### 1. Dapatkan API Key (gratis)
@@ -251,8 +270,11 @@ Di mode interaktif TUI, Anda dapat menggunakan tombol pintas keyboard (*hotkeys*
 | **`F4`** | Salin Respon | Menyalin pesan/jawaban terakhir AI ke clipboard sistem |
 | **`F5`** | Compact | Meringkas riwayat context window percakapan |
 | **`F6`** | Ganti Bahasa | Memunculkan modal dialog interaktif untuk memilih bahasa UI |
-| **`Ctrl+C`**| Batal / Stop | Membatalkan/menghentikan eksekusi proses AI atau tool yang aktif |
-| **`F7`**| File Explorer | Toggle file/folder tree di panel kiri (click file → auto baca) |
+| **`F7`** | File Explorer | Toggle file/folder tree di panel kiri (click file → auto baca) |
+| **`Ctrl+K`**| Kanban Board | Toggle papan Kanban proyek secara langsung (kapan saja) |
+| **`Ctrl+D`**| Debate Log | Toggle log perdebatan multi-agent di background (kapan saja) |
+| **`Ctrl+C`**| Batal / Stop | Menghentikan proses AI atau tool yang aktif (tanpa keluar aplikasi) |
+| **`Ctrl+Q`**| Keluar CLI | Keluar paksa dari aplikasi autokeren secara instan |
 
 ### Perintah Slash
 
