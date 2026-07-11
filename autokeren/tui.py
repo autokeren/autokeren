@@ -21,7 +21,7 @@ try:
 
     _HAS_PYPERCLIP = True
 except Exception:
-    pyperclip = None
+    pyperclip = None  # type: ignore[assignment]
     _HAS_PYPERCLIP = False
 
 from autokeren.agent import Agent
