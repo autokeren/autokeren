@@ -67,7 +67,7 @@ func (m MainModel) KanbanView(panelWidth int, panelHeight int) string {
 		PaddingTop(1)
 
 	footer := footerStyle.Render(
-		"  ↑↓/←→: Pilih Kartu  ·  Space: Pindahkan  ·  a: Tambah  ·  d: Hapus  ·  Tab: Kembali ke Chat",
+		"  ↑↓/←→: Pilih Kartu  ·  Space: Pindahkan  ·  a: Tambah  ·  d: Hapus  ·  Tab/Ctrl+K: Kembali ke Chat",
 	)
 
 	if overlay != "" {

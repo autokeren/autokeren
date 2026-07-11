@@ -104,7 +104,7 @@ func (m MainModel) DebateView(panelWidth int, panelHeight int) string {
 		PaddingTop(1)
 
 	footer := footerStyle.Render(
-		"  ←/→: Pilih Agent  ·  k: Kill Agent  ·  Tab: Kembali ke Chat",
+		"  ←/→: Pilih Agent  ·  k: Kill Agent  ·  Tab/Ctrl+D: Kembali ke Chat",
 	)
 
 	return lipgloss.JoinVertical(lipgloss.Left, body, footer)

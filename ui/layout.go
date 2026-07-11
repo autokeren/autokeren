@@ -92,9 +92,9 @@ type SlashCommandInfo struct {
 var slashCommands = []SlashCommandInfo{
 	{Name: "/model", Description: "Ganti model AI yang digunakan"},
 	{Name: "/ghost", Description: "Kelola background agent"},
-	{Name: "/board", Description: "Buka/tutup papan Kanban proyek"},
-	{Name: "/kanban", Description: "Buka/tutup papan Kanban proyek"},
-	{Name: "/debate", Description: "Lihat visualisasi diskusi multi-agent"},
+	{Name: "/board", Description: "Buka/tutup papan Kanban proyek (Shortcut: Ctrl+K)"},
+	{Name: "/kanban", Description: "Buka/tutup papan Kanban proyek (Shortcut: Ctrl+K)"},
+	{Name: "/debate", Description: "Lihat visualisasi diskusi multi-agent (Shortcut: Ctrl+D)"},
 	{Name: "/compact", Description: "Kompak/ringkas konteks percakapan"},
 	{Name: "/reset", Description: "Reset sesi percakapan baru"},
 	{Name: "/q", Description: "Keluar dari autokeren"},
@@ -401,7 +401,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if m.ShowDebate {
 			switch msg.String() {
-			case "tab", "esc":
+			case "tab", "esc", "ctrl+d":
 				m.ShowDebate = false
 				m.TextInput.Focus()
 				return m, nil
@@ -498,7 +498,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			switch msg.String() {
-			case "tab", "esc":
+			case "tab", "esc", "ctrl+k":
 				m.ShowKanban = false
 				m.TextInput.Focus()
 				return m, nil
@@ -755,6 +755,37 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.Type {
+		case tea.KeyCtrlK:
+			m.ShowKanban = !m.ShowKanban
+			if m.ShowKanban {
+				m.ShowDebate = false
+				m.SelectedColumn = 0
+				m.SelectedTaskIndex = 0
+				var statusReply map[string]interface{}
+				_ = m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply)
+				parsed := parseStatusReply(statusReply, m.ProjectRoot)
+				m.KanbanTasks = parsed.KanbanTasks
+				m.Sidebar.Todos = parsed.Todos
+			} else {
+				m.TextInput.Focus()
+			}
+			return m, nil
+
+		case tea.KeyCtrlD:
+			m.ShowDebate = !m.ShowDebate
+			if m.ShowDebate {
+				m.ShowKanban = false
+				list := m.GhostMgr.List()
+				if len(list) > 0 {
+					m.SelectedDebateAgentID = list[0].ID
+				} else {
+					m.SelectedDebateAgentID = 0
+				}
+			} else {
+				m.TextInput.Focus()
+			}
+			return m, nil
+
 		case tea.KeyCtrlC, tea.KeyCtrlQ:
 			if m.AgentRunning {
 				go func() {
