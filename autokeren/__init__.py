@@ -1,2 +1,2 @@
 """autokeren — Cloudflare-first agentic coding CLI."""
-__version__ = "0.9.9"
+__version__ = "0.10.0"
