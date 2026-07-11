@@ -347,6 +347,11 @@ class Agent:
                                     "role": "system",
                                     "content": lb_action.suggestion,
                                 })
+                            self.run_self_improvement(
+                                failed_tool_name=tc.name,
+                                error_message=raw_result.error or str(raw_result.to_dict()),
+                                tool_args=tc.arguments
+                            )
                             if lb_action.switch_model:
                                 self.router.swap_models()
                             if lb_action.clear_context:
@@ -593,3 +598,49 @@ class Agent:
             "reflection_summary": reflector.summary(),
             "patterns": reflector.get_patterns(),
         }
+
+    def run_self_improvement(self, failed_tool_name: str, error_message: str, tool_args: dict[str, Any]) -> bool:
+        """Menjalankan siklus self-evolution mandiri jika sebuah tool gagal berulang kali."""
+        if getattr(self, "_evolving", False):
+            return False
+        self._evolving = True
+        
+        try:
+            # Cari path file tool-nya
+            tool_file = Path(self.project_root) / "autokeren" / "tools" / f"{failed_tool_name}.py"
+            if not tool_file.exists():
+                # Jika kustom tool dinamis
+                tool_file = Path(self.project_root) / ".ak-tools" / f"{failed_tool_name}.py"
+                
+            if not tool_file.exists():
+                return False
+                
+            if self.on_tool_output:
+                self.on_tool_output("self_evolution", f"🛠️ [bold magenta]SELF-EVOLUTION TRIGGERED:[/bold magenta] Tool '{failed_tool_name}' gagal berulang kali dengan error: {error_message}. Memulai self-refactoring...")
+
+            goal = (
+                f"Perbaiki bug/keterbatasan pada tool '{failed_tool_name}' yang berada di {tool_file.name}. "
+                f"Tool tersebut dipanggil dengan argumen: {tool_args} "
+                f"dan menghasilkan error: {error_message}. "
+                f"Refaktor implementasi Python tool tersebut di file {tool_file.name}, "
+                f"tambahkan test case baru di tests/ jika diperlukan, dan jalankan pytest untuk memvalidasi perbaikan."
+            )
+            
+            # Jalankan autonomous run untuk memperbaiki dirinya sendiri!
+            self.run_autonomous(goal, context=f"File target: {tool_file}\nError: {error_message}")
+            
+            # Muat ulang registry agar perubahan tool langsung diterapkan secara hot-reload!
+            from autokeren.cli import build_registry
+            new_registry = build_registry(self.cfg, Path(self.project_root), self.memory)
+            self.tools = new_registry
+            
+            if self.on_tool_output:
+                self.on_tool_output("self_evolution", f"✨ [bold green]SELF-EVOLUTION SUKSES:[/bold green] Tool '{failed_tool_name}' berhasil direfaktor dan dimuat ulang secara hot-reload!")
+            return True
+            
+        except Exception as e:
+            if self.on_tool_output:
+                self.on_tool_output("self_evolution", f"❌ [bold red]SELF-EVOLUTION GAGAL:[/bold red] Gagal merefaktor tool: {e}")
+            return False
+        finally:
+            self._evolving = False
