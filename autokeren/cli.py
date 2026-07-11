@@ -689,7 +689,6 @@ def main() -> int:
     parser.add_argument("--task", help="Task untuk non-interactive mode")
     parser.add_argument("prompt", nargs="?", help="Single prompt to run non-interactively")
     args = parser.parse_args()
-    _try_run_go_tui(args, sys.argv)
 
     if args.about:
         console.print(f"\n[bold]autokeren[/bold] v{__version__}")
@@ -775,6 +774,7 @@ def main() -> int:
                 cfg.cloudflare.primary_model = args.model
 
     project_root = Path(args.project_root).expanduser().resolve()
+    _try_run_go_tui(args, sys.argv)
     memory = MemoryManager(str(project_root))
     reg = build_registry(cfg, project_root, memory)
     load_mcp_servers(cfg, reg)

@@ -114,12 +114,56 @@ class JSONRPCDaemon:
             cfg_path = params.get("config_path")
             cfg = load_config(Path(cfg_path) if cfg_path else None)
 
+            # Menerapkan opsi config dinamis dari CLI
+            if params.get("agy"):
+                cfg.auth.mode = "antigravity"
+                if not params.get("model"):
+                    cfg.cloudflare.primary_model = "Gemini 3.5 Flash (Low)"
+            elif params.get("aistudio"):
+                cfg.auth.mode = "aistudio"
+                if not params.get("model"):
+                    cfg.cloudflare.primary_model = "gemini-3.5-flash"
+            
+            if params.get("plan"):
+                cfg.autokeren.plan_mode = True
+
+            if params.get("model"):
+                model_name = str(params.get("model"))
+                if cfg.auth.mode in ("antigravity", "aistudio"):
+                    cfg.cloudflare.primary_model = model_name
+                else:
+                    from autokeren.models.cloudflare import resolve_model_id
+                    if cfg.auth.mode == "platform":
+                        cfg.cloudflare.primary_model = resolve_model_id(model_name, "platform")
+                    else:
+                        cfg.cloudflare.primary_model = model_name
+
             project_path = Path(project_root).expanduser().resolve()
             memory = MemoryManager(str(project_path))
             reg = build_registry(cfg, project_path, memory)
 
+            # Daftarkan optional tools yang ada di cli.py agar daemon memiliki toolset yang sama persis
+            from autokeren.tools import RewindTool, GenomeTool, ReviewTool, ResearchTool
+            temp_agent = Agent(cfg, reg, str(project_path), memory=memory)
+            if temp_agent.checkpoints:
+                reg.register(RewindTool(temp_agent.checkpoints))
+            if temp_agent._genome_scanner and temp_agent._genome:
+                reg.register(GenomeTool(temp_agent._genome_scanner, temp_agent._genome))
+            if cfg.autokeren.cross_model_review.enabled:
+                coder_model = temp_agent.router.current_model_id()
+                reg.register(ReviewTool(str(project_path), coder_model=coder_model, router=temp_agent.router))
+            if cfg.autokeren.research.enabled:
+                rc = cfg.autokeren.research
+                reg.register(ResearchTool(
+                    router=temp_agent.router,
+                    max_results=rc.max_results,
+                    max_depth=rc.max_depth,
+                    summarize=rc.summarize,
+                    min_comment_score=rc.min_comment_score,
+                ))
+
             # Inisialisasi Agent
-            self.agent = Agent(cfg, reg, str(project_path), memory=memory)
+            self.agent = temp_agent
 
             # Pasang callbacks agen untuk dikirim sebagai notifikasi JSON-RPC ke Go TUI
             self.agent.on_model_start = lambda: self.send_notification("ui.on_model_start", {})

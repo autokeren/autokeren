@@ -66,6 +66,7 @@ type MainModel struct {
 	GhostMgr      *ghost.GhostManager
 	ProjectRoot   string
 	ConfigPath    string
+	InitOpts      map[string]interface{}
 	
 	Width  int
 	Height int
@@ -78,7 +79,7 @@ type MainModel struct {
 	InitError      string
 }
 
-func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot, configPath string) MainModel {
+func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot, configPath string, opts map[string]interface{}) MainModel {
 	ti := textinput.New()
 	ti.Placeholder = "Ketik perintah Anda di sini... (atau /q untuk keluar)"
 	ti.Focus()
@@ -95,6 +96,7 @@ func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot,
 		GhostMgr:    ghostMgr,
 		ProjectRoot: projectRoot,
 		ConfigPath:  configPath,
+		InitOpts:    opts,
 	}
 }
 
@@ -491,7 +493,7 @@ func (m *MainModel) handleGhostCommand(args string) {
 func (m MainModel) connectToAgentCmd() tea.Cmd {
 	return func() tea.Msg {
 		// Jalankan start client
-		err := m.IPCClient.Start(m.ProjectRoot, m.ConfigPath)
+		err := m.IPCClient.Start(m.ProjectRoot, m.ConfigPath, m.InitOpts)
 		if err != nil {
 			return ErrorMsg{Message: fmt.Sprintf("Gagal menjalankan daemon Python: %v", err)}
 		}

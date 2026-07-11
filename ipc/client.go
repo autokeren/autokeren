@@ -63,7 +63,7 @@ func NewClient(callbacks *IPCCallbacks) *Client {
 	}
 }
 
-func (c *Client) Start(projectRoot string, configPath string) error {
+func (c *Client) Start(projectRoot string, configPath string, opts map[string]interface{}) error {
 	// Dapatkan path interpreter Python dari parent process
 	pythonPath := os.Getenv("AUTOKEREN_PYTHON_PATH")
 	if pythonPath == "" {
@@ -122,6 +122,9 @@ func (c *Client) Start(projectRoot string, configPath string) error {
 	}
 	if configPath != "" {
 		initParams["config_path"] = configPath
+	}
+	for k, v := range opts {
+		initParams[k] = v
 	}
 
 	var respStr string

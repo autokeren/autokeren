@@ -18,6 +18,8 @@ var (
 	configPath     string
 	modelOverride  string
 	useAIStudio    bool
+	useAgy         bool
+	planMode       bool
 	nonInteractive bool
 	taskPrompt     string
 )
@@ -99,6 +101,21 @@ var rootCmd = &cobra.Command{
 		// 2. Start IPC Client
 		client := ipc.NewClient(callbacks)
 
+		// Bangun parameter inisialisasi dinamis dari flag CLI
+		opts := make(map[string]interface{})
+		if modelOverride != "" {
+			opts["model"] = modelOverride
+		}
+		if useAIStudio {
+			opts["aistudio"] = true
+		}
+		if useAgy {
+			opts["agy"] = true
+		}
+		if planMode {
+			opts["plan"] = true
+		}
+
 		// 3. Eksekusi Non-Interactive Mode jika ada prompt/task
 		if prompt != "" || nonInteractive {
 			if prompt == "" {
@@ -106,7 +123,7 @@ var rootCmd = &cobra.Command{
 				os.Exit(1)
 			}
 			
-			err := client.Start(projectRoot, configPath)
+			err := client.Start(projectRoot, configPath, opts)
 			if err != nil {
 				fmt.Printf("Error: %v\n", err)
 				os.Exit(1)
@@ -130,7 +147,7 @@ var rootCmd = &cobra.Command{
 
 		// 4. Jalankan TUI Mode jika dipanggil interaktif (Default)
 		ghostMgr := ghost.NewGhostManager(projectRoot)
-		m := ui.NewMainModel(client, ghostMgr, projectRoot, configPath)
+		m := ui.NewMainModel(client, ghostMgr, projectRoot, configPath, opts)
 		p := tea.NewProgram(m, tea.WithAltScreen())
 
 		// Arahkan callbacks agar menyalurkan pesan ke Bubble Tea program
@@ -208,6 +225,8 @@ func init() {
 	rootCmd.Flags().StringVar(&configPath, "config", "", "Path ke custom config YAML")
 	rootCmd.Flags().StringVarP(&modelOverride, "model", "m", "", "Override model primary")
 	rootCmd.Flags().BoolVar(&useAIStudio, "aistudio", false, "Gunakan backend Google AI Studio")
+	rootCmd.Flags().BoolVar(&useAgy, "agy", false, "Gunakan backend Google Antigravity")
+	rootCmd.Flags().BoolVar(&planMode, "plan", false, "Mulai dalam plan mode")
 	rootCmd.Flags().BoolVar(&nonInteractive, "non-interactive", false, "Jalankan single task tanpa REPL")
 	rootCmd.Flags().StringVar(&taskPrompt, "task", "", "Deskripsi task untuk dijalankan")
 }
