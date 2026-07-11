@@ -29,6 +29,7 @@ from autokeren.tools import (
     CloudflareD1Tool,
     CloudflareDeployTool,
     CloudflareKVTool,
+    CollaborateTool,
     CreateProjectTool,
     DeployProjectTool,
     FetchURLTool,
@@ -85,6 +86,7 @@ def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegist
     reg.register(KanbanTool(project_root))
     reg.register(RememberTool(memory))
     reg.register(SpawnAgentTool(cfg, str(project_root), memory))
+    reg.register(CollaborateTool(cfg, str(project_root), memory))
     if cfg.auth.mode == "platform":
         reg.register(CreateProjectTool(cfg))
         reg.register(DeployProjectTool(cfg))

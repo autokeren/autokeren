@@ -17,12 +17,14 @@ from autokeren.tools.spawn_agent import SpawnAgentTool
 from autokeren.tools.tmux import TmuxTool
 from autokeren.tools.todo import TodoTool
 from autokeren.tools.kanban import KanbanTool
+from autokeren.tools.collaborate import CollaborateTool
 from autokeren.tools.web import FetchURLTool
 
 __all__ = [
     "Tool",
     "ToolRegistry",
     "ToolResult",
+    "CollaborateTool",
     "ReadFileTool",
     "WriteFileTool",
     "PatchFileTool",
