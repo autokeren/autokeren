@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.15] - 2026-07-12
+
+### Changed
+- update README dengan dokumentasi fitur AGI Evolution (Fase 3 ## [ 4) dan shortcut keyboard TUI baru
+
 ## [0.11.14] - 2026-07-12
 
 ### Changed
