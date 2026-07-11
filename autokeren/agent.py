@@ -101,6 +101,7 @@ class Agent:
         self.on_chunk: Callable[[str], None] | None = None
         self.on_retry: Callable[[int, float, str], None] | None = None
         self.permission_callback: Callable[[str, str, dict[str, Any]], bool] | None = None
+        self._consecutive_no_tool_prompts = 0
 
     def _build_system_prompt(self) -> None:
         """Build system prompt dengan memory + AGENTS.md."""
@@ -185,9 +186,16 @@ class Agent:
                 import os
                 if os.environ.get("AUTOKEREN_DEBUG") == "1":
                     raise
+                err_msg = str(e) or type(e).__name__
+                if iteration < self.cfg.autokeren.max_iterations - 1:
+                    if self.on_retry:
+                        self.on_retry(iteration + 1, 3.0, f"Error: {err_msg} | Mencoba berpindah model...")
+                    import time
+                    time.sleep(3.0)
+                    self.router.swap_models()
+                    continue
                 if self.on_model_end:
                     self.on_model_end(ModelResponse(content=""))
-                err_msg = str(e) or type(e).__name__
                 return ModelResponse(content=f"[red]⚠ Model error: {err_msg}[/red]\n\nCoba ganti model dengan /model, atau ulangi pertanyaan.")
             if self.on_model_end:
                 self.on_model_end(resp)
@@ -202,9 +210,29 @@ class Agent:
                 return resp  # caller will ask user for approval
 
             if not resp.tool_calls:
+                has_run_tools = any(isinstance(m, dict) and m.get("role") == "tool" for m in self.context.messages)
+                if has_run_tools and self._consecutive_no_tool_prompts < 2 and iteration < self.cfg.autokeren.max_iterations - 1:
+                    continuation_keywords = ["akan", "mari", "selanjutnya", "berikutnya", "mencoba", "perlu", "harus", "apology", "maaf"]
+                    content_lower = (resp.content or "").lower()
+                    needs_continue = any(kw in content_lower for kw in continuation_keywords)
+                    if needs_continue:
+                        self._consecutive_no_tool_prompts += 1
+                        self.context.add_assistant(resp)
+                        self.context.messages.append({
+                            "role": "system",
+                            "content": (
+                                "⚠️ KAMU SEDANG DALAM MODE OTONOM. Jangan sekadar menjelaskan langkah selanjutnya "
+                                "atau meminta maaf. Gunakan tool yang sesuai secara langsung untuk melanjutkan tugas "
+                                "sampai selesai sepenuhnya."
+                            )
+                        })
+                        continue
+
+                self._consecutive_no_tool_prompts = 0
                 self.context.add_assistant(resp)
                 return resp
 
+            self._consecutive_no_tool_prompts = 0
             self.context.add_assistant(resp)
             for tc in resp.tool_calls:
                 try:
