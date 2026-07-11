@@ -94,6 +94,7 @@ var slashCommands = []SlashCommandInfo{
 	{Name: "/ghost", Description: "Kelola background agent"},
 	{Name: "/board", Description: "Buka/tutup papan Kanban proyek"},
 	{Name: "/kanban", Description: "Buka/tutup papan Kanban proyek"},
+	{Name: "/debate", Description: "Lihat visualisasi diskusi multi-agent"},
 	{Name: "/compact", Description: "Kompak/ringkas konteks percakapan"},
 	{Name: "/reset", Description: "Reset sesi percakapan baru"},
 	{Name: "/q", Description: "Keluar dari autokeren"},
@@ -146,6 +147,9 @@ type MainModel struct {
 	SelectedTaskIndex int
 	KanbanAddingTask  bool
 	KanbanInputTitle  textinput.Model
+
+	ShowDebate            bool
+	SelectedDebateAgentID int
 }
 
 type KanbanTask struct {
@@ -201,6 +205,8 @@ func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot,
 		SelectedTaskIndex:  0,
 		KanbanAddingTask:   false,
 		KanbanInputTitle:   kit,
+		ShowDebate:         false,
+		SelectedDebateAgentID: 0,
 	}
 }
 
@@ -393,6 +399,69 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.PermissionReq = &msg
 
 	case tea.KeyMsg:
+		if m.ShowDebate {
+			switch msg.String() {
+			case "tab", "esc":
+				m.ShowDebate = false
+				m.TextInput.Focus()
+				return m, nil
+			case "left", "h":
+				list := m.GhostMgr.List()
+				if len(list) > 0 {
+					idx := -1
+					for i, a := range list {
+						if a.ID == m.SelectedDebateAgentID {
+							idx = i
+							break
+						}
+					}
+					if idx == -1 {
+						m.SelectedDebateAgentID = list[0].ID
+					} else {
+						idx--
+						if idx < 0 {
+							idx = len(list) - 1
+						}
+						m.SelectedDebateAgentID = list[idx].ID
+					}
+				}
+				return m, nil
+			case "right", "l":
+				list := m.GhostMgr.List()
+				if len(list) > 0 {
+					idx := -1
+					for i, a := range list {
+						if a.ID == m.SelectedDebateAgentID {
+							idx = i
+							break
+						}
+					}
+					if idx == -1 {
+						m.SelectedDebateAgentID = list[0].ID
+					} else {
+						idx++
+						if idx >= len(list) {
+							idx = 0
+						}
+						m.SelectedDebateAgentID = list[idx].ID
+					}
+				}
+				return m, nil
+			case "k":
+				if m.SelectedDebateAgentID != 0 {
+					m.GhostMgr.Kill(m.SelectedDebateAgentID)
+					list := m.GhostMgr.List()
+					if len(list) > 0 {
+						m.SelectedDebateAgentID = list[0].ID
+					} else {
+						m.SelectedDebateAgentID = 0
+					}
+				}
+				return m, nil
+			}
+			return m, nil
+		}
+
 		if m.ShowKanban {
 			if m.KanbanAddingTask {
 				switch msg.String() {
@@ -771,6 +840,22 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
+
+			if val == "/debate" {
+				m.ShowDebate = !m.ShowDebate
+				if m.ShowDebate {
+					m.ShowKanban = false
+					list := m.GhostMgr.List()
+					if len(list) > 0 {
+						m.SelectedDebateAgentID = list[0].ID
+					} else {
+						m.SelectedDebateAgentID = 0
+					}
+				} else {
+					m.TextInput.Focus()
+				}
+				return m, nil
+			}
 			
 			// ── Kirim perintah biasa secara asinkron ke background thread ──
 			m.AgentRunning = true
@@ -927,6 +1012,15 @@ func (m MainModel) View() string {
 			lipgloss.Top,
 			sidebarView,
 			kanbanView,
+		)
+	}
+
+	if m.ShowDebate {
+		debateView := m.DebateView(panelWidth, m.Height)
+		return lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			sidebarView,
+			debateView,
 		)
 	}
 
