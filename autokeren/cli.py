@@ -50,6 +50,7 @@ from autokeren.tools import (
     ShellTool,
     SpawnAgentTool,
     TodoTool,
+    KanbanTool,
     ToolRegistry,
     TmuxTool,
     WriteFileTool,
@@ -81,6 +82,7 @@ def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegist
     reg.register(CloudflareD1Tool(cfg))
     reg.register(TmuxTool(project_root))
     reg.register(TodoTool())
+    reg.register(KanbanTool(project_root))
     reg.register(RememberTool(memory))
     reg.register(SpawnAgentTool(cfg, str(project_root), memory))
     if cfg.auth.mode == "platform":

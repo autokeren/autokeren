@@ -494,9 +494,19 @@ class Agent:
         todos = []
         if todo_tool and hasattr(todo_tool, "get_todos"):
             todos = todo_tool.get_todos()
+        
+        kanban_tasks = []
+        try:
+            from autokeren.kanban import KanbanDB
+            db = KanbanDB(self.project_root)
+            kanban_tasks = db.list_tasks()
+        except Exception:
+            pass
+
         return {
             "project_root": self.project_root,
             "model_status": self.router.status(),
             "context": self.context.summary(),
             "todos": todos,
+            "kanban_tasks": kanban_tasks,
         }

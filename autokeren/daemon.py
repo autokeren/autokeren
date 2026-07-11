@@ -11,6 +11,7 @@ from autokeren.agent import Agent
 from autokeren.config import load_config
 from autokeren.memory import MemoryManager
 from autokeren.cli import build_registry
+from autokeren.kanban import KanbanDB
 
 
 class JSONRPCDaemon:
@@ -104,6 +105,14 @@ class JSONRPCDaemon:
             self.handle_agent_switch_model(req_id, params)
         elif method == "agent.list_models":
             self.handle_agent_list_models(req_id)
+        elif method == "kanban.list":
+            self.handle_kanban_list(req_id)
+        elif method == "kanban.add":
+            self.handle_kanban_add(req_id, params)
+        elif method == "kanban.move":
+            self.handle_kanban_move(req_id, params)
+        elif method == "kanban.delete":
+            self.handle_kanban_delete(req_id, params)
         else:
             self.send_response(
                 req_id,
@@ -323,6 +332,79 @@ class JSONRPCDaemon:
             self.send_response(req_id, result=result)
         except Exception as e:
             self.send_response(req_id, error={"code": -32603, "message": str(e)})
+
+    def _get_kanban_db(self) -> KanbanDB:
+        if not self.agent:
+            raise RuntimeError("Agent not initialized")
+        from autokeren.kanban import KanbanDB
+        return KanbanDB(self.agent.project_root)
+
+    def handle_kanban_list(self, req_id: str | int | None) -> None:
+        if not self.agent:
+            self.send_response(req_id, error={"code": -32000, "message": "Agent not initialized"})
+            return
+        try:
+            db = self._get_kanban_db()
+            tasks = db.list_tasks()
+            self.send_response(req_id, result=tasks)
+        except Exception as e:
+            self.send_response(req_id, error={"code": -32603, "message": str(e)})
+
+    def handle_kanban_add(self, req_id: str | int | None, params: dict[str, Any]) -> None:
+        if not self.agent:
+            self.send_response(req_id, error={"code": -32000, "message": "Agent not initialized"})
+            return
+        try:
+            db = self._get_kanban_db()
+            title = params.get("title", "")
+            if not title:
+                self.send_response(req_id, error={"code": -32602, "message": "title parameter is required"})
+                return
+            desc = params.get("description")
+            status = params.get("status", "todo")
+            priority = params.get("priority", "medium")
+            task_id = db.add_task(title, desc, status, priority)
+            self.send_response(req_id, result={"id": task_id, "status": "success"})
+        except Exception as e:
+            self.send_response(req_id, error={"code": -32603, "message": str(e)})
+
+    def handle_kanban_move(self, req_id: str | int | None, params: dict[str, Any]) -> None:
+        if not self.agent:
+            self.send_response(req_id, error={"code": -32000, "message": "Agent not initialized"})
+            return
+        try:
+            db = self._get_kanban_db()
+            task_id = params.get("id", 0)
+            status = params.get("status", "")
+            if task_id <= 0 or not status:
+                self.send_response(req_id, error={"code": -32602, "message": "id and status parameters are required"})
+                return
+            success = db.move_task(task_id, status)
+            if success:
+                self.send_response(req_id, result={"id": task_id, "status": f"moved_to_{status}"})
+            else:
+                self.send_response(req_id, error={"code": -32002, "message": f"Task {task_id} not found"})
+        except Exception as e:
+            self.send_response(req_id, error={"code": -32603, "message": str(e)})
+
+    def handle_kanban_delete(self, req_id: str | int | None, params: dict[str, Any]) -> None:
+        if not self.agent:
+            self.send_response(req_id, error={"code": -32000, "message": "Agent not initialized"})
+            return
+        try:
+            db = self._get_kanban_db()
+            task_id = params.get("id", 0)
+            if task_id <= 0:
+                self.send_response(req_id, error={"code": -32602, "message": "id parameter is required"})
+                return
+            success = db.delete_task(task_id)
+            if success:
+                self.send_response(req_id, result={"id": task_id, "status": "deleted"})
+            else:
+                self.send_response(req_id, error={"code": -32002, "message": f"Task {task_id} not found"})
+        except Exception as e:
+            self.send_response(req_id, error={"code": -32603, "message": str(e)})
+
 
     def run(self) -> None:
         """Main loop membaca JSON-RPC baris demi baris dari stdin."""

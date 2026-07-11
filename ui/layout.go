@@ -62,6 +62,7 @@ type StatusUpdateMsg struct {
 	NeuronsRemaining int
 	NeuronsQuota     int
 	Todos            []TodoItem
+	KanbanTasks      []KanbanTask
 }
 
 // PermissionConfirmReq mewakili request izin masuk yang harus direspon balik
@@ -91,6 +92,8 @@ type SlashCommandInfo struct {
 var slashCommands = []SlashCommandInfo{
 	{Name: "/model", Description: "Ganti model AI yang digunakan"},
 	{Name: "/ghost", Description: "Kelola background agent"},
+	{Name: "/board", Description: "Buka/tutup papan Kanban proyek"},
+	{Name: "/kanban", Description: "Buka/tutup papan Kanban proyek"},
 	{Name: "/compact", Description: "Kompak/ringkas konteks percakapan"},
 	{Name: "/reset", Description: "Reset sesi percakapan baru"},
 	{Name: "/q", Description: "Keluar dari autokeren"},
@@ -136,6 +139,23 @@ type MainModel struct {
 
 	// Task aktif saat ini (ditampilkan di sidebar)
 	CurrentTask string
+
+	ShowKanban        bool
+	KanbanTasks       []KanbanTask
+	SelectedColumn    int // 0 = Todo, 1 = In Progress, 2 = Done
+	SelectedTaskIndex int
+	KanbanAddingTask  bool
+	KanbanInputTitle  textinput.Model
+}
+
+type KanbanTask struct {
+	ID          int    `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Status      string `json:"status"`
+	Priority    string `json:"priority"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
 }
 
 func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot, configPath string, opts map[string]interface{}) MainModel {
@@ -146,6 +166,13 @@ func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot,
 	ti.Width = 80
 	ti.Prompt = " ❯ "
 	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#00E5FF")).Bold(true)
+
+	kit := textinput.New()
+	kit.Placeholder = "Judul task baru..."
+	kit.CharLimit = 200
+	kit.Width = 50
+	kit.Prompt = " ✏️  "
+	kit.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FBBF24")).Bold(true)
 
 	return MainModel{
 		Chat:               NewChatModel(),
@@ -168,6 +195,12 @@ func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot,
 		SpinnerPos:         0,
 		AlwaysAllow:        make(map[string]bool),
 		CurrentTask:        "",
+		ShowKanban:         false,
+		KanbanTasks:        []KanbanTask{},
+		SelectedColumn:     0,
+		SelectedTaskIndex:  0,
+		KanbanAddingTask:   false,
+		KanbanInputTitle:   kit,
 	}
 }
 
@@ -333,6 +366,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Sidebar.NeuronsRemaining = msg.NeuronsRemaining
 		m.Sidebar.NeuronsQuota = msg.NeuronsQuota
 		m.Sidebar.Todos = msg.Todos
+		m.KanbanTasks = msg.KanbanTasks
 
 	case PeriodicTickMsg:
 		m.Sidebar.GhostAgents = msg.GhostAgents
@@ -346,6 +380,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Sidebar.NeuronsRemaining = parsed.NeuronsRemaining
 			m.Sidebar.NeuronsQuota = parsed.NeuronsQuota
 			m.Sidebar.Todos = parsed.Todos
+			m.KanbanTasks = parsed.KanbanTasks
 		}
 		return m, m.pollPeriodicCmd()
 
@@ -358,6 +393,135 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.PermissionReq = &msg
 
 	case tea.KeyMsg:
+		if m.ShowKanban {
+			if m.KanbanAddingTask {
+				switch msg.String() {
+				case "enter":
+					val := m.KanbanInputTitle.Value()
+					if val != "" {
+						var reply map[string]interface{}
+						_ = m.IPCClient.Call("kanban.add", map[string]interface{}{
+							"title":    val,
+							"status":   "todo",
+							"priority": "medium",
+						}, &reply)
+
+						// Ambil status terbaru
+						var statusReply map[string]interface{}
+						_ = m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply)
+						parsed := parseStatusReply(statusReply, m.ProjectRoot)
+						m.KanbanTasks = parsed.KanbanTasks
+						m.Sidebar.Todos = parsed.Todos
+					}
+					m.KanbanAddingTask = false
+					m.KanbanInputTitle.SetValue("")
+					m.SelectedTaskIndex = 0
+					return m, nil
+				case "esc":
+					m.KanbanAddingTask = false
+					m.KanbanInputTitle.SetValue("")
+					return m, nil
+				default:
+					var cmd tea.Cmd
+					m.KanbanInputTitle, cmd = m.KanbanInputTitle.Update(msg)
+					return m, cmd
+				}
+			}
+
+			switch msg.String() {
+			case "tab", "esc":
+				m.ShowKanban = false
+				m.TextInput.Focus()
+				return m, nil
+			case "left", "h":
+				m.SelectedColumn--
+				if m.SelectedColumn < 0 {
+					m.SelectedColumn = 2
+				}
+				m.SelectedTaskIndex = 0
+				return m, nil
+			case "right", "l":
+				m.SelectedColumn++
+				if m.SelectedColumn > 2 {
+					m.SelectedColumn = 0
+				}
+				m.SelectedTaskIndex = 0
+				return m, nil
+			case "up", "k":
+				m.SelectedTaskIndex--
+				if m.SelectedTaskIndex < 0 {
+					m.SelectedTaskIndex = 0
+				}
+				return m, nil
+			case "down", "j":
+				m.SelectedTaskIndex++
+				var colTasksCount int
+				status := "todo"
+				if m.SelectedColumn == 1 {
+					status = "in_progress"
+				} else if m.SelectedColumn == 2 {
+					status = "done"
+				}
+				for _, t := range m.KanbanTasks {
+					if t.Status == status {
+						colTasksCount++
+					}
+				}
+				if m.SelectedTaskIndex >= colTasksCount {
+					m.SelectedTaskIndex = colTasksCount - 1
+					if m.SelectedTaskIndex < 0 {
+						m.SelectedTaskIndex = 0
+					}
+				}
+				return m, nil
+			case "space":
+				if task, ok := m.getSelectedTask(); ok {
+					nextStatus := "in_progress"
+					if task.Status == "in_progress" {
+						nextStatus = "done"
+					} else if task.Status == "done" {
+						nextStatus = "todo"
+					}
+					var reply map[string]interface{}
+					_ = m.IPCClient.Call("kanban.move", map[string]interface{}{
+						"id":     task.ID,
+						"status": nextStatus,
+					}, &reply)
+
+					// Refresh
+					var statusReply map[string]interface{}
+					_ = m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply)
+					parsed := parseStatusReply(statusReply, m.ProjectRoot)
+					m.KanbanTasks = parsed.KanbanTasks
+					m.Sidebar.Todos = parsed.Todos
+					m.SelectedTaskIndex = 0
+				}
+				return m, nil
+			case "a", "n":
+				m.KanbanAddingTask = true
+				m.KanbanInputTitle.SetValue("")
+				m.KanbanInputTitle.Focus()
+				return m, nil
+			case "d", "x":
+				if task, ok := m.getSelectedTask(); ok {
+					var reply map[string]interface{}
+					_ = m.IPCClient.Call("kanban.delete", map[string]interface{}{
+						"id": task.ID,
+					}, &reply)
+
+					// Refresh
+					var statusReply map[string]interface{}
+					_ = m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply)
+					parsed := parseStatusReply(statusReply, m.ProjectRoot)
+					m.KanbanTasks = parsed.KanbanTasks
+					m.Sidebar.Todos = parsed.Todos
+					m.SelectedTaskIndex = 0
+				}
+				return m, nil
+			}
+			return m, nil
+		}
+
 		// Jika autocomplete slash sedang tampil, tangani navigasi dropdown dulu
 		if m.ShowAutocomplete && len(m.FilteredCmds) > 0 {
 			switch msg.String() {
@@ -591,6 +755,22 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}()
 				return m, nil
 			}
+
+			if val == "/board" || val == "/kanban" {
+				m.ShowKanban = !m.ShowKanban
+				if m.ShowKanban {
+					m.SelectedColumn = 0
+					m.SelectedTaskIndex = 0
+					var statusReply map[string]interface{}
+					_ = m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply)
+					parsed := parseStatusReply(statusReply, m.ProjectRoot)
+					m.KanbanTasks = parsed.KanbanTasks
+					m.Sidebar.Todos = parsed.Todos
+				} else {
+					m.TextInput.Focus()
+				}
+				return m, nil
+			}
 			
 			// ── Kirim perintah biasa secara asinkron ke background thread ──
 			m.AgentRunning = true
@@ -740,6 +920,15 @@ func (m MainModel) View() string {
 	sidebarView := m.Sidebar.View()
 
 	panelWidth := m.Width - m.Sidebar.Width - 4
+
+	if m.ShowKanban {
+		kanbanView := m.KanbanView(panelWidth, m.Height)
+		return lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			sidebarView,
+			kanbanView,
+		)
+	}
 
 	inputStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -1126,6 +1315,30 @@ func parseStatusReply(statusReply map[string]interface{}, projectRoot string) St
 		}
 	}
 
+	var kanbanTasks []KanbanTask
+	if rawKanban, ok := statusReply["kanban_tasks"].([]interface{}); ok {
+		for _, rk := range rawKanban {
+			if km, ok := rk.(map[string]interface{}); ok {
+				idVal, _ := km["id"].(float64)
+				title, _ := km["title"].(string)
+				desc, _ := km["description"].(string)
+				status, _ := km["status"].(string)
+				priority, _ := km["priority"].(string)
+				created, _ := km["created_at"].(string)
+				updated, _ := km["updated_at"].(string)
+				kanbanTasks = append(kanbanTasks, KanbanTask{
+					ID:          int(idVal),
+					Title:       title,
+					Description: desc,
+					Status:      status,
+					Priority:    priority,
+					CreatedAt:   created,
+					UpdatedAt:   updated,
+				})
+			}
+		}
+	}
+
 	return StatusUpdateMsg{
 		ModelName:        modelName,
 		ProjectName:      projectName,
@@ -1135,5 +1348,27 @@ func parseStatusReply(statusReply map[string]interface{}, projectRoot string) St
 		NeuronsRemaining: neuronsRemaining,
 		NeuronsQuota:     neuronsQuota,
 		Todos:            todos,
+		KanbanTasks:      kanbanTasks,
 	}
+}
+
+func (m MainModel) getSelectedTask() (KanbanTask, bool) {
+	var colTasks []KanbanTask
+	status := "todo"
+	if m.SelectedColumn == 1 {
+		status = "in_progress"
+	} else if m.SelectedColumn == 2 {
+		status = "done"
+	}
+
+	for _, t := range m.KanbanTasks {
+		if t.Status == status {
+			colTasks = append(colTasks, t)
+		}
+	}
+
+	if len(colTasks) == 0 || m.SelectedTaskIndex < 0 || m.SelectedTaskIndex >= len(colTasks) {
+		return KanbanTask{}, false
+	}
+	return colTasks[m.SelectedTaskIndex], true
 }
