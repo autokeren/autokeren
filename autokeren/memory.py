@@ -35,10 +35,46 @@ class MemoryManager:
 
     def load(self) -> str:
         """Load memory content (max max_lines baris)."""
-        if not self.memory_file.exists():
-            return ""
+        if not self.memory_file.exists() or self.memory_file.stat().st_size == 0:
+            self._initialize_default_memory()
         lines = self.memory_file.read_text(encoding="utf-8", errors="replace").splitlines()
         return "\n".join(lines[: self.max_lines])
+
+    def _initialize_default_memory(self) -> None:
+        """Inisialisasi file memory.md default dengan metadata proyek."""
+        path = Path(self.project_root).resolve()
+        name = path.name or "default"
+        
+        # Tebak tech stack
+        stacks = []
+        if (path / "package.json").exists():
+            stacks.append("Node.js")
+        if (path / "requirements.txt").exists() or (path / "pyproject.toml").exists() or (path / "setup.py").exists():
+            stacks.append("Python")
+        if (path / "go.mod").exists():
+            stacks.append("Go")
+        if (path / "Cargo.toml").exists():
+            stacks.append("Rust")
+        if (path / "wrangler.toml").exists() or (path / "wrangler.json").exists():
+            stacks.append("Cloudflare Workers")
+        tech_stack = ", ".join(stacks) if stacks else "Unknown"
+
+        template = (
+            f"# Project Memory: {name}\n\n"
+            f"## Metadata Proyek\n"
+            f"- **Nama Project**: {name}\n"
+            f"- **Direktori**: {path}\n"
+            f"- **Teknologi**: {tech_stack}\n"
+            f"- **Link Frontend (FE)**: (Silakan diisi, contoh: http://localhost:3000)\n"
+            f"- **Link Backend (BE)**: (Silakan diisi, contoh: http://localhost:8787)\n\n"
+            f"## Panduan / Runbook\n"
+            f"- **Install Dependencies**: (contoh: npm install atau pip install)\n"
+            f"- **Jalankan Aplikasi**: (contoh: npm run dev)\n"
+            f"- **Jalankan Pengujian**: (contoh: pytest atau npm test)\n\n"
+            f"## Catatan Kunci & Context\n"
+            f"- Proyek ini dikelola menggunakan autokeren CLI.\n"
+        )
+        self.save(template)
 
     def save(self, content: str) -> None:
         """Overwrite memory file."""

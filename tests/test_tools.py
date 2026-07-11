@@ -214,8 +214,7 @@ def memory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> MemoryManager:
 class TestMemoryManager:
     def test_init_does_not_create_file(self, memory: MemoryManager) -> None:
         assert memory.exists() is False
-        assert memory.load() == ""
-        assert memory.line_count() == 0
+        assert "Metadata Proyek" in memory.load()
 
     def test_save_and_load(self, memory: MemoryManager) -> None:
         memory.save("line one\nline two")
@@ -253,7 +252,7 @@ class TestMemoryManager:
         memory.save("something important")
         assert memory.exists() is True
         memory.clear()
-        assert memory.load() == ""
+        assert "Metadata Proyek" in memory.load()
 
     def test_get_path(self, memory: MemoryManager) -> None:
         path = memory.get_path()

@@ -768,7 +768,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 			
 		case tea.KeyEnter:
-			val := m.TextInput.Value()
+			val := strings.TrimSpace(m.TextInput.Value())
 			if val == "" {
 				return m, nil
 			}
