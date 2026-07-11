@@ -88,7 +88,7 @@ fi
 
 # Sisipkan setelah baris pertama yang berisi "## [" atau setelah header file
 if head -10 CHANGELOG.md | grep -q "^## \["; then
-  sed -i "0,/^## \[/{s/^## \[/$ENTRY\n## \[/}" CHANGELOG.md
+  sed -i "0,/^## \[/{s|^## \[|$ENTRY\n## \[|}" CHANGELOG.md
 else
   sed -i "1a\\\n$ENTRY" CHANGELOG.md
 fi
