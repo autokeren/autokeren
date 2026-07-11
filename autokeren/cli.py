@@ -695,10 +695,12 @@ def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
                 return False  # Tidak ada Go compiler, dan tidak ada prebuilt, fallback ke Python TUI
 
     if ak_bin.exists():
-        # Jalankan biner Go. Gunakan os.execvp agar menggantikan proses Python secara instan
         argv = [str(ak_bin)] + sys_argv[1:]
         try:
-            os.execvp(str(ak_bin), argv)
+            if os.name == "nt":
+                sys.exit(subprocess.call(argv))
+            else:
+                os.execvp(str(ak_bin), argv)
         except Exception:
             return False
             
