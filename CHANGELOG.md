@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.6] - 2026-07-11
+
+### Changed
+- feat: implement hybrid Go TUI and JSON-RPC IPC with cyberpunk theme
+
 ## [0.9.5] - 2026-07-11
 
 ### Changed
