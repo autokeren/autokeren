@@ -14,6 +14,7 @@ from autokeren.tools.rewind import RewindTool
 from autokeren.tools.search import SearchCodeTool
 from autokeren.tools.shell import ShellTool
 from autokeren.tools.spawn_agent import SpawnAgentTool
+from autokeren.tools.check_agent import CheckAgentTool
 from autokeren.tools.tmux import TmuxTool
 from autokeren.tools.todo import TodoTool
 from autokeren.tools.kanban import KanbanTool
@@ -50,6 +51,7 @@ __all__ = [
     "DeployProjectTool",
     "ListProjectsTool",
     "SpawnAgentTool",
+    "CheckAgentTool",
     "RewindTool",
     "GenomeTool",
     "ReviewTool",

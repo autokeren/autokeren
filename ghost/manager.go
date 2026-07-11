@@ -1,6 +1,7 @@
 package ghost
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -66,13 +67,18 @@ func (gm *GhostManager) Spawn(task string) (*GhostAgentInfo, error) {
 		return nil, fmt.Errorf("tmux tidak ditemukan di sistem. Harap pasang tmux terlebih dahulu")
 	}
 
-	// 2. Buat tmux session baru di background
+	// 2. Tulis metadata JSON
+	metaFile := filepath.Join(gm.ProjectRoot, fmt.Sprintf(".ak-ghost-%d.json", agentID))
+	metaContent := fmt.Sprintf(`{"id":%d,"task":%q,"started_at":%q}`, agentID, task, time.Now().UTC().Format(time.RFC3339))
+	_ = os.WriteFile(metaFile, []byte(metaContent), 0644)
+
+	// 3. Buat tmux session baru di background
 	cmdNew := exec.Command("tmux", "new-session", "-d", "-s", sessionName, "-c", gm.ProjectRoot)
 	if err := cmdNew.Run(); err != nil {
 		return nil, fmt.Errorf("gagal membuat tmux session: %v", err)
 	}
 
-	// 3. Jalankan autokeren-cli (biner Go baru kita) untuk memproses task
+	// 4. Jalankan autokeren-cli (biner Go baru kita) untuk memproses task
 	// Gunakan full path biner jika berjalan di folder lokal, atau default global "autokeren"
 	binPath := "./autokeren-cli"
 	if _, err := os.Stat(binPath); os.IsNotExist(err) {
@@ -122,6 +128,35 @@ func (gm *GhostManager) Kill(agentID int) bool {
 }
 
 func (gm *GhostManager) List() []*GhostAgentInfo {
+	// Scan files .ak-ghost-*.json untuk deteksi session baru atau sisa restart
+	matches, _ := filepath.Glob(filepath.Join(gm.ProjectRoot, ".ak-ghost-*.json"))
+	for _, match := range matches {
+		var id int
+		_, err := fmt.Sscanf(filepath.Base(match), ".ak-ghost-%d.json", &id)
+		if err == nil {
+			if _, exists := gm.agents[id]; !exists {
+				data, err := os.ReadFile(match)
+				if err == nil {
+					var meta struct {
+						ID        int    `json:"id"`
+						Task      string `json:"task"`
+						StartedAt string `json:"started_at"`
+					}
+					if json.Unmarshal(data, &meta) == nil {
+						started, _ := time.Parse(time.RFC3339, meta.StartedAt)
+						gm.agents[id] = &GhostAgentInfo{
+							ID:        id,
+							Task:      meta.Task,
+							Status:    "running",
+							StartedAt: started,
+							LogFile:   filepath.Join(gm.ProjectRoot, fmt.Sprintf(".ak-ghost-%d.log", id)),
+						}
+					}
+				}
+			}
+		}
+	}
+
 	list := make([]*GhostAgentInfo, 0, len(gm.agents))
 	for _, a := range gm.agents {
 		gm.CheckStatus(a.ID)

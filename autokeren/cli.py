@@ -50,6 +50,7 @@ from autokeren.tools import (
     SearchCodeTool,
     ShellTool,
     SpawnAgentTool,
+    CheckAgentTool,
     TodoTool,
     KanbanTool,
     ToolRegistry,
@@ -86,6 +87,7 @@ def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegist
     reg.register(KanbanTool(project_root))
     reg.register(RememberTool(memory))
     reg.register(SpawnAgentTool(cfg, str(project_root), memory))
+    reg.register(CheckAgentTool(cfg, str(project_root), memory))
     reg.register(CollaborateTool(cfg, str(project_root), memory))
     if cfg.auth.mode == "platform":
         reg.register(CreateProjectTool(cfg))
@@ -753,6 +755,7 @@ def main() -> int:
     parser.add_argument("--project-root", default=".", help="Project root path")
     parser.add_argument("--workspace", "-w", dest="project_root", help="Alias for --project-root")
     parser.add_argument("--model", "-m", help="Override primary model (alias atau @cf/... ID)")
+    parser.add_argument("--role", help="Persona/role kustom untuk Agent")
     parser.add_argument("--agy", action="store_true", help="Otomatis gunakan Google Antigravity backend")
     parser.add_argument("--aistudio", action="store_true", help="Otomatis gunakan Google AI Studio backend")
     parser.add_argument("--non-interactive", action="store_true", help="Run single task, no REPL (for ghost agent)")
@@ -848,7 +851,7 @@ def main() -> int:
     memory = MemoryManager(str(project_root))
     reg = build_registry(cfg, project_root, memory)
     load_mcp_servers(cfg, reg)
-    agent = Agent(cfg, reg, str(project_root), memory=memory)
+    agent = Agent(cfg, reg, str(project_root), memory=memory, role=args.role)
     if agent.checkpoints:
         reg.register(RewindTool(agent.checkpoints))
     if agent._genome_scanner and agent._genome:

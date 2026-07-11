@@ -46,7 +46,7 @@ class GhostManager:
         self._agents: dict[int, GhostAgentInfo] = {}
         self._next_id = 1
 
-    def spawn(self, task: str) -> GhostAgentInfo:
+    def spawn(self, task: str, role: str = "", model_id: str = "") -> GhostAgentInfo:
         if len(self._agents) >= self.max_agents:
             raise RuntimeError(f"Maksimal {self.max_agents} ghost agent.")
         
@@ -67,11 +67,31 @@ class GhostManager:
             started_at=time.time(), log_file=log_file,
         )
         try:
+            import json
+            meta_file = Path(self.project_root) / f".ak-ghost-{agent_id}.json"
+            meta_data = {
+                "id": agent_id,
+                "task": task,
+                "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(info.started_at)),
+                "role": role,
+                "model_id": model_id
+            }
+            meta_file.write_text(json.dumps(meta_data), encoding="utf-8")
+
             subprocess.run(
                 ["tmux", "new-session", "-d", "-s", session_name, "-c", self.project_root],
                 check=True, capture_output=True,
             )
-            cmd = f'autokeren --non-interactive --task "{task}" 2>&1 | tee {log_file}'
+            
+            import shlex
+            args = ["autokeren", "--non-interactive"]
+            if role:
+                args.extend(["--role", role])
+            if model_id:
+                args.extend(["--model", model_id])
+            args.extend(["--task", task])
+            
+            cmd = " ".join(shlex.quote(a) for a in args) + f" 2>&1 | tee {shlex.quote(log_file)}"
             subprocess.run(
                 ["tmux", "send-keys", "-t", session_name, cmd, "Enter"],
                 check=True, capture_output=True,

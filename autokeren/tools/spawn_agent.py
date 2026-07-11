@@ -18,9 +18,8 @@ class SpawnAgentTool(Tool):
 
     name = "spawn_agent"
     description = (
-        "Spawn satu sub-agent yang akan mengerjakan task spesifik secara independen dan mengembalikan hasilnya. "
-        "Gunakan tool ini saat satu task bisa diparalelkan atau membutuhkan fokus terpisah dari conversation utama. "
-        "Sub-agent memiliki akses ke semua tool yang sama. Hasil dikembalikan sebagai teks setelah selesai."
+        "Spawn satu sub-agent yang akan mengerjakan task spesifik secara independen. "
+        "Dapat dijalankan sinkron (in-process) atau asinkron di background (tmux session baru)."
     )
     parameters = {
         "type": "object",
@@ -49,6 +48,11 @@ class SpawnAgentTool(Tool):
                 "description": "Custom Cloudflare/AI Studio model ID untuk override primary model sub-agent ini (opsional).",
                 "default": "",
             },
+            "background": {
+                "type": "boolean",
+                "description": "Jika true, sub-agent akan didelegasikan di background tmux session baru secara paralel (tidak memblokir agent saat ini). Jika false, berjalan sinkron.",
+                "default": False,
+            },
         },
         "required": ["task"],
     }
@@ -63,8 +67,10 @@ class SpawnAgentTool(Tool):
         name = kwargs.get("agent_name", "sub-agent")
         task = str(kwargs.get("task", ""))[:80]
         role = kwargs.get("role", "")
+        bg = kwargs.get("background", False)
+        bg_info = " (BACKGROUND)" if bg else ""
         role_info = f" ({role})" if role else ""
-        return f"Spawn sub-agent '{name}'{role_info} untuk: {task}..."
+        return f"Spawn sub-agent '{name}'{role_info}{bg_info} untuk: {task}..."
 
     def run(
         self,
@@ -73,6 +79,7 @@ class SpawnAgentTool(Tool):
         context: str = "",
         role: str = "",
         model_id: str = "",
+        background: bool = False,
     ) -> ToolResult:
         from autokeren.cli import build_registry
         from autokeren.agent import Agent
@@ -81,6 +88,26 @@ class SpawnAgentTool(Tool):
         full_task = task
         if context:
             full_task = f"Konteks:\n{context}\n\nTask:\n{task}"
+
+        if background:
+            from autokeren.ghost.manager import GhostManager
+            try:
+                mgr = GhostManager(self._project_root)
+                info = mgr.spawn(full_task, role=role, model_id=model_id)
+                return ToolResult(
+                    output=(
+                        f"[Sub-agent '{agent_name}' berhasil didelegasikan di background!]\n"
+                        f"ID: #{info.id}\n"
+                        f"Sesi tmux: ak-ghost-{info.id}\n"
+                        f"Log file: {info.log_file}\n"
+                        f"Gunakan `check_agent` tool dengan ID #{info.id} untuk memantau status tugas ini."
+                    )
+                )
+            except Exception as e:
+                return ToolResult(
+                    output=f"[Gagal mendelegasikan sub-agent ke background: {e}]",
+                    error=str(e),
+                )
 
         try:
             child_reg = build_registry(self._cfg, Path(self._project_root), self._memory)  # type: ignore[arg-type]
@@ -99,6 +126,6 @@ class SpawnAgentTool(Tool):
             )
         except Exception as exc:
             return ToolResult(
-                output=f"[Sub-agent '{agent_name}' gagal: {exc}]",
+                output=f"[Gagal menjalankan sub-agent: {exc}]",
                 error=str(exc),
             )
