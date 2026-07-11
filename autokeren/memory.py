@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 import hashlib
+import math
 import os
+import re
+import sqlite3
+from collections import Counter
 from pathlib import Path
 
 from autokeren.utils import now_iso, sanitize_filename
@@ -20,11 +24,78 @@ def _config_base() -> Path:
     return Path(os.environ.get("AUTOKEREN_CONFIG_DIR", Path.home() / ".config" / "autokeren"))
 
 
-class MemoryManager:
-    """Kelola memory.md per project. Disimpan di ~/.config/autokeren/projects/<slug>/memory.md.
+def tokenize(text: str) -> list[str]:
+    return re.findall(r"\w+", text.lower())
 
-    Memory diload ke system prompt setiap startup (200 baris pertama).
-    Agent bisa append via remember tool. User bisa edit via /memory.
+
+def compute_tfidf_similarity(query: str, documents: list[str]) -> list[float]:
+    if not documents:
+        return []
+    query_tokens = tokenize(query)
+    if not query_tokens:
+        return [0.0] * len(documents)
+
+    doc_tokens = [tokenize(doc) for doc in documents]
+    
+    # Vocabulary
+    vocab = set(query_tokens)
+    for doc in doc_tokens:
+        vocab.update(doc)
+    vocab_list = list(vocab)
+    vocab_idx = {word: i for i, word in enumerate(vocab_list)}
+    
+    # Document frequency
+    df: Counter[str] = Counter()
+    for doc in doc_tokens:
+        unique_words = set(doc)
+        for word in unique_words:
+            df[word] += 1
+            
+    num_docs = len(documents)
+    idf = {}
+    for word in vocab_list:
+        # idf with smoothing
+        idf[word] = math.log((1 + num_docs) / (1 + df[word])) + 1
+        
+    # Query vector
+    query_tf = Counter(query_tokens)
+    query_vec = [0.0] * len(vocab_list)
+    for word, tf in query_tf.items():
+        if word in vocab_idx:
+            query_vec[vocab_idx[word]] = tf * idf[word]
+            
+    # Doc vectors
+    doc_vecs = []
+    for doc in doc_tokens:
+        doc_tf = Counter(doc)
+        doc_vec = [0.0] * len(vocab_list)
+        for word, tf in doc_tf.items():
+            if word in vocab_idx:
+                doc_vec[vocab_idx[word]] = tf * idf[word]
+        doc_vecs.append(doc_vec)
+        
+    # Cosine similarity
+    similarities = []
+    query_norm = math.sqrt(sum(val * val for val in query_vec))
+    if query_norm == 0:
+        return [0.0] * len(documents)
+        
+    for doc_vec in doc_vecs:
+        doc_norm = math.sqrt(sum(val * val for val in doc_vec))
+        if doc_norm == 0:
+            similarities.append(0.0)
+            continue
+        dot_product = sum(q * d for q, d in zip(query_vec, doc_vec))
+        similarities.append(dot_product / (query_norm * doc_norm))
+        
+    return similarities
+
+
+class MemoryManager:
+    """Kelola memory.md (markdown) & memory.db (SQLite) per project.
+    
+    Disimpan di ~/.config/autokeren/projects/<slug>/.
+    Menyediakan pencarian semantik (TF-IDF VSM) secara lokal.
     """
 
     def __init__(self, project_root: str, max_lines: int = _MAX_MEMORY_LINES):
@@ -32,6 +103,86 @@ class MemoryManager:
         self.max_lines = max_lines
         self.project_dir = _config_base() / "projects" / _project_slug(project_root)
         self.memory_file = self.project_dir / "memory.md"
+        self.db_file = self.project_dir / "memory.db"
+        self._init_db()
+
+    def _init_db(self) -> None:
+        self.project_dir.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(self.db_file) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT,
+                    role TEXT,
+                    content TEXT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS lessons (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    pattern TEXT,
+                    task_title TEXT,
+                    lesson TEXT,
+                    success INTEGER,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+    def log_message(self, session_id: str, role: str, content: str) -> None:
+        """Simpan transkrip pesan ke database SQLite."""
+        try:
+            with sqlite3.connect(self.db_file) as conn:
+                conn.execute(
+                    "INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)",
+                    (session_id, role, content),
+                )
+        except Exception:
+            pass
+
+    def search_relevant(self, query: str, limit: int = 5) -> list[str]:
+        """Lakukan pencarian semantik (TF-IDF VSM) di markdown & SQLite lessons."""
+        documents: list[str] = []
+        
+        # 1. Baca dari memory.md (menangkap manual edits oleh user)
+        if self.memory_file.exists():
+            try:
+                content = self.memory_file.read_text(encoding="utf-8", errors="replace")
+                # Ambil semua bullet points di memory.md
+                for line in content.splitlines():
+                    clean_line = line.strip()
+                    if clean_line.startswith("- "):
+                        note = clean_line[2:].strip()
+                        if note and note not in documents:
+                            documents.append(note)
+            except Exception:
+                pass
+
+        # 2. Baca dari SQLite lessons table
+        try:
+            with sqlite3.connect(self.db_file) as conn:
+                cursor = conn.execute("SELECT pattern, task_title, lesson FROM lessons")
+                for row in cursor.fetchall():
+                    pattern, title, lesson = row
+                    note = f"[{pattern}] {title}: {lesson}"
+                    if note not in documents:
+                        documents.append(note)
+        except Exception:
+            pass
+
+        if not documents:
+            return []
+
+        # 3. Hitung TF-IDF Similarity
+        try:
+            sims = compute_tfidf_similarity(query, documents)
+            # Gabungkan dan urutkan
+            scored_docs = sorted(zip(sims, documents), key=lambda x: x[0], reverse=True)
+            # Ambil yang skor > 0 (relevan)
+            relevant_docs = [doc for score, doc in scored_docs if score > 0.05]
+            return relevant_docs[:limit]
+        except Exception:
+            return documents[:limit]
 
     def load(self) -> str:
         """Load memory content (max max_lines baris)."""
@@ -97,12 +248,29 @@ class MemoryManager:
             existing += f"\n{header}\n_Update: {ts}_\n- {note}\n"
 
         self.save(existing)
+        
+        # Simpan juga ke SQLite lessons table
+        try:
+            with sqlite3.connect(self.db_file) as conn:
+                conn.execute(
+                    "INSERT INTO lessons (pattern, task_title, lesson, success) VALUES (?, ?, ?, ?)",
+                    (section, "manual_note" if "autoplan" not in section else section, note, 1),
+                )
+        except Exception:
+            pass
+
         return existing
 
     def clear(self) -> None:
         """Hapus semua memory."""
         if self.memory_file.exists():
             self.memory_file.write_text("", encoding="utf-8")
+        try:
+            with sqlite3.connect(self.db_file) as conn:
+                conn.execute("DELETE FROM messages")
+                conn.execute("DELETE FROM lessons")
+        except Exception:
+            pass
 
     def get_path(self) -> Path:
         return self.memory_file

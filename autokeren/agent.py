@@ -163,8 +163,19 @@ class Agent:
             self.interrupted = False
             raise KeyboardInterrupt("Interrupted by user")
 
+    def _add_assistant_and_log(self, resp: ModelResponse) -> None:
+        self.context.add_assistant(resp)
+        if self.cfg.autokeren.memory_enabled and resp.content:
+            self.memory.log_message(session_id="default", role="assistant", content=resp.content)
+
     def run(self, user_input: str) -> ModelResponse:
         self.context.add_user(user_input)
+        if self.cfg.autokeren.memory_enabled:
+            self.memory.log_message(session_id="default", role="user", content=user_input)
+            relevant = self.memory.search_relevant(user_input, limit=3)
+            if relevant:
+                ctx_msg = "ℹ️ MEMORI HISTORIS RELEVAN DARI SESI SEBELUMNYA:\n" + "\n".join(f"- {r}" for r in relevant)
+                self.context.messages.insert(-1, {"role": "system", "content": ctx_msg})
         try:
             for iteration in range(self.cfg.autokeren.max_iterations):
                 self.check_interrupt()
@@ -218,7 +229,7 @@ class Agent:
 
                 # Plan mode: sebelum persetujuan, kembalikan respon tanpa jalankan tool
                 if self.cfg.autokeren.plan_mode and not self.plan_approved:
-                    self.context.add_assistant(resp)
+                    self._add_assistant_and_log(resp)
                     return resp
 
                 if not resp.tool_calls:
@@ -229,7 +240,7 @@ class Agent:
                         needs_continue = any(kw in content_lower for kw in continuation_keywords)
                         if needs_continue:
                             self._consecutive_no_tool_prompts += 1
-                            self.context.add_assistant(resp)
+                            self._add_assistant_and_log(resp)
                             self.context.messages.append({
                                 "role": "system",
                                 "content": (
@@ -241,11 +252,11 @@ class Agent:
                             continue
 
                     self._consecutive_no_tool_prompts = 0
-                    self.context.add_assistant(resp)
+                    self._add_assistant_and_log(resp)
                     return resp
 
                 self._consecutive_no_tool_prompts = 0
-                self.context.add_assistant(resp)
+                self._add_assistant_and_log(resp)
                 for tc in resp.tool_calls:
                     self.check_interrupt()
 
