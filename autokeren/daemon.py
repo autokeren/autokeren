@@ -44,10 +44,22 @@ class SystemObserver:
                         pass
 
         # Scan code files untuk mtime tracking
-        for ext in ("*.py", "*.js", "*.ts", "*.go"):
-            for path in self.project_root.rglob(ext):
-                p_str = str(path)
-                if ".venv" not in p_str and "node_modules" not in p_str and ".git" not in p_str:
+        import os
+        excluded_dirs = {
+            ".git", "node_modules", ".venv", "venv", ".cache", ".local",
+            "dist", "build", "__pycache__", ".ak-checkpoints", ".ak-tools",
+            ".gemini",
+        }
+        allowed_exts = {".py", ".js", ".ts", ".go"}
+        
+        for root, dirs, files in os.walk(self.project_root):
+            # Batasi traversal folder agar tidak masuk ke folder excluded
+            dirs[:] = [d for d in dirs if d not in excluded_dirs]
+            
+            for file in files:
+                ext = os.path.splitext(file)[1]
+                if ext in allowed_exts:
+                    path = Path(root) / file
                     try:
                         self.last_mtimes[path] = path.stat().st_mtime
                     except Exception:
