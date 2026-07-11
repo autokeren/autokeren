@@ -188,13 +188,20 @@ class Agent:
                     )
                 except Exception as e:
                     import os
+                    import time
                     if os.environ.get("AUTOKEREN_DEBUG") == "1":
                         raise
                     err_msg = str(e) or type(e).__name__
                     if iteration < self.cfg.autokeren.max_iterations - 1:
+                        if not self.router.has_healthy():
+                            if self.on_retry:
+                                self.on_retry(iteration + 1, 5.0, f"Semua model down ({err_msg}). Reset circuit breakers, mencoba lagi...")
+                            self.router.reset_breakers()
+                            backoff = min(3.0 * (2 ** min(iteration, 5)), 60.0)
+                            time.sleep(backoff)
+                            continue
                         if self.on_retry:
                             self.on_retry(iteration + 1, 3.0, f"Error: {err_msg} | Mencoba berpindah model...")
-                        import time
                         time.sleep(3.0)
                         self.router.swap_models()
                         continue
@@ -543,4 +550,35 @@ class Agent:
             "context": self.context.summary(),
             "todos": todos,
             "kanban_tasks": kanban_tasks,
+        }
+
+    def run_autonomous(self, goal: str, context: str = "") -> dict[str, Any]:
+        """Run autonomous planning: decompose goal, execute sub-tasks, reflect.
+
+        Returns dict with tracker summary, results, and lessons.
+        """
+        from autokeren.autoplan import PlanExecutor, Reflector
+
+        reflector = Reflector(router=self.router, memory=self.memory)
+        executor = PlanExecutor(
+            agent=self,
+            router=self.router,
+            max_retries_per_task=2,
+            on_task_start=lambda t: None,
+            on_task_done=lambda t, r: reflector.reflect(t, r),
+            on_progress=lambda msg: None,
+        )
+
+        mem_context = context
+        if self.cfg.autokeren.memory_enabled:
+            mem_context = (self.memory.load() or "") + chr(10) + context
+
+        tracker = executor.execute_plan(goal=goal, context=mem_context)
+
+        return {
+            "tracker": tracker.to_dict(),
+            "results": [r.to_dict() for r in executor.results],
+            "lessons": [lesson.to_dict() for lesson in reflector.lessons],
+            "reflection_summary": reflector.summary(),
+            "patterns": reflector.get_patterns(),
         }

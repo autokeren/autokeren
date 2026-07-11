@@ -1,0 +1,15 @@
+{
+  "name": "kopi-juara-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
+# ak:ab8a11c31d6b32b3

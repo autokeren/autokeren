@@ -7,7 +7,7 @@ from typing import Any, Callable
 from autokeren.config import Config
 from autokeren.models.base import Message, ModelResponse, TokenUsage
 from autokeren.models.cloudflare import CloudflareModel
-from autokeren.models.retry import CircuitBreaker
+from autokeren.models.retry import CircuitBreaker, CircuitState
 from autokeren.utils import redact
 
 
@@ -73,6 +73,17 @@ class ModelRouter:
         """Tukar primary <-> secondary."""
         if len(self.models) >= 2:
             self.models[0], self.models[1] = self.models[1], self.models[0]
+
+    def reset_breakers(self) -> None:
+        """Reset semua circuit breakers ke CLOSED — untuk recovery otomatis."""
+        for cb in self.breakers.values():
+            cb._failures = 0
+            cb._state = CircuitState.CLOSED
+            cb._last_failure = None
+
+    def has_healthy(self) -> bool:
+        """Cek apakah masih ada model yang healthy."""
+        return any(cb.allow() for cb in self.breakers.values())
 
     def set_primary(self, model_id: str) -> bool:
         """Jadikan model dengan id tertentu sebagai primary. Return True kalau sukses."""
