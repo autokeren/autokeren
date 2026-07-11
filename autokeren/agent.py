@@ -490,7 +490,7 @@ class Agent:
         )
 
     def status(self) -> dict[str, Any]:
-        todo_tool = self.registry.get("todo")
+        todo_tool = self.tools.get("todo")
         todos = []
         if todo_tool and hasattr(todo_tool, "get_todos"):
             todos = todo_tool.get_todos()
