@@ -8,7 +8,19 @@ from typing import Any
 class KanbanDB:
     def __init__(self, project_root: str | Path) -> None:
         self.project_root = Path(project_root)
-        self.db_path = self.project_root / ".ak-kanban.db"
+        db_path = self.project_root / ".ak-kanban.db"
+        try:
+            # Coba buat/buka koneksi db di project root untuk tes izin menulis
+            conn = sqlite3.connect(db_path)
+            conn.close()
+            self.db_path = db_path
+        except sqlite3.OperationalError:
+            # Jika tidak memiliki izin menulis (misal di / atau folder sistem), fallback ke folder config user
+            from autokeren.memory import _config_base, _project_slug
+            project_dir = _config_base() / "projects" / _project_slug(str(self.project_root))
+            project_dir.mkdir(parents=True, exist_ok=True)
+            self.db_path = project_dir / "kanban.db"
+            
         self._init_db()
 
     def _get_connection(self) -> sqlite3.Connection:

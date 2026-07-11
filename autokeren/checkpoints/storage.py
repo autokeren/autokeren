@@ -8,8 +8,18 @@ from typing import Any
 
 def _checkpoint_dir(project_root: Path, session_id: str) -> Path:
     d = project_root / ".ak-checkpoints" / f"session-{session_id}"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+        test_file = d / ".test_write"
+        test_file.touch()
+        test_file.unlink()
+        return d
+    except (OSError, PermissionError):
+        from autokeren.memory import _config_base, _project_slug
+        project_dir = _config_base() / "projects" / _project_slug(str(project_root))
+        d_fallback = project_dir / ".ak-checkpoints" / f"session-{session_id}"
+        d_fallback.mkdir(parents=True, exist_ok=True)
+        return d_fallback
 
 
 class CheckpointStorage:
