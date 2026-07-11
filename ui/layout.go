@@ -124,7 +124,8 @@ type MainModel struct {
 	SpinnerPos   int // posisi bola saat ini
 
 	// Always-allow set: tool name yang sudah diizinkan selama sesi
-	AlwaysAllow map[string]bool
+	AlwaysAllow    map[string]bool
+	AllowAllTools  bool // autonomous mode: semua tool diizinkan tanpa konfirmasi
 
 	// Task aktif saat ini (ditampilkan di sidebar)
 	CurrentTask string
@@ -308,8 +309,12 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Sidebar.NeuronsQuota = msg.NeuronsQuota
 
 	case PermissionConfirmReq:
+		// Autonomous mode: auto-approve tanpa dialog
+		if m.AllowAllTools || m.AlwaysAllow[msg.Name] {
+			msg.RespChan <- true
+			return m, nil
+		}
 		m.PermissionReq = &msg
-		m.Chat.AppendMessage("system", fmt.Sprintf("permission required: %s — %s", msg.Name, msg.Description))
 
 	case tea.KeyMsg:
 		// Jika autocomplete slash sedang tampil, tangani navigasi dropdown dulu
@@ -451,23 +456,22 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.PermissionReq != nil {
 			switch msg.String() {
 			case "y", "Y", "enter":
-				// Allow sekali ini
 				m.PermissionReq.RespChan <- true
-				m.Chat.AppendMessage("system", fmt.Sprintf("allowed: %s", m.PermissionReq.Name))
 				m.PermissionReq = nil
 			case "a", "A":
-				// Allow selalu selama sesi ini
 				m.AlwaysAllow[m.PermissionReq.Name] = true
 				m.PermissionReq.RespChan <- true
-				m.Chat.AppendMessage("system", fmt.Sprintf("always allowed (session): %s", m.PermissionReq.Name))
 				m.PermissionReq = nil
+			case "t", "T":
+				m.AllowAllTools = true
+				m.PermissionReq.RespChan <- true
+				m.PermissionReq = nil
+				m.Chat.AppendMessage("system", "⚡ autonomous mode: semua tool diizinkan untuk sesi ini")
 			case "n", "N", "esc":
-				// Tolak sekali ini
 				m.PermissionReq.RespChan <- false
-				m.Chat.AppendMessage("system", fmt.Sprintf("denied: %s", m.PermissionReq.Name))
+				m.Chat.AppendMessage("system", fmt.Sprintf("✗ denied: %s", m.PermissionReq.Name))
 				m.PermissionReq = nil
 			case "q", "Q":
-				// Abort: tolak dan hentikan agent
 				m.PermissionReq.RespChan <- false
 				m.PermissionReq = nil
 				m.AgentRunning = false
@@ -750,39 +754,42 @@ func (m MainModel) View() string {
 		spinnerView = spinnerStyle.Render(spinnerText)
 	}
 
-	// Permission dialog 4-opsi overlay
+	// Permission dialog overlay
 	var permissionView string
 	if m.PermissionReq != nil {
 		permStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#FBBF24")).
-			Padding(1, 2).
+			Padding(1, 3).
 			Width(panelWidth)
 
 		titleStyle  := lipgloss.NewStyle().Foreground(lipgloss.Color("#FBBF24")).Bold(true)
 		toolStyle   := lipgloss.NewStyle().Foreground(lipgloss.Color("#F8FAFC")).Bold(true)
 		descStyle   := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Italic(true)
-		divStyle    := lipgloss.NewStyle().Foreground(lipgloss.Color("#374151"))
-
+		divStyle    := lipgloss.NewStyle().Foreground(lipgloss.Color("#2D3748"))
 		keyStyle    := lipgloss.NewStyle().Foreground(lipgloss.Color("#FBBF24")).Bold(true)
-		labelOkStyle:= lipgloss.NewStyle().Foreground(lipgloss.Color("#34D399"))
-		labelAlStyle:= lipgloss.NewStyle().Foreground(lipgloss.Color("#38BDF8"))
-		labelNoStyle:= lipgloss.NewStyle().Foreground(lipgloss.Color("#F87171"))
-		labelAbStyle:= lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280"))
+		keyBgStyle  := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FBBF24")).
+			Background(lipgloss.Color("#1A1A2E")).
+			Bold(true).
+			Padding(0, 1)
+		labelStyle  := lipgloss.NewStyle().Foreground(lipgloss.Color("#94A3B8"))
+		autoStyle   := lipgloss.NewStyle().Foreground(lipgloss.Color("#A78BFA")).Bold(true)
 
 		var pb strings.Builder
-		pb.WriteString(titleStyle.Render("  permission required") + "\n")
-		pb.WriteString(divStyle.Render(strings.Repeat("─", panelWidth-8)) + "\n")
+		pb.WriteString(titleStyle.Render("⚠  permission required") + "\n")
+		pb.WriteString(divStyle.Render(strings.Repeat("─", panelWidth-10)) + "\n\n")
 		pb.WriteString(toolStyle.Render("  "+m.PermissionReq.Name) + "\n")
 		if m.PermissionReq.Description != "" {
 			pb.WriteString(descStyle.Render("  "+m.PermissionReq.Description) + "\n")
 		}
 		pb.WriteString("\n")
 		pb.WriteString(
-			keyStyle.Render("  [y]") + labelOkStyle.Render(" allow once") + "   " +
-			keyStyle.Render("[a]") + labelAlStyle.Render(" always (session)") + "   " +
-			keyStyle.Render("[n]") + labelNoStyle.Render(" deny") + "   " +
-			keyStyle.Render("[q]") + labelAbStyle.Render(" abort task"),
+			keyBgStyle.Render("y") + labelStyle.Render(" once") + "   " +
+			keyBgStyle.Render("a") + labelStyle.Render(" this tool") + "   " +
+			keyBgStyle.Render("t") + autoStyle.Render(" all tools") + "   " +
+			keyStyle.Render("n") + labelStyle.Render(" deny") + "   " +
+			keyStyle.Render("q") + labelStyle.Render(" abort"),
 		)
 		permissionView = permStyle.Render(pb.String())
 	}

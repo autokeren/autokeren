@@ -119,8 +119,10 @@ func (m SidebarModel) View() string {
 		sb.WriteString(dimStyle.Render("—") + "\n")
 	}
 
-	if barInnerW > 3 && m.ContextWindow > 0 {
-		filled := int(float64(barInnerW) * m.ContextPct / 100.0)
+	if barInnerW > 10 && m.ContextWindow > 0 && m.ContextUsed > 0 {
+		// Hitung ulang pct langsung dari raw values untuk akurasi
+		rawPct := float64(m.ContextUsed) / float64(m.ContextWindow) * 100.0
+		filled := int(float64(barInnerW) * rawPct / 100.0)
 		if filled < 0 {
 			filled = 0
 		}
@@ -129,9 +131,9 @@ func (m SidebarModel) View() string {
 		}
 		unfilled := barInnerW - filled
 		barColor := "#34D399"
-		if m.ContextPct >= 90.0 {
+		if rawPct >= 90.0 {
 			barColor = "#F87171"
-		} else if m.ContextPct >= 70.0 {
+		} else if rawPct >= 70.0 {
 			barColor = "#FBBF24"
 		}
 		barFill := lipgloss.NewStyle().Foreground(lipgloss.Color(barColor))
