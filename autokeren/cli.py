@@ -616,6 +616,62 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
             ui.cleanup()
 
 
+def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
+    """Mencoba meluncurkan TUI Go (ak). Mengembalikan False jika harus fallback ke Python TUI."""
+    if args.about or args.init or args.login or args.prompt or args.task or args.non_interactive:
+        return False
+
+    import os
+    import sys
+    import shutil
+    import subprocess
+    from pathlib import Path
+
+    os.environ["AUTOKEREN_PYTHON_PATH"] = sys.executable
+    cache_dir = Path.home() / ".cache" / "autokeren" / "bin"
+    ak_bin = cache_dir / ("ak.exe" if os.name == "nt" else "ak")
+
+    # Jika biner belum ada, coba compile
+    if not ak_bin.exists():
+        go_path = shutil.which("go")
+        if not go_path:
+            return False  # Tidak ada Go compiler, langsung fallback
+        
+        # Cari source Go di site-packages
+        package_dir = Path(__file__).parent
+        go_src_dir = package_dir / "go"
+        
+        # Jika tidak ada source Go di site-packages (misal development mode biasa di repo),
+        # coba cari di root direktori repo
+        if not go_src_dir.exists():
+            go_src_dir = package_dir.parent
+            if not (go_src_dir / "main.go").exists():
+                return False
+
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            # Jalankan go build
+            subprocess.run(
+                [go_path, "build", "-o", str(ak_bin), "main.go"],
+                cwd=str(go_src_dir),
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            return False  # Gagal kompilasi, fallback
+
+    if ak_bin.exists():
+        # Jalankan biner Go. Gunakan os.execvp agar menggantikan proses Python saat ini secara instan
+        argv = [str(ak_bin)] + sys_argv[1:]
+        try:
+            os.execvp(str(ak_bin), argv)
+        except Exception:
+            return False
+            
+    return False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="autokeren", description="Cloudflare-first agentic coding CLI")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -633,6 +689,7 @@ def main() -> int:
     parser.add_argument("--task", help="Task untuk non-interactive mode")
     parser.add_argument("prompt", nargs="?", help="Single prompt to run non-interactively")
     args = parser.parse_args()
+    _try_run_go_tui(args, sys.argv)
 
     if args.about:
         console.print(f"\n[bold]autokeren[/bold] v{__version__}")

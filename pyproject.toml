@@ -72,5 +72,14 @@ autokeren = "autokeren.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["autokeren"]
 
+[tool.hatch.build.targets.wheel.shared-data]
+"cmd" = "autokeren/go/cmd"
+"ui" = "autokeren/go/ui"
+"ipc" = "autokeren/go/ipc"
+"ghost" = "autokeren/go/ghost"
+"main.go" = "autokeren/go/main.go"
+"go.mod" = "autokeren/go/go.mod"
+"go.sum" = "autokeren/go/go.sum"
+
 [tool.ruff]
 line-length = 120

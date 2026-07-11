@@ -1,0 +1,545 @@
+package ui
+
+import (
+	"encoding/json"
+	"fmt"
+	"path/filepath"
+	"strconv"
+	"strings"
+
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/autokeren/autokeren/ghost"
+	"github.com/autokeren/autokeren/ipc"
+)
+
+// Definisikan tipe-tipe pesan Bubble Tea untuk komunikasi asinkron dari daemon
+type ChunkMsg struct{ Text string }
+type ModelStartMsg struct{}
+type ModelEndMsg struct {
+	Content string
+	ModelID string
+	Usage   map[string]interface{}
+}
+type ToolStartMsg struct {
+	Name string
+	Args map[string]interface{}
+}
+type ToolEndMsg struct {
+	Name   string
+	Result map[string]interface{}
+}
+type ToolOutputMsg struct {
+	Name string
+	Line string
+}
+type RetryMsg struct {
+	Attempt int
+	Delay   float64
+	Message string
+}
+type ErrorMsg struct{ Message string }
+type StatusUpdateMsg struct {
+	ModelName        string
+	ProjectName      string
+	ContextUsed      int
+	ContextWindow    int
+	ContextPct       float64
+	NeuronsRemaining int
+	NeuronsQuota     int
+}
+
+// PermissionConfirmReq mewakili request izin masuk yang harus direspon balik
+type PermissionConfirmReq struct {
+	Name        string
+	Description string
+	Arguments   map[string]interface{}
+	RespChan    chan bool
+}
+
+type MainModel struct {
+	Chat          ChatModel
+	Sidebar       SidebarModel
+	TextInput     textinput.Model
+	IPCClient     *ipc.Client
+	GhostMgr      *ghost.GhostManager
+	ProjectRoot   string
+	ConfigPath    string
+	
+	Width  int
+	Height int
+	
+	AgentRunning   bool
+	PermissionReq  *PermissionConfirmReq
+	ActiveModelID  string
+	
+	Initialized    bool
+	InitError      string
+}
+
+func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot, configPath string) MainModel {
+	ti := textinput.New()
+	ti.Placeholder = "Ketik perintah Anda di sini... (atau /q untuk keluar)"
+	ti.Focus()
+	ti.CharLimit = 1000
+	ti.Width = 80
+
+	return MainModel{
+		Chat:        NewChatModel(),
+		Sidebar:     NewSidebarModel(),
+		TextInput:   ti,
+		IPCClient:   client,
+		GhostMgr:    ghostMgr,
+		ProjectRoot: projectRoot,
+		ConfigPath:  configPath,
+	}
+}
+
+func (m MainModel) Init() tea.Cmd {
+	return tea.Batch(
+		textinput.Blink,
+		m.connectToAgentCmd(),
+	)
+}
+
+func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.Width = msg.Width
+		m.Height = msg.Height
+		
+		sidebarWidth := 30
+		if m.Width > 90 {
+			sidebarWidth = m.Width / 4
+			if sidebarWidth > 40 {
+				sidebarWidth = 40
+			}
+		}
+		
+		m.Sidebar.Width = sidebarWidth
+		m.Sidebar.Height = m.Height
+		
+		chatWidth := m.Width - sidebarWidth
+		m.Chat.Resize(chatWidth, m.Height-4) // kurangi ruang untuk input box
+		
+		m.TextInput.Width = chatWidth - 6
+		
+	case ChunkMsg:
+		m.Chat.AppendMessage("assistant", msg.Text)
+		
+	case ModelStartMsg:
+		m.AgentRunning = true
+		m.Chat.AppendMessage("system", "autokeren sedang berpikir...")
+		
+	case ModelEndMsg:
+		m.AgentRunning = false
+		m.Chat.UpdateViewport()
+		
+		// Update info token di sidebar jika ada
+		if msg.Usage != nil {
+			if total, ok := msg.Usage["total"].(float64); ok {
+				m.Sidebar.ContextUsed += int(total)
+			}
+		}
+		if msg.ModelID != "" {
+			m.Sidebar.ModelName = msg.ModelID
+		}
+		
+	case ToolStartMsg:
+		argsStr, _ := jsonMarshalIndent(msg.Args)
+		m.Chat.AppendMessage("tool", fmt.Sprintf("⏺ Memanggil %s(%s)...", msg.Name, argsStr))
+		
+	case ToolEndMsg:
+		ok := true
+		if val, exists := msg.Result["ok"]; exists {
+			if b, isBool := val.(bool); isBool {
+				ok = b
+			}
+		}
+		if ok {
+			m.Chat.AppendMessage("tool", fmt.Sprintf("✓ %s selesai.", msg.Name))
+		} else {
+			m.Chat.AppendMessage("tool", fmt.Sprintf("✗ %s gagal: %v", msg.Name, msg.Result["error"]))
+		}
+		
+	case ToolOutputMsg:
+		m.Chat.AppendMessage("tool", fmt.Sprintf("│ %s", msg.Line))
+		
+	case RetryMsg:
+		m.Chat.AppendMessage("system", fmt.Sprintf("↻ Mencoba kembali #%d (delay %.0fs): %s", msg.Attempt, msg.Delay, msg.Message))
+		
+	case ErrorMsg:
+		m.InitError = msg.Message
+		m.Chat.AppendMessage("system", fmt.Sprintf("⚠ Error Inisialisasi: %s", msg.Message))
+		
+	case StatusUpdateMsg:
+		m.Initialized = true
+		m.Sidebar.ModelName = msg.ModelName
+		m.Sidebar.ProjectName = msg.ProjectName
+		m.Sidebar.ContextUsed = msg.ContextUsed
+		m.Sidebar.ContextWindow = msg.ContextWindow
+		m.Sidebar.ContextPct = msg.ContextPct
+		m.Sidebar.NeuronsRemaining = msg.NeuronsRemaining
+		m.Sidebar.NeuronsQuota = msg.NeuronsQuota
+
+	case PermissionConfirmReq:
+		m.PermissionReq = &msg
+		m.Chat.AppendMessage("system", fmt.Sprintf("⚡ KONFIRMASI IZIN: %s\nDeskripsi: %s", msg.Name, msg.Description))
+
+	case tea.KeyMsg:
+		// Jika dialog izin sedang aktif, tangani input persetujuan khusus
+		if m.PermissionReq != nil {
+			switch msg.String() {
+			case "y", "Y", "enter":
+				m.PermissionReq.RespChan <- true
+				m.PermissionReq = nil
+				m.Chat.AppendMessage("system", "Izin diberikan.")
+			case "n", "N", "esc":
+				m.PermissionReq.RespChan <- false
+				m.PermissionReq = nil
+				m.Chat.AppendMessage("system", "Izin ditolak.")
+			}
+			return m, nil
+		}
+
+		switch msg.Type {
+		case tea.KeyCtrlC, tea.KeyCtrlQ:
+			m.IPCClient.Close()
+			return m, tea.Quit
+			
+		case tea.KeyEnter:
+			val := m.TextInput.Value()
+			if val == "" {
+				return m, nil
+			}
+			
+			if val == "/q" || val == "/quit" {
+				m.IPCClient.Close()
+				return m, tea.Quit
+			}
+			
+			m.TextInput.SetValue("")
+			m.Chat.AppendMessage("user", val)
+
+			// ── Penanganan Slash Commands Secara Native ────────────────────
+			if strings.HasPrefix(val, "/ghost") {
+				args := strings.TrimSpace(strings.TrimPrefix(val, "/ghost"))
+				m.handleGhostCommand(args)
+				return m, nil
+			}
+			
+			if strings.HasPrefix(val, "/model") {
+				args := strings.TrimSpace(strings.TrimPrefix(val, "/model"))
+				if args == "" {
+					m.Chat.AppendMessage("system", "Gunakan: /model <nama_model>. Contoh: /model gemini-3.5-pro")
+				} else {
+					m.AgentRunning = true
+					go func() {
+						var reply string
+						err := m.IPCClient.Call("agent.switch_model", map[string]interface{}{"model_id": args}, &reply)
+						if err == nil {
+							m.Chat.AppendMessage("system", fmt.Sprintf("Model aktif diganti ke: %s", args))
+							m.Sidebar.ModelName = args
+						} else {
+							m.Chat.AppendMessage("system", fmt.Sprintf("Gagal ganti model: %v", err))
+						}
+					}()
+				}
+				return m, nil
+			}
+			
+			if val == "/compact" {
+				m.AgentRunning = true
+				m.Chat.AppendMessage("system", "Mengompak context...")
+				go func() {
+					var reply map[string]interface{}
+					err := m.IPCClient.Call("agent.compact", map[string]interface{}{}, &reply)
+					if err == nil {
+						msg, _ := reply["message"].(string)
+						m.Chat.AppendMessage("system", msg)
+					} else {
+						m.Chat.AppendMessage("system", fmt.Sprintf("Gagal compact: %v", err))
+					}
+				}()
+				return m, nil
+			}
+			
+			if val == "/reset" {
+				m.AgentRunning = true
+				m.Chat.AppendMessage("system", "Mereset sesi percakapan...")
+				go func() {
+					var reply string
+					err := m.IPCClient.Call("agent.reset", map[string]interface{}{}, &reply)
+					if err == nil {
+						m.Chat.AppendMessage("system", "Sesi berhasil direset.")
+						m.Chat.Messages = []ChatMessage{}
+					} else {
+						m.Chat.AppendMessage("system", fmt.Sprintf("Gagal reset: %v", err))
+					}
+				}()
+				return m, nil
+			}
+			
+			// ── Kirim perintah biasa secara asinkron ke background thread ──
+			m.AgentRunning = true
+			go func(userInput string) {
+				runParams := map[string]interface{}{
+					"user_input": userInput,
+				}
+				var reply map[string]interface{}
+				err := m.IPCClient.Call("agent.run", runParams, &reply)
+				if err != nil {
+					m.IPCClient.Close()
+				}
+			}(val)
+			
+			return m, nil
+		}
+	}
+	
+	if m.PermissionReq == nil {
+		m.TextInput, cmd = m.TextInput.Update(msg)
+	}
+	return m, cmd
+}
+
+func (m MainModel) View() string {
+	if m.Width == 0 || m.Height == 0 {
+		return "Menginisialisasi antarmuka..."
+	}
+
+	if !m.Initialized && m.InitError == "" {
+		sidebarView := m.Sidebar.View()
+		chatWidth := m.Width - m.Sidebar.Width
+		chatHeight := m.Height - 4
+		
+		chatStyle := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#4FC3F7")).
+			Padding(1, 2).
+			Width(chatWidth - 4).
+			Height(chatHeight - 2)
+
+		chatView := chatStyle.Render("⚙ Menghubungkan ke agen Python di latar belakang...\nHarap tunggu sebentar...")
+
+		inputView := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#757575")).
+			Padding(0, 1).
+			Width(chatWidth - 4).
+			Render("Menghubungkan...")
+
+		return lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			sidebarView,
+			lipgloss.JoinVertical(
+				lipgloss.Left,
+				chatView,
+				inputView,
+			),
+		)
+	}
+
+	if m.InitError != "" {
+		sidebarView := m.Sidebar.View()
+		chatWidth := m.Width - m.Sidebar.Width
+		chatHeight := m.Height - 4
+		
+		chatStyle := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#FF5252")).
+			Padding(1, 2).
+			Width(chatWidth - 4).
+			Height(chatHeight - 2)
+
+		chatView := chatStyle.Render(fmt.Sprintf("⚠ GAGAL MENYAMBUNG KE AGEN:\n\n%s\n\nTekan [Ctrl+C] atau [Ctrl+Q] untuk keluar.", m.InitError))
+
+		inputView := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#FF5252")).
+			Padding(0, 1).
+			Width(chatWidth - 4).
+			Render("Gagal Inisialisasi")
+
+		return lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			sidebarView,
+			lipgloss.JoinVertical(
+				lipgloss.Left,
+				chatView,
+				inputView,
+			),
+		)
+	}
+
+	chatView := m.Chat.View()
+	sidebarView := m.Sidebar.View()
+
+	inputStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#757575")).
+		Padding(0, 1).
+		Width(m.Width - m.Sidebar.Width - 4)
+
+	inputView := inputStyle.Render(m.TextInput.View())
+	
+	// Jika sedang menunggu izin
+	if m.PermissionReq != nil {
+		inputView = inputStyle.BorderForeground(lipgloss.Color("#FFB74D")).
+			Render(lipgloss.NewStyle().Foreground(lipgloss.Color("#FFB74D")).Bold(true).Render("Izinkan operasi di atas? [y] Ya / [n] Tidak: "))
+	}
+
+	mainLayout := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		sidebarView,
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			chatView,
+			inputView,
+		),
+	)
+
+	return mainLayout
+}
+
+// helper marshall indent
+func jsonMarshalIndent(v interface{}) (string, error) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+func (m *MainModel) handleGhostCommand(args string) {
+	if args == "" || args == "help" {
+		m.Chat.AppendMessage("system", "Perintah Ghost Agent:\n  /ghost <task>  : spawn background agent baru\n  /ghost list    : lihat daftar agent aktif\n  /ghost show <id>: tampilkan output log agent\n  /ghost kill <id>: matikan agent")
+		return
+	}
+
+	if args == "list" {
+		list := m.GhostMgr.List()
+		if len(list) == 0 {
+			m.Chat.AppendMessage("system", "Tidak ada background ghost agent yang aktif.")
+			return
+		}
+		var sb strings.Builder
+		sb.WriteString("Daftar Ghost Agent Aktif:\n")
+		for _, a := range list {
+			sb.WriteString(fmt.Sprintf("  #%d [%s] %s (run %.0fs)\n", a.ID, a.Status, a.Task, a.Runtime()))
+		}
+		m.Chat.AppendMessage("system", sb.String())
+		return
+	}
+
+	if strings.HasPrefix(args, "show ") {
+		idStr := strings.TrimPrefix(args, "show ")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			m.Chat.AppendMessage("system", "ID agent tidak valid.")
+			return
+		}
+		out := m.GhostMgr.GetOutput(id)
+		if out == "" {
+			m.Chat.AppendMessage("system", fmt.Sprintf("Tidak ada output log untuk Ghost Agent #%d.", id))
+		} else {
+			if len(out) > 2000 {
+				out = out[len(out)-2000:] + "\n... truncated (2000 chars limit)"
+			}
+			m.Chat.AppendMessage("system", fmt.Sprintf("Log Output Ghost Agent #%d:\n%s", id, out))
+		}
+		return
+	}
+
+	if strings.HasPrefix(args, "kill ") {
+		target := strings.TrimPrefix(args, "kill ")
+		if target == "all" {
+			list := m.GhostMgr.List()
+			for _, a := range list {
+				m.GhostMgr.Kill(a.ID)
+			}
+			m.Chat.AppendMessage("system", "Semua background agent dimatikan.")
+		} else {
+			id, err := strconv.Atoi(target)
+			if err != nil {
+				m.Chat.AppendMessage("system", "ID agent tidak valid.")
+				return
+			}
+			if m.GhostMgr.Kill(id) {
+				m.Chat.AppendMessage("system", fmt.Sprintf("Ghost Agent #%d dimatikan.", id))
+			} else {
+				m.Chat.AppendMessage("system", fmt.Sprintf("Ghost Agent #%d tidak ditemukan.", id))
+			}
+		}
+		return
+	}
+
+	// Default: Spawn task baru
+	info, err := m.GhostMgr.Spawn(args)
+	if err != nil {
+		m.Chat.AppendMessage("system", fmt.Sprintf("Gagal spawn Ghost Agent: %v", err))
+	} else {
+		m.Chat.AppendMessage("system", fmt.Sprintf("👻 Ghost Agent #%d didelegasikan: %s\nKetik `/ghost list` atau `/ghost show %d` untuk memantau.", info.ID, args, info.ID))
+	}
+}
+
+func (m MainModel) connectToAgentCmd() tea.Cmd {
+	return func() tea.Msg {
+		// Jalankan start client
+		err := m.IPCClient.Start(m.ProjectRoot, m.ConfigPath)
+		if err != nil {
+			return ErrorMsg{Message: fmt.Sprintf("Gagal menjalankan daemon Python: %v", err)}
+		}
+
+		// Ambil status awal
+		var statusReply map[string]interface{}
+		err = m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply)
+		if err != nil {
+			return ErrorMsg{Message: fmt.Sprintf("Gagal mengambil status awal agen: %v", err)}
+		}
+
+		// Parse status awal
+		modelName := "?"
+		if mStatus, ok := statusReply["model_status"].(map[string]interface{}); ok {
+			if active, ok := mStatus["models"].([]interface{}); ok && len(active) > 0 {
+				if primary, ok := active[0].(map[string]interface{}); ok {
+					modelName, _ = primary["model_id"].(string)
+				}
+			}
+		}
+		
+		contextInfo, _ := statusReply["context_info"].(map[string]interface{})
+		contextUsed := 0
+		contextWindow := 262144
+		contextPct := 0.0
+		
+		if contextInfo != nil {
+			if u, ok := contextInfo["tokens"].(float64); ok {
+				contextUsed = int(u)
+			}
+			if w, ok := contextInfo["window"].(float64); ok {
+				contextWindow = int(w)
+			}
+			if p, ok := contextInfo["pct"].(float64); ok {
+				contextPct = p
+			}
+		}
+
+		// Ambil base name dari project root secara aman
+		projectName := "autokeren"
+		if m.ProjectRoot != "" {
+			projectName = filepath.Base(m.ProjectRoot)
+		}
+
+		return StatusUpdateMsg{
+			ModelName:     modelName,
+			ProjectName:   projectName,
+			ContextUsed:   contextUsed,
+			ContextWindow: contextWindow,
+			ContextPct:   contextPct,
+		}
+	}
+}
