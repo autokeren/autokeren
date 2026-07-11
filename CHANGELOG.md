@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.17] - 2026-07-12
+
+### Changed
+- memperbaiki duplikasi session tmux saat memicu ghost agent
+
 ## [0.11.16] - 2026-07-12
 
 ### Changed
