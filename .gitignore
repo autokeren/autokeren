@@ -74,3 +74,7 @@ scratch/
 # Time-Travel checkpoints
 .ak-checkpoints/
 
+# SQLite databases
+*.db
+.ak-kanban.db
+
