@@ -30,8 +30,8 @@ func NewSidebarModel() SidebarModel {
 func (m SidebarModel) View() string {
 	style := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#81C784")).
-		Padding(1, 1).
+		BorderForeground(lipgloss.Color("#2A2A35")).
+		Padding(1, 2).
 		Width(m.Width - 4).
 		Height(m.Height - 2)
 
@@ -40,24 +40,24 @@ func (m SidebarModel) View() string {
 	// Title Banner
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("#FF5252")).
+		Foreground(lipgloss.Color("#00E5FF")).
 		Align(lipgloss.Center).
-		Width(m.Width - 6)
+		Width(m.Width - 8)
 	sb.WriteString(titleStyle.Render("⚡ AUTOKEREN ⚡") + "\n\n")
 
 	// Info Project
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#E0E0E0")).Render("📂 Project:") + "\n")
-	sb.WriteString(lipgloss.NewStyle().Bold(true).Render(m.ProjectName) + "\n\n")
+	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888899")).Render("󰉋  PROJECT:") + "\n")
+	sb.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#E0E0E0")).Render(m.ProjectName) + "\n\n")
 
 	// Info Model
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#E0E0E0")).Render("🤖 Model:") + "\n")
-	sb.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#4FC3F7")).Render(m.ModelName) + "\n\n")
+	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888899")).Render("🤖 ACTIVE MODEL:") + "\n")
+	sb.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00E5FF")).Render(m.ModelName) + "\n\n")
 
 	// Context Bar
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#E0E0E0")).Render("📊 Context Window:") + "\n")
-	sb.WriteString(fmt.Sprintf("%d/%d tokens (%.1f%%)\n", m.ContextUsed, m.ContextWindow, m.ContextPct))
+	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888899")).Render("📊 CONTEXT MEMORY:") + "\n")
+	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#E0E0E0")).Render(fmt.Sprintf("%d/%d tokens (%.1f%%)", m.ContextUsed, m.ContextWindow, m.ContextPct)) + "\n")
 	
-	barWidth := m.Width - 8
+	barWidth := m.Width - 10
 	if barWidth > 5 {
 		filled := int(float64(barWidth) * m.ContextPct / 100.0)
 		if filled < 0 {
@@ -68,23 +68,34 @@ func (m SidebarModel) View() string {
 		}
 		unfilled := barWidth - filled
 		
-		barStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#81C784"))
-		bgStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#424242"))
+		// Tentukan warna progress bar berdasarkan persentase
+		barColor := "#34D399" // Hijau jika < 70%
+		if m.ContextPct >= 90.0 {
+			barColor = "#FF5252" // Merah jika > 90%
+		} else if m.ContextPct >= 70.0 {
+			barColor = "#FBBF24" // Kuning jika > 70%
+		}
+		
+		barStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(barColor))
+		bgStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#2A2A35"))
 		sb.WriteString(barStyle.Render(strings.Repeat("█", filled)) + bgStyle.Render(strings.Repeat("░", unfilled)) + "\n\n")
 	}
 
 	// Neurons Quota jika ada
 	if m.NeuronsQuota > 0 {
-		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#E0E0E0")).Render("🧠 Neurons Quota:") + "\n")
-		sb.WriteString(fmt.Sprintf("%d/%d used\n\n", m.NeuronsQuota-m.NeuronsRemaining, m.NeuronsQuota))
+		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888899")).Render("🧠 NEURON QUOTA:") + "\n")
+		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#E0E0E0")).Render(fmt.Sprintf("%d/%d used", m.NeuronsQuota-m.NeuronsRemaining, m.NeuronsQuota)) + "\n\n")
 	}
 
 	// Short Help / Shortcuts
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#9E9E9E")).Render("Pintasan:") + "\n")
-	sb.WriteString("  [ctrl+c] Keluar\n")
-	sb.WriteString("  [ctrl+q] Keluar TUI\n")
-	sb.WriteString("  [/model] Ganti Model\n")
-	sb.WriteString("  [/compact] Ringkas Chat\n")
+	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#666677")).Render("PINTASAN KEYBOARD:") + "\n")
+	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#A0A0B0")).Render(
+		"  ^C      Keluar TUI\n" +
+		"  /model  Ganti Model\n" +
+		"  /ghost  Background Agent\n" +
+		"  /compact Ringkas Chat\n" +
+		"  /reset  Mulai Ulang Sesi\n",
+	))
 
 	return style.Render(sb.String())
 }

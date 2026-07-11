@@ -84,6 +84,8 @@ func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot,
 	ti.Focus()
 	ti.CharLimit = 1000
 	ti.Width = 80
+	ti.Prompt = " ❯ "
+	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#00E5FF")).Bold(true)
 
 	return MainModel{
 		Chat:        NewChatModel(),
@@ -318,7 +320,7 @@ func (m MainModel) View() string {
 		
 		chatStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#4FC3F7")).
+			BorderForeground(lipgloss.Color("#2A2A35")).
 			Padding(1, 2).
 			Width(chatWidth - 4).
 			Height(chatHeight - 2)
@@ -327,7 +329,7 @@ func (m MainModel) View() string {
 
 		inputView := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#757575")).
+			BorderForeground(lipgloss.Color("#2A2A35")).
 			Padding(0, 1).
 			Width(chatWidth - 4).
 			Render("Menghubungkan...")
@@ -380,7 +382,7 @@ func (m MainModel) View() string {
 
 	inputStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#757575")).
+		BorderForeground(lipgloss.Color("#2A2A35")).
 		Padding(0, 1).
 		Width(m.Width - m.Sidebar.Width - 4)
 
