@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.8] - 2026-07-11
+
+### Changed
+- fix: use subprocess.call instead of execvp on Windows to maintain terminal keyboard raw-mode focus
+
 ## [0.9.7] - 2026-07-11
 
 ### Changed
