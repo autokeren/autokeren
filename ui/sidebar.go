@@ -21,81 +21,155 @@ type SidebarModel struct {
 
 func NewSidebarModel() SidebarModel {
 	return SidebarModel{
-		ModelName:     "?",
-		ProjectName:   "?",
+		ModelName:     "—",
+		ProjectName:   "—",
 		ContextWindow: 262144,
 	}
 }
 
 func (m SidebarModel) View() string {
-	style := lipgloss.NewStyle().
+	w := m.Width - 4
+	if w < 4 {
+		w = 4
+	}
+
+	outerStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#2A2A35")).
+		BorderForeground(lipgloss.Color("#1E1E2A")).
 		Padding(1, 2).
-		Width(m.Width - 4).
+		Width(w).
 		Height(m.Height - 2)
+
+	// ── Styles ──
+	brandStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#38BDF8")).
+		Width(w - 4).
+		Align(lipgloss.Center)
+
+	sectionLabelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#374151"))
+
+	valueStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#CBD5E1")).
+		Bold(true)
+
+	dimStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#4B5563"))
+
+	accentStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#38BDF8"))
+
+	hintStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#374151"))
+
+	dividerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#1E1E2A"))
+
+	divider := dividerStyle.Render(strings.Repeat("─", w-4))
 
 	var sb strings.Builder
 
-	// Title Banner
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#00E5FF")).
-		Align(lipgloss.Center).
-		Width(m.Width - 8)
-	sb.WriteString(titleStyle.Render("⚡ AUTOKEREN ⚡") + "\n\n")
+	// Brand
+	sb.WriteString(brandStyle.Render("autokeren") + "\n")
+	sb.WriteString(divider + "\n\n")
 
-	// Info Project
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888899")).Render("󰉋  PROJECT:") + "\n")
-	sb.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#E0E0E0")).Render(m.ProjectName) + "\n\n")
+	// Project
+	sb.WriteString(sectionLabelStyle.Render("project") + "\n")
+	sb.WriteString(valueStyle.Render(truncate(m.ProjectName, w-4)) + "\n\n")
 
-	// Info Model
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888899")).Render("🤖 ACTIVE MODEL:") + "\n")
-	sb.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00E5FF")).Render(m.ModelName) + "\n\n")
+	// Model
+	sb.WriteString(sectionLabelStyle.Render("model") + "\n")
+	modelDisplay := m.ModelName
+	// Potong prefix panjang model ID supaya muat
+	if idx := strings.LastIndex(modelDisplay, "/"); idx >= 0 {
+		modelDisplay = modelDisplay[idx+1:]
+	}
+	sb.WriteString(accentStyle.Render(truncate(modelDisplay, w-4)) + "\n\n")
 
-	// Context Bar
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888899")).Render("📊 CONTEXT MEMORY:") + "\n")
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#E0E0E0")).Render(fmt.Sprintf("%d/%d tokens (%.1f%%)", m.ContextUsed, m.ContextWindow, m.ContextPct)) + "\n")
-	
-	barWidth := m.Width - 10
-	if barWidth > 5 {
-		filled := int(float64(barWidth) * m.ContextPct / 100.0)
+	// Context
+	sb.WriteString(sectionLabelStyle.Render("context") + "\n")
+	if m.ContextUsed > 0 {
+		sb.WriteString(dimStyle.Render(fmt.Sprintf("%s / %s  %.1f%%",
+			humanTokens(m.ContextUsed),
+			humanTokens(m.ContextWindow),
+			m.ContextPct,
+		)) + "\n")
+	} else {
+		sb.WriteString(dimStyle.Render("—") + "\n")
+	}
+
+	barW := w - 4
+	if barW > 3 && m.ContextWindow > 0 {
+		filled := int(float64(barW) * m.ContextPct / 100.0)
 		if filled < 0 {
 			filled = 0
 		}
-		if filled > barWidth {
-			filled = barWidth
+		if filled > barW {
+			filled = barW
 		}
-		unfilled := barWidth - filled
-		
-		// Tentukan warna progress bar berdasarkan persentase
-		barColor := "#34D399" // Hijau jika < 70%
+		unfilled := barW - filled
+
+		barColor := "#34D399"
 		if m.ContextPct >= 90.0 {
-			barColor = "#FF5252" // Merah jika > 90%
+			barColor = "#F87171"
 		} else if m.ContextPct >= 70.0 {
-			barColor = "#FBBF24" // Kuning jika > 70%
+			barColor = "#FBBF24"
 		}
-		
+
 		barStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(barColor))
-		bgStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#2A2A35"))
-		sb.WriteString(barStyle.Render(strings.Repeat("█", filled)) + bgStyle.Render(strings.Repeat("░", unfilled)) + "\n\n")
+		bgBarStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#1E2433"))
+		sb.WriteString(barStyle.Render(strings.Repeat("▪", filled)) +
+			bgBarStyle.Render(strings.Repeat("▪", unfilled)) + "\n\n")
+	} else {
+		sb.WriteString("\n")
 	}
 
-	// Neurons Quota jika ada
+	// Neurons
 	if m.NeuronsQuota > 0 {
-		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888899")).Render("🧠 NEURON QUOTA:") + "\n")
-		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#E0E0E0")).Render(fmt.Sprintf("%d/%d used", m.NeuronsQuota-m.NeuronsRemaining, m.NeuronsQuota)) + "\n\n")
+		sb.WriteString(sectionLabelStyle.Render("quota") + "\n")
+		used := m.NeuronsQuota - m.NeuronsRemaining
+		pct := 0.0
+		if m.NeuronsQuota > 0 {
+			pct = float64(used) / float64(m.NeuronsQuota) * 100.0
+		}
+		sb.WriteString(dimStyle.Render(fmt.Sprintf("%d / %d  %.0f%%", used, m.NeuronsQuota, pct)) + "\n\n")
 	}
 
-	// Short Help / Shortcuts
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#666677")).Render("PINTASAN KEYBOARD:") + "\n")
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#A0A0B0")).Render(
-		"  ^C      Keluar TUI\n" +
-		"  /model  Ganti Model\n" +
-		"  /ghost  Background Agent\n" +
-		"  /compact Ringkas Chat\n" +
-		"  /reset  Mulai Ulang Sesi\n",
-	))
+	sb.WriteString(divider + "\n\n")
 
-	return style.Render(sb.String())
+	// Shortcuts
+	sb.WriteString(hintStyle.Render("shortcuts") + "\n")
+	shortcuts := []struct{ key, desc string }{
+		{"/", "slash commands"},
+		{"↑↓", "navigasi menu"},
+		{"^c", "keluar"},
+	}
+	for _, s := range shortcuts {
+		sb.WriteString(
+			dimStyle.Render("  ")+
+				accentStyle.Render(fmt.Sprintf("%-5s", s.key))+
+				hintStyle.Render(s.desc)+"\n",
+		)
+	}
+
+	return outerStyle.Render(sb.String())
+}
+
+func truncate(s string, max int) string {
+	if max <= 3 {
+		return s
+	}
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	return string(runes[:max-1]) + "…"
+}
+
+func humanTokens(n int) string {
+	if n >= 1000 {
+		return fmt.Sprintf("%.1fk", float64(n)/1000.0)
+	}
+	return fmt.Sprintf("%d", n)
 }

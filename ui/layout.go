@@ -196,16 +196,18 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Name == "write_file" || msg.Name == "patch_file" || msg.Name == "read_file" {
 			filePath, _ := msg.Args["path"].(string)
 			m.ActiveEditingFile = filePath
-			actionName := "MEMBACA"
-			if msg.Name == "write_file" {
-				actionName = "MENULIS"
-			} else if msg.Name == "patch_file" {
-				actionName = "MENYUNTING"
+			var verb string
+			switch msg.Name {
+			case "write_file":
+				verb = "write"
+			case "patch_file":
+				verb = "edit"
+			default:
+				verb = "read"
 			}
-			m.Chat.AppendMessage("tool", fmt.Sprintf("📝 %s BERKAS:\n  📂 Path: %s\n  ⚙ Status: Sedang diproses...", actionName, filePath))
+			m.Chat.AppendMessage("tool", fmt.Sprintf("📝 %s\n  📂 Path: %s\n  ⚙ Status: working...", verb, filePath))
 		} else {
-			argsStr, _ := jsonMarshalIndent(msg.Args)
-			m.Chat.AppendMessage("tool", fmt.Sprintf("⏺ Memanggil %s(%s)...", msg.Name, argsStr))
+			m.Chat.AppendMessage("tool", fmt.Sprintf("⏺ %s", msg.Name))
 		}
 		
 	case ToolEndMsg:
@@ -217,28 +219,28 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.ActiveEditingFile != "" {
 			if ok {
-				m.Chat.AppendMessage("tool", fmt.Sprintf("✓ BERKAS SELESAI DIPROSES\n  📂 Path: %s", m.ActiveEditingFile))
+				m.Chat.AppendMessage("tool", fmt.Sprintf("✓ done\n  📂 Path: %s", m.ActiveEditingFile))
 			} else {
-				m.Chat.AppendMessage("tool", fmt.Sprintf("✗ BERKAS GAGAL DIPROSES\n  📂 Path: %s\n  ⚠ Error: %v", m.ActiveEditingFile, msg.Result["error"]))
+				m.Chat.AppendMessage("tool", fmt.Sprintf("✗ failed\n  📂 Path: %s\n  ⚠ Error: %v", m.ActiveEditingFile, msg.Result["error"]))
 			}
 			m.ActiveEditingFile = ""
 		} else {
 			if ok {
-				m.Chat.AppendMessage("tool", fmt.Sprintf("✓ %s selesai.", msg.Name))
+				m.Chat.AppendMessage("tool", fmt.Sprintf("✓ %s", msg.Name))
 			} else {
-				m.Chat.AppendMessage("tool", fmt.Sprintf("✗ %s gagal: %v", msg.Name, msg.Result["error"]))
+				m.Chat.AppendMessage("tool", fmt.Sprintf("✗ %s: %v", msg.Name, msg.Result["error"]))
 			}
 		}
 		
 	case ToolOutputMsg:
 		m.Chat.AppendMessage("tool", fmt.Sprintf("│ %s", msg.Line))
-		
+
 	case RetryMsg:
-		m.Chat.AppendMessage("system", fmt.Sprintf("↻ Mencoba kembali #%d (delay %.0fs): %s", msg.Attempt, msg.Delay, msg.Message))
-		
+		m.Chat.AppendMessage("system", fmt.Sprintf("retry #%d (%.0fs) %s", msg.Attempt, msg.Delay, msg.Message))
+
 	case ErrorMsg:
 		m.InitError = msg.Message
-		m.Chat.AppendMessage("system", fmt.Sprintf("⚠ Error: %s", msg.Message))
+		m.Chat.AppendMessage("system", fmt.Sprintf("error: %s", msg.Message))
 		
 	case ModelsLoadedMsg:
 		m.SelectorModels = msg.Models
@@ -263,7 +265,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case PermissionConfirmReq:
 		m.PermissionReq = &msg
-		m.Chat.AppendMessage("system", fmt.Sprintf("⚡ KONFIRMASI IZIN: %s\nDeskripsi: %s", msg.Name, msg.Description))
+		m.Chat.AppendMessage("system", fmt.Sprintf("permission required: %s — %s", msg.Name, msg.Description))
 
 	case tea.KeyMsg:
 		// Jika autocomplete slash sedang tampil, tangani navigasi dropdown dulu
