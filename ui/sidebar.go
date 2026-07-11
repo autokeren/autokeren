@@ -4,8 +4,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/autokeren/autokeren/ghost"
 	"github.com/charmbracelet/lipgloss"
 )
+
+type TodoItem struct {
+	Content string `json:"content"`
+	Status  string `json:"status"`
+}
 
 type SidebarModel struct {
 	ModelName        string
@@ -18,6 +24,8 @@ type SidebarModel struct {
 	Width            int
 	Height           int
 	CurrentTask      string
+	GhostAgents      []*ghost.GhostAgentInfo
+	Todos            []TodoItem
 }
 
 func NewSidebarModel() SidebarModel {
@@ -190,9 +198,49 @@ func (m SidebarModel) View() string {
 	if m.CurrentTask != "" {
 		// Wrap task text supaya masuk lebar sidebar
 		wrapped := wrapText(m.CurrentTask, w-4)
-		sb.WriteString(taskStyle.Render(wrapped) + "\n")
+		sb.WriteString(taskStyle.Render(wrapped) + "\n\n")
 	} else {
-		sb.WriteString(dimStyle.Render("idle") + "\n")
+		sb.WriteString(dimStyle.Render("idle") + "\n\n")
+	}
+
+	// ── Todo List ──
+	if len(m.Todos) > 0 {
+		sb.WriteString(labelStyle.Render("todo list") + "\n")
+		for _, t := range m.Todos {
+			icon := "○"
+			contentStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#94A3B8"))
+			if t.Status == "in_progress" {
+				icon = "◐"
+				contentStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FBBF24")).Italic(true)
+			} else if t.Status == "completed" {
+				icon = "●"
+				contentStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#4B5563")).Strikethrough(true)
+			}
+			sb.WriteString(fmt.Sprintf("  %s %s\n", icon, contentStyle.Render(truncate(t.Content, w-6))))
+		}
+		sb.WriteString("\n")
+	}
+
+	// ── Ghost Agents ──
+	if len(m.GhostAgents) > 0 {
+		sb.WriteString(labelStyle.Render("ghost agents") + "\n")
+		for _, a := range m.GhostAgents {
+			statusIcon := "⏳"
+			statusColor := "#94A3B8"
+			if a.Status == "running" {
+				statusIcon = "🟡"
+				statusColor = "#FBBF24"
+			} else if a.Status == "completed" {
+				statusIcon = "✅"
+				statusColor = "#34D399"
+			} else if a.Status == "killed" {
+				statusIcon = "❌"
+				statusColor = "#F87171"
+			}
+			agentStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor))
+			sb.WriteString(fmt.Sprintf("  %s #%d %s\n", statusIcon, a.ID, agentStyle.Render(truncate(a.Task, w-9))))
+		}
+		sb.WriteString("\n")
 	}
 
 	return outerStyle.Render(sb.String())

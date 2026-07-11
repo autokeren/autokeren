@@ -18,6 +18,12 @@ import (
 // SpinnerTickMsg adalah tick untuk animasi spinner
 type SpinnerTickMsg struct{}
 
+// PeriodicTickMsg adalah tick periodik untuk refresh status & ghost agents
+type PeriodicTickMsg struct {
+	Status      map[string]interface{}
+	GhostAgents []*ghost.GhostAgentInfo
+}
+
 // Definisikan tipe-tipe pesan Bubble Tea untuk komunikasi asinkron dari daemon
 type ChunkMsg struct{ Text string }
 type ModelStartMsg struct{}
@@ -55,6 +61,7 @@ type StatusUpdateMsg struct {
 	ContextPct       float64
 	NeuronsRemaining int
 	NeuronsQuota     int
+	Todos            []TodoItem
 }
 
 // PermissionConfirmReq mewakili request izin masuk yang harus direspon balik
@@ -169,12 +176,30 @@ func (m MainModel) Init() tea.Cmd {
 		textinput.Blink,
 		m.connectToAgentCmd(),
 		spinnerTick(),
+		m.pollPeriodicCmd(),
 	)
 }
 
 func spinnerTick() tea.Cmd {
 	return tea.Tick(120*time.Millisecond, func(_ time.Time) tea.Msg {
 		return SpinnerTickMsg{}
+	})
+}
+
+func (m MainModel) pollPeriodicCmd() tea.Cmd {
+	return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
+		var statusReply map[string]interface{}
+		_ = m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply)
+		
+		var ghostAgents []*ghost.GhostAgentInfo
+		if m.GhostMgr != nil {
+			ghostAgents = m.GhostMgr.List()
+		}
+		
+		return PeriodicTickMsg{
+			Status:      statusReply,
+			GhostAgents: ghostAgents,
+		}
 	})
 }
 
@@ -307,6 +332,22 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Sidebar.ContextPct = msg.ContextPct
 		m.Sidebar.NeuronsRemaining = msg.NeuronsRemaining
 		m.Sidebar.NeuronsQuota = msg.NeuronsQuota
+		m.Sidebar.Todos = msg.Todos
+
+	case PeriodicTickMsg:
+		m.Sidebar.GhostAgents = msg.GhostAgents
+		if msg.Status != nil {
+			parsed := parseStatusReply(msg.Status, m.ProjectRoot)
+			m.Sidebar.ModelName = parsed.ModelName
+			m.Sidebar.ProjectName = parsed.ProjectName
+			m.Sidebar.ContextUsed = parsed.ContextUsed
+			m.Sidebar.ContextWindow = parsed.ContextWindow
+			m.Sidebar.ContextPct = parsed.ContextPct
+			m.Sidebar.NeuronsRemaining = parsed.NeuronsRemaining
+			m.Sidebar.NeuronsQuota = parsed.NeuronsQuota
+			m.Sidebar.Todos = parsed.Todos
+		}
+		return m, m.pollPeriodicCmd()
 
 	case PermissionConfirmReq:
 		// Autonomous mode: auto-approve tanpa dialog
@@ -992,59 +1033,7 @@ func (m MainModel) connectToAgentCmd() tea.Cmd {
 			return ErrorMsg{Message: fmt.Sprintf("Gagal mengambil status awal agen: %v", err)}
 		}
 
-		// Parse status awal
-		modelName := "?"
-		if mStatus, ok := statusReply["model_status"].(map[string]interface{}); ok {
-			if active, ok := mStatus["models"].([]interface{}); ok && len(active) > 0 {
-				if primary, ok := active[0].(map[string]interface{}); ok {
-					modelName, _ = primary["model_id"].(string)
-				}
-			}
-		}
-		
-		contextInfo, _ := statusReply["context_info"].(map[string]interface{})
-		contextUsed := 0
-		contextWindow := 262144
-		contextPct := 0.0
-		
-		if contextInfo != nil {
-			if u, ok := contextInfo["tokens"].(float64); ok {
-				contextUsed = int(u)
-			}
-			if w, ok := contextInfo["window"].(float64); ok {
-				contextWindow = int(w)
-			}
-			if p, ok := contextInfo["pct"].(float64); ok {
-				contextPct = p
-			}
-		}
-
-		// Ambil base name dari project root secara aman
-		projectName := "autokeren"
-		if m.ProjectRoot != "" {
-			projectName = filepath.Base(m.ProjectRoot)
-		}
-
-		neuronsRemaining := 0
-		neuronsQuota := 0
-		if sbi, ok := statusReply["status_bar_info"].(map[string]interface{}); ok {
-			if nr, ok := sbi["neurons_remaining"].(float64); ok {
-				neuronsRemaining = int(nr)
-			}
-			if nq, ok := sbi["neurons_quota"].(float64); ok {
-				neuronsQuota = int(nq)
-			}
-		}
-
-		return StatusUpdateMsg{
-			ModelName:        modelName,
-			ProjectName:      projectName,
-			ContextUsed:      contextUsed,
-			ContextWindow:    contextWindow,
-			ContextPct:       contextPct,
-			NeuronsRemaining: neuronsRemaining,
-			NeuronsQuota:     neuronsQuota,
-		}
+		return parseStatusReply(statusReply, m.ProjectRoot)
 	}
 }
 
@@ -1076,43 +1065,75 @@ func (m MainModel) switchModelCmd(modelID string) tea.Cmd {
 			}
 		}
 
-		projectName := filepath.Base(m.ProjectRoot)
-		contextUsed := 0
-		contextWindow := 262144
-		contextPct := 0.0
-		
-		contextInfo, _ := statusReply["context_info"].(map[string]interface{})
-		if contextInfo != nil {
-			if u, ok := contextInfo["tokens"].(float64); ok {
-				contextUsed = int(u)
-			}
-			if w, ok := contextInfo["window"].(float64); ok {
-				contextWindow = int(w)
-			}
-			if p, ok := contextInfo["pct"].(float64); ok {
-				contextPct = p
-			}
-		}
+		return parseStatusReply(statusReply, m.ProjectRoot)
+	}
+}
 
-		neuronsRemaining := 0
-		neuronsQuota := 0
-		if sbi, ok := statusReply["status_bar_info"].(map[string]interface{}); ok {
-			if nr, ok := sbi["neurons_remaining"].(float64); ok {
-				neuronsRemaining = int(nr)
-			}
-			if nq, ok := sbi["neurons_quota"].(float64); ok {
-				neuronsQuota = int(nq)
+func parseStatusReply(statusReply map[string]interface{}, projectRoot string) StatusUpdateMsg {
+	modelName := "?"
+	if mStatus, ok := statusReply["model_status"].(map[string]interface{}); ok {
+		if active, ok := mStatus["models"].([]interface{}); ok && len(active) > 0 {
+			if primary, ok := active[0].(map[string]interface{}); ok {
+				modelName, _ = primary["model_id"].(string)
 			}
 		}
+	}
+	
+	contextInfo, _ := statusReply["context_info"].(map[string]interface{})
+	contextUsed := 0
+	contextWindow := 262144
+	contextPct := 0.0
+	
+	if contextInfo != nil {
+		if u, ok := contextInfo["tokens"].(float64); ok {
+			contextUsed = int(u)
+		}
+		if w, ok := contextInfo["window"].(float64); ok {
+			contextWindow = int(w)
+		}
+		if p, ok := contextInfo["pct"].(float64); ok {
+			contextPct = p
+		}
+	}
 
-		return StatusUpdateMsg{
-			ModelName:        modelID,
-			ProjectName:      projectName,
-			ContextUsed:      contextUsed,
-			ContextWindow:    contextWindow,
-			ContextPct:       contextPct,
-			NeuronsRemaining: neuronsRemaining,
-			NeuronsQuota:     neuronsQuota,
+	projectName := "autokeren"
+	if projectRoot != "" {
+		projectName = filepath.Base(projectRoot)
+	}
+
+	neuronsRemaining := 0
+	neuronsQuota := 0
+	if sbi, ok := statusReply["status_bar_info"].(map[string]interface{}); ok {
+		if nr, ok := sbi["neurons_remaining"].(float64); ok {
+			neuronsRemaining = int(nr)
 		}
+		if nq, ok := sbi["neurons_quota"].(float64); ok {
+			neuronsQuota = int(nq)
+		}
+	}
+
+	var todos []TodoItem
+	if rawTodos, ok := statusReply["todos"].([]interface{}); ok {
+		for _, rt := range rawTodos {
+			if todoMap, ok := rt.(map[string]interface{}); ok {
+				content, _ := todoMap["content"].(string)
+				status, _ := todoMap["status"].(string)
+				todos = append(todos, TodoItem{
+					Content: content,
+					Status:  status,
+				})
+			}
+		}
+	}
+
+	return StatusUpdateMsg{
+		ModelName:        modelName,
+		ProjectName:      projectName,
+		ContextUsed:      contextUsed,
+		ContextWindow:    contextWindow,
+		ContextPct:       contextPct,
+		NeuronsRemaining: neuronsRemaining,
+		NeuronsQuota:     neuronsQuota,
+		Todos:            todos,
 	}
 }

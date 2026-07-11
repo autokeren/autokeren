@@ -490,8 +490,13 @@ class Agent:
         )
 
     def status(self) -> dict[str, Any]:
+        todo_tool = self.registry.get("todo")
+        todos = []
+        if todo_tool and hasattr(todo_tool, "get_todos"):
+            todos = todo_tool.get_todos()
         return {
             "project_root": self.project_root,
             "model_status": self.router.status(),
             "context": self.context.summary(),
+            "todos": todos,
         }
