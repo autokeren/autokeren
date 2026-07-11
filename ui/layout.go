@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,6 +14,9 @@ import (
 	"github.com/autokeren/autokeren/ghost"
 	"github.com/autokeren/autokeren/ipc"
 )
+
+// SpinnerTickMsg adalah tick untuk animasi spinner
+type SpinnerTickMsg struct{}
 
 // Definisikan tipe-tipe pesan Bubble Tea untuk komunikasi asinkron dari daemon
 type ChunkMsg struct{ Text string }
@@ -60,6 +64,9 @@ type PermissionConfirmReq struct {
 	Arguments   map[string]interface{}
 	RespChan    chan bool
 }
+
+// PermissionAbortMsg dikirim saat user memilih abort (q) pada dialog izin
+type PermissionAbortMsg struct{}
 
 
 
@@ -110,6 +117,12 @@ type MainModel struct {
 	ShowAutocomplete  bool
 	FilteredCmds      []SlashCommandInfo
 	SelectedCommand   int
+
+	// Spinner state
+	SpinnerFrame int
+
+	// Always-allow set: tool name yang sudah diizinkan selama sesi
+	AlwaysAllow map[string]bool
 }
 
 func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot, configPath string, opts map[string]interface{}) MainModel {
@@ -137,6 +150,8 @@ func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot,
 		ShowAutocomplete:   false,
 		FilteredCmds:       []SlashCommandInfo{},
 		SelectedCommand:    0,
+		SpinnerFrame:       0,
+		AlwaysAllow:        make(map[string]bool),
 	}
 }
 
@@ -144,7 +159,14 @@ func (m MainModel) Init() tea.Cmd {
 	return tea.Batch(
 		textinput.Blink,
 		m.connectToAgentCmd(),
+		spinnerTick(),
 	)
+}
+
+func spinnerTick() tea.Cmd {
+	return tea.Tick(120*time.Millisecond, func(_ time.Time) tea.Msg {
+		return SpinnerTickMsg{}
+	})
 }
 
 func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -171,6 +193,10 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 		m.TextInput.Width = chatWidth - 6
 		
+	case SpinnerTickMsg:
+		m.SpinnerFrame++
+		return m, spinnerTick()
+
 	case ChunkMsg:
 		m.Chat.AppendMessage("assistant", msg.Text)
 		
@@ -403,17 +429,31 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 
 
-		// Jika dialog izin sedang aktif, tangani input persetujuan khusus
+		// Jika dialog izin sedang aktif, tangani 4 opsi
 		if m.PermissionReq != nil {
 			switch msg.String() {
 			case "y", "Y", "enter":
+				// Allow sekali ini
 				m.PermissionReq.RespChan <- true
+				m.Chat.AppendMessage("system", fmt.Sprintf("allowed: %s", m.PermissionReq.Name))
 				m.PermissionReq = nil
-				m.Chat.AppendMessage("system", "Izin diberikan.")
+			case "a", "A":
+				// Allow selalu selama sesi ini
+				m.AlwaysAllow[m.PermissionReq.Name] = true
+				m.PermissionReq.RespChan <- true
+				m.Chat.AppendMessage("system", fmt.Sprintf("always allowed (session): %s", m.PermissionReq.Name))
+				m.PermissionReq = nil
 			case "n", "N", "esc":
+				// Tolak sekali ini
+				m.PermissionReq.RespChan <- false
+				m.Chat.AppendMessage("system", fmt.Sprintf("denied: %s", m.PermissionReq.Name))
+				m.PermissionReq = nil
+			case "q", "Q":
+				// Abort: tolak dan hentikan agent
 				m.PermissionReq.RespChan <- false
 				m.PermissionReq = nil
-				m.Chat.AppendMessage("system", "Izin ditolak.")
+				m.AgentRunning = false
+				m.Chat.AppendMessage("system", "task aborted.")
 			}
 			return m, nil
 		}
@@ -615,12 +655,60 @@ func (m MainModel) View() string {
 		Padding(0, 1).
 		Width(panelWidth)
 
+	// Spinner saat agent sedang berpikir
+	spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	spinnerFrame := spinnerFrames[m.SpinnerFrame%len(spinnerFrames)]
+
 	inputView := inputStyle.Render(m.TextInput.View())
 
-	// Jika sedang menunggu izin
+	// Spinner bar saat agent berpikir
+	var spinnerView string
+	if m.AgentRunning && m.PermissionReq == nil {
+		spinnerStyle := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#1E1E2A")).
+			Padding(0, 2).
+			Width(panelWidth)
+		spinnerText := lipgloss.NewStyle().Foreground(lipgloss.Color("#38BDF8")).Bold(true).Render(spinnerFrame) +
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#4B5563")).Render(" thinking...")
+		spinnerView = spinnerStyle.Render(spinnerText)
+	}
+
+	// Permission dialog 4-opsi overlay
+	var permissionView string
 	if m.PermissionReq != nil {
-		inputView = inputStyle.BorderForeground(lipgloss.Color("#FFB74D")).
-			Render(lipgloss.NewStyle().Foreground(lipgloss.Color("#FFB74D")).Bold(true).Render("Izinkan operasi di atas? [y] Ya / [n] Tidak: "))
+		permStyle := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#FBBF24")).
+			Padding(1, 2).
+			Width(panelWidth)
+
+		titleStyle  := lipgloss.NewStyle().Foreground(lipgloss.Color("#FBBF24")).Bold(true)
+		toolStyle   := lipgloss.NewStyle().Foreground(lipgloss.Color("#F8FAFC")).Bold(true)
+		descStyle   := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Italic(true)
+		divStyle    := lipgloss.NewStyle().Foreground(lipgloss.Color("#374151"))
+
+		keyStyle    := lipgloss.NewStyle().Foreground(lipgloss.Color("#FBBF24")).Bold(true)
+		labelOkStyle:= lipgloss.NewStyle().Foreground(lipgloss.Color("#34D399"))
+		labelAlStyle:= lipgloss.NewStyle().Foreground(lipgloss.Color("#38BDF8"))
+		labelNoStyle:= lipgloss.NewStyle().Foreground(lipgloss.Color("#F87171"))
+		labelAbStyle:= lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280"))
+
+		var pb strings.Builder
+		pb.WriteString(titleStyle.Render("  permission required") + "\n")
+		pb.WriteString(divStyle.Render(strings.Repeat("─", panelWidth-8)) + "\n")
+		pb.WriteString(toolStyle.Render("  "+m.PermissionReq.Name) + "\n")
+		if m.PermissionReq.Description != "" {
+			pb.WriteString(descStyle.Render("  "+m.PermissionReq.Description) + "\n")
+		}
+		pb.WriteString("\n")
+		pb.WriteString(
+			keyStyle.Render("  [y]") + labelOkStyle.Render(" allow once") + "   " +
+			keyStyle.Render("[a]") + labelAlStyle.Render(" always (session)") + "   " +
+			keyStyle.Render("[n]") + labelNoStyle.Render(" deny") + "   " +
+			keyStyle.Render("[q]") + labelAbStyle.Render(" abort task"),
+		)
+		permissionView = permStyle.Render(pb.String())
 	}
 
 	// Render autocomplete slash command dropdown
@@ -687,6 +775,19 @@ func (m MainModel) View() string {
 			chatView,
 			modelSelectorView,
 			inputView,
+		)
+	case m.PermissionReq != nil:
+		rightPanel = lipgloss.JoinVertical(
+			lipgloss.Left,
+			chatView,
+			permissionView,
+			inputView,
+		)
+	case m.AgentRunning && spinnerView != "":
+		rightPanel = lipgloss.JoinVertical(
+			lipgloss.Left,
+			chatView,
+			spinnerView,
 		)
 	case m.ShowAutocomplete && autocompleteView != "":
 		rightPanel = lipgloss.JoinVertical(
