@@ -42,7 +42,13 @@ func (m *ChatModel) Resize(width, height int) {
 
 func (m *ChatModel) AppendMessage(role, content string) {
 	n := len(m.Messages)
-	if n > 0 && m.Messages[n-1].Role == role {
+	if n > 0 && m.Messages[n-1].Role == role && role != "system" {
+		if role == "tool" {
+			// Pastikan ada newline pemisah antar log tool agar tidak menyatu dalam satu baris
+			if !strings.HasSuffix(m.Messages[n-1].Content, "\n") {
+				m.Messages[n-1].Content += "\n"
+			}
+		}
 		m.Messages[n-1].Content += content
 	} else {
 		m.Messages = append(m.Messages, ChatMessage{Role: role, Content: content})

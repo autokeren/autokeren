@@ -159,7 +159,7 @@ func (m SidebarModel) View() string {
 			nPctStyle = warnStyle
 		}
 		sb.WriteString(
-			dimStyle.Render(fmt.Sprintf("%s used / %s", humanTokens(used), humanTokens(m.NeuronsQuota)))+"\n",
+			dimStyle.Render(fmt.Sprintf("pakai: %s | sisa: %s (limit %s)", humanTokens(used), humanTokens(m.NeuronsRemaining), humanTokens(m.NeuronsQuota)))+"\n",
 		)
 		// Neuron progress bar
 		if barInnerW > 3 {
