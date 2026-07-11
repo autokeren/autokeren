@@ -120,9 +120,14 @@ type MainModel struct {
 
 	// Spinner state
 	SpinnerFrame int
+	SpinnerDir   int // 1 = kanan, -1 = kiri (untuk bouncing ball)
+	SpinnerPos   int // posisi bola saat ini
 
 	// Always-allow set: tool name yang sudah diizinkan selama sesi
 	AlwaysAllow map[string]bool
+
+	// Task aktif saat ini (ditampilkan di sidebar)
+	CurrentTask string
 }
 
 func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot, configPath string, opts map[string]interface{}) MainModel {
@@ -151,7 +156,10 @@ func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot,
 		FilteredCmds:       []SlashCommandInfo{},
 		SelectedCommand:    0,
 		SpinnerFrame:       0,
+		SpinnerDir:         1,
+		SpinnerPos:         0,
 		AlwaysAllow:        make(map[string]bool),
+		CurrentTask:        "",
 	}
 }
 
@@ -195,6 +203,14 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 	case SpinnerTickMsg:
 		m.SpinnerFrame++
+		// Bounce logic untuk bola gliding
+		m.SpinnerPos += m.SpinnerDir
+		if m.SpinnerPos >= 18 {
+			m.SpinnerDir = -1
+		}
+		if m.SpinnerPos <= 0 {
+			m.SpinnerDir = 1
+		}
 		return m, spinnerTick()
 
 	case ChunkMsg:
@@ -202,10 +218,12 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 	case ModelStartMsg:
 		m.AgentRunning = true
-		m.Chat.AppendMessage("system", "autokeren sedang berpikir...")
+		// Tidak menambah pesan "berpikir..." — cukup spinner di UI
 		
 	case ModelEndMsg:
 		m.AgentRunning = false
+		m.CurrentTask = ""
+		m.Sidebar.CurrentTask = ""
 		m.Chat.UpdateViewport()
 		
 		// Update info token di sidebar jika ada
@@ -531,6 +549,13 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			
 			// ── Kirim perintah biasa secara asinkron ke background thread ──
 			m.AgentRunning = true
+			// Simpan ringkasan task di sidebar (maks 40 char)
+			taskLabel := val
+			if len([]rune(taskLabel)) > 40 {
+				taskLabel = string([]rune(taskLabel)[:39]) + "…"
+			}
+			m.CurrentTask = taskLabel
+			m.Sidebar.CurrentTask = taskLabel
 			go func(userInput string) {
 				runParams := map[string]interface{}{
 					"user_input": userInput,
@@ -655,13 +680,9 @@ func (m MainModel) View() string {
 		Padding(0, 1).
 		Width(panelWidth)
 
-	// Spinner saat agent sedang berpikir
-	spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-	spinnerFrame := spinnerFrames[m.SpinnerFrame%len(spinnerFrames)]
-
 	inputView := inputStyle.Render(m.TextInput.View())
 
-	// Spinner bar saat agent berpikir
+	// Bouncing ball gliding spinner
 	var spinnerView string
 	if m.AgentRunning && m.PermissionReq == nil {
 		spinnerStyle := lipgloss.NewStyle().
@@ -669,8 +690,41 @@ func (m MainModel) View() string {
 			BorderForeground(lipgloss.Color("#1E1E2A")).
 			Padding(0, 2).
 			Width(panelWidth)
-		spinnerText := lipgloss.NewStyle().Foreground(lipgloss.Color("#38BDF8")).Bold(true).Render(spinnerFrame) +
-			lipgloss.NewStyle().Foreground(lipgloss.Color("#4B5563")).Render(" thinking...")
+
+		// Track width untuk ball (kurangi padding + border)
+		trackW := panelWidth - 10
+		if trackW < 8 {
+			trackW = 8
+		}
+		pos := m.SpinnerPos
+		if pos > trackW {
+			pos = trackW
+		}
+
+		// Gradient warna: kiri biru, tengah cyan, kanan ungu
+		gradColors := []string{
+			"#1E3A5F", "#1E4A8F", "#1560BD", "#0078D4",
+			"#00A8E8", "#38BDF8", "#00E5FF", "#7C3AED",
+		}
+
+		var trackSb strings.Builder
+		for i := 0; i < trackW; i++ {
+			if i == pos {
+				// Bola: bright white dot
+				ballColor := gradColors[(i*len(gradColors))/trackW]
+				trackSb.WriteString(
+					lipgloss.NewStyle().Foreground(lipgloss.Color(ballColor)).Bold(true).Render("●"),
+				)
+			} else {
+				// Track: titik redup
+				trackSb.WriteString(
+					lipgloss.NewStyle().Foreground(lipgloss.Color("#1E1E2A")).Render("─"),
+				)
+			}
+		}
+
+		labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#374151"))
+		spinnerText := trackSb.String() + "  " + labelStyle.Render("processing")
 		spinnerView = spinnerStyle.Render(spinnerText)
 	}
 
