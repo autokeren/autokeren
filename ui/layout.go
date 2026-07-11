@@ -61,23 +61,25 @@ type PermissionConfirmReq struct {
 	RespChan    chan bool
 }
 
+
+
+type ModelSelectorItem struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Active bool   `json:"active"`
+}
+
 type SlashCommandInfo struct {
 	Name        string
 	Description string
 }
 
 var slashCommands = []SlashCommandInfo{
-	{Name: "/model", Description: "Ganti model kecerdasan buatan (AI)"},
-	{Name: "/ghost", Description: "Kelola background agent (ghost)"},
-	{Name: "/compact", Description: "Ringkas riwayat percakapan"},
-	{Name: "/reset", Description: "Mulai ulang sesi & reset izin"},
-	{Name: "/q", Description: "Keluar dari TUI autokeren"},
-}
-
-type ModelSelectorItem struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Active bool   `json:"active"`
+	{Name: "/model", Description: "Ganti model AI yang digunakan"},
+	{Name: "/ghost", Description: "Kelola background agent"},
+	{Name: "/compact", Description: "Kompak/ringkas konteks percakapan"},
+	{Name: "/reset", Description: "Reset sesi percakapan baru"},
+	{Name: "/q", Description: "Keluar dari autokeren"},
 }
 
 type MainModel struct {
@@ -89,28 +91,30 @@ type MainModel struct {
 	ProjectRoot       string
 	ConfigPath        string
 	InitOpts          map[string]interface{}
-	
+
 	Width  int
 	Height int
-	
+
 	AgentRunning      bool
 	PermissionReq     *PermissionConfirmReq
 	ActiveModelID     string
-	
+
 	Initialized       bool
 	InitError         string
-	ShowAutocomplete  bool
-	SelectedCommand   int
 	ActiveEditingFile string
 
 	ShowModelSelector  bool
 	SelectorModels     []ModelSelectorItem
 	SelectedModelIndex int
+
+	ShowAutocomplete  bool
+	FilteredCmds      []SlashCommandInfo
+	SelectedCommand   int
 }
 
 func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot, configPath string, opts map[string]interface{}) MainModel {
 	ti := textinput.New()
-	ti.Placeholder = "Ketik perintah Anda di sini... (atau /q untuk keluar)"
+	ti.Placeholder = "Ketik perintah atau / untuk melihat menu..."
 	ti.Focus()
 	ti.CharLimit = 1000
 	ti.Width = 80
@@ -126,12 +130,13 @@ func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot,
 		ProjectRoot:        projectRoot,
 		ConfigPath:         configPath,
 		InitOpts:           opts,
-		ShowAutocomplete:   false,
-		SelectedCommand:    0,
 		ActiveEditingFile:  "",
 		ShowModelSelector:  false,
 		SelectorModels:     []ModelSelectorItem{},
 		SelectedModelIndex: 0,
+		ShowAutocomplete:   false,
+		FilteredCmds:       []SlashCommandInfo{},
+		SelectedCommand:    0,
 	}
 }
 
@@ -261,6 +266,98 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Chat.AppendMessage("system", fmt.Sprintf("⚡ KONFIRMASI IZIN: %s\nDeskripsi: %s", msg.Name, msg.Description))
 
 	case tea.KeyMsg:
+		// Jika autocomplete slash sedang tampil, tangani navigasi dropdown dulu
+		if m.ShowAutocomplete && len(m.FilteredCmds) > 0 {
+			switch msg.String() {
+			case "up", "shift+tab":
+				m.SelectedCommand--
+				if m.SelectedCommand < 0 {
+					m.SelectedCommand = len(m.FilteredCmds) - 1
+				}
+				return m, nil
+			case "down", "tab":
+				m.SelectedCommand++
+				if m.SelectedCommand >= len(m.FilteredCmds) {
+					m.SelectedCommand = 0
+				}
+				return m, nil
+			case "enter":
+				selected := m.FilteredCmds[m.SelectedCommand]
+				m.ShowAutocomplete = false
+				m.TextInput.SetValue(selected.Name + " ")
+				m.TextInput.CursorEnd()
+				// Langsung trigger action kalau command lengkap (tanpa argumen)
+				if selected.Name == "/model" {
+					m.TextInput.SetValue("")
+					m.Chat.AppendMessage("system", "Memuat daftar model...")
+					return m, m.fetchModelsCmd()
+				}
+				if selected.Name == "/compact" {
+					m.TextInput.SetValue("")
+					m.AgentRunning = true
+					m.Chat.AppendMessage("system", "Mengompak context...")
+					go func() {
+						var reply map[string]interface{}
+						err := m.IPCClient.Call("agent.compact", map[string]interface{}{}, &reply)
+						if err == nil {
+							msg2, _ := reply["message"].(string)
+							m.Chat.AppendMessage("system", msg2)
+						} else {
+							m.Chat.AppendMessage("system", fmt.Sprintf("Gagal compact: %v", err))
+						}
+					}()
+					return m, nil
+				}
+				if selected.Name == "/reset" {
+					m.TextInput.SetValue("")
+					m.AgentRunning = true
+					m.Chat.AppendMessage("system", "Mereset sesi percakapan...")
+					go func() {
+						var reply string
+						err := m.IPCClient.Call("agent.reset", map[string]interface{}{}, &reply)
+						if err == nil {
+							m.Chat.Messages = []ChatMessage{}
+							m.Chat.AppendMessage("system", "Sesi berhasil direset.")
+						} else {
+							m.Chat.AppendMessage("system", fmt.Sprintf("Gagal reset: %v", err))
+						}
+					}()
+					return m, nil
+				}
+				if selected.Name == "/q" {
+					m.IPCClient.Close()
+					return m, tea.Quit
+				}
+				// Untuk /ghost: biarkan user isi argumen setelah
+				return m, nil
+			case "esc":
+				m.ShowAutocomplete = false
+				m.TextInput.SetValue("")
+				return m, nil
+			default:
+				// Shortcut angka 1-9 langsung pilih
+				if len(msg.String()) == 1 && msg.String() >= "1" && msg.String() <= "9" {
+					idx := int(msg.String()[0] - '1')
+					if idx >= 0 && idx < len(m.FilteredCmds) {
+						selected := m.FilteredCmds[idx]
+						m.ShowAutocomplete = false
+						if selected.Name == "/model" {
+							m.TextInput.SetValue("")
+							m.Chat.AppendMessage("system", "Memuat daftar model...")
+							return m, m.fetchModelsCmd()
+						}
+						if selected.Name == "/q" {
+							m.IPCClient.Close()
+							return m, tea.Quit
+						}
+						m.TextInput.SetValue(selected.Name + " ")
+						m.TextInput.CursorEnd()
+						return m, nil
+					}
+				}
+			}
+		}
+
 		// Jika selector model sedang tampil, tangani navigasi selector model
 		if m.ShowModelSelector {
 			switch msg.String() {
@@ -302,37 +399,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// Jika autocomplete sedang tampil, tangani tombol navigasi khusus
-		if m.ShowAutocomplete {
-			switch msg.String() {
-			case "up", "shift+tab":
-				m.SelectedCommand--
-				if m.SelectedCommand < 0 {
-					m.SelectedCommand = len(slashCommands) - 1
-				}
-				return m, nil
-			case "down", "tab":
-				m.SelectedCommand++
-				if m.SelectedCommand >= len(slashCommands) {
-					m.SelectedCommand = 0
-				}
-				return m, nil
-			case "enter":
-				m.TextInput.SetValue(slashCommands[m.SelectedCommand].Name + " ")
-				m.ShowAutocomplete = false
-				return m, nil
-			case "esc":
-				m.ShowAutocomplete = false
-				return m, nil
-			case "1", "2", "3", "4", "5":
-				idx := int(msg.Runes[0] - '1')
-				if idx >= 0 && idx < len(slashCommands) {
-					m.TextInput.SetValue(slashCommands[idx].Name + " ")
-					m.ShowAutocomplete = false
-					return m, nil
-				}
-			}
-		}
+
 
 		// Jika dialog izin sedang aktif, tangani input persetujuan khusus
 		if m.PermissionReq != nil {
@@ -439,14 +506,30 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	
 	if m.PermissionReq == nil {
 		m.TextInput, cmd = m.TextInput.Update(msg)
-		
-		val := m.TextInput.Value()
-		if strings.HasPrefix(val, "/") && !strings.Contains(val, " ") {
-			m.ShowAutocomplete = true
+	}
+
+	// Cek apakah perlu tampilkan/update autocomplete berdasarkan isi text input
+	if !m.ShowModelSelector && !m.AgentRunning {
+		currentVal := m.TextInput.Value()
+		if strings.HasPrefix(currentVal, "/") && !strings.Contains(currentVal, " ") {
+			// Filter slash commands berdasarkan teks yang sudah diketik
+			var filtered []SlashCommandInfo
+			for _, sc := range slashCommands {
+				if strings.HasPrefix(sc.Name, currentVal) {
+					filtered = append(filtered, sc)
+				}
+			}
+			m.FilteredCmds = filtered
+			m.ShowAutocomplete = len(filtered) > 0
+			if m.SelectedCommand >= len(filtered) {
+				m.SelectedCommand = 0
+			}
 		} else {
 			m.ShowAutocomplete = false
+			m.FilteredCmds = nil
 		}
 	}
+
 	return m, cmd
 }
 
@@ -522,39 +605,48 @@ func (m MainModel) View() string {
 	chatView := m.Chat.View()
 	sidebarView := m.Sidebar.View()
 
+	panelWidth := m.Width - m.Sidebar.Width - 4
+
 	inputStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#2A2A35")).
 		Padding(0, 1).
-		Width(m.Width - m.Sidebar.Width - 4)
+		Width(panelWidth)
 
 	inputView := inputStyle.Render(m.TextInput.View())
-	
+
 	// Jika sedang menunggu izin
 	if m.PermissionReq != nil {
 		inputView = inputStyle.BorderForeground(lipgloss.Color("#FFB74D")).
 			Render(lipgloss.NewStyle().Foreground(lipgloss.Color("#FFB74D")).Bold(true).Render("Izinkan operasi di atas? [y] Ya / [n] Tidak: "))
 	}
 
-	// Render autocomplete dropdown overlay jika aktif
+	// Render autocomplete slash command dropdown
 	var autocompleteView string
-	if m.ShowAutocomplete {
+	if m.ShowAutocomplete && len(m.FilteredCmds) > 0 {
 		var acSb strings.Builder
 		acStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#00E5FF")).
+			BorderForeground(lipgloss.Color("#7C3AED")).
 			Padding(0, 1).
-			Width(m.Width - m.Sidebar.Width - 4)
+			Width(panelWidth)
 
-		acSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888899")).Render("💡 PINTASAN SLASH (Tab/Panah navigasi, Enter/Angka pilih):") + "\n")
-		for i, cmd := range slashCommands {
-			numStr := fmt.Sprintf("%d. ", i+1)
+		titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#A78BFA")).Bold(true)
+		acSb.WriteString(titleStyle.Render("  ╱ PERINTAH SLASH") + "\n")
+		for i, sc := range m.FilteredCmds {
+			numStr := fmt.Sprintf(" %d ", i+1)
 			if i == m.SelectedCommand {
-				acSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#00E5FF")).Bold(true).Render(fmt.Sprintf(" ▸ %s%s - %s", numStr, cmd.Name, cmd.Description)) + "\n")
+				selStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Background(lipgloss.Color("#7C3AED")).Bold(true)
+				descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#DDD6FE")).Background(lipgloss.Color("#4C1D95"))
+				acSb.WriteString(selStyle.Render(fmt.Sprintf(" ▸%s%-12s", numStr, sc.Name)) + descStyle.Render(fmt.Sprintf(" %s ", sc.Description)) + "\n")
 			} else {
-				acSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#E0E0E0")).Render(fmt.Sprintf("   %s%s - %s", numStr, cmd.Name, cmd.Description)) + "\n")
+				numStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280"))
+				cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#C4B5FD")).Bold(true)
+				descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280"))
+				acSb.WriteString(numStyle.Render(fmt.Sprintf("  %s", numStr)) + cmdStyle.Render(fmt.Sprintf("%-12s", sc.Name)) + descStyle.Render(fmt.Sprintf(" %s", sc.Description)) + "\n")
 			}
 		}
+		acSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#4B5563")).Render("   ↑↓/Tab navigasi · Enter pilih · 1-5 cepat · Esc batal"))
 		autocompleteView = acStyle.Render(acSb.String())
 	}
 
@@ -566,41 +658,42 @@ func (m MainModel) View() string {
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#00E5FF")).
 			Padding(1, 2).
-			Width(m.Width - m.Sidebar.Width - 4)
+			Width(panelWidth)
 
 		msSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#00E5FF")).Bold(true).Render("🤖 PILIH MODEL KECERDASAN BUATAN:") + "\n\n")
 		for i, item := range m.SelectorModels {
 			numStr := fmt.Sprintf("%d. ", i+1)
 			activeMarker := ""
 			if item.Active {
-				activeMarker = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF66")).Render(" (Aktif)")
+				activeMarker = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF66")).Render(" ✓ Aktif")
 			}
 			if i == m.SelectedModelIndex {
-				msSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#00E5FF")).Bold(true).Render(fmt.Sprintf(" ▸ %s%s%s", numStr, item.Name, activeMarker)) + "\n")
+				msSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#00E5FF")).Background(lipgloss.Color("#003344")).Bold(true).Render(fmt.Sprintf(" ▸ %s%-35s%s", numStr, item.Name, activeMarker)) + "\n")
 			} else {
-				msSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#E0E0E0")).Render(fmt.Sprintf("   %s%s%s", numStr, item.Name, activeMarker)) + "\n")
+				msSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#E0E0E0")).Render(fmt.Sprintf("   %s%-35s%s", numStr, item.Name, activeMarker)) + "\n")
 			}
 		}
-		msSb.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888899")).Render("💡 Gunakan Tab/Panah navigasi, Enter pilih, Esc batal, 1-9 pilih cepat."))
+		msSb.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888899")).Render("  ↑↓/Tab navigasi · Enter pilih · Esc batal · 1-9 pilih cepat"))
 		modelSelectorView = msStyle.Render(msSb.String())
 	}
 
 	var rightPanel string
-	if m.ShowModelSelector {
+	switch {
+	case m.ShowModelSelector:
 		rightPanel = lipgloss.JoinVertical(
 			lipgloss.Left,
 			chatView,
 			modelSelectorView,
 			inputView,
 		)
-	} else if m.ShowAutocomplete {
+	case m.ShowAutocomplete && autocompleteView != "":
 		rightPanel = lipgloss.JoinVertical(
 			lipgloss.Left,
 			chatView,
 			autocompleteView,
 			inputView,
 		)
-	} else {
+	default:
 		rightPanel = lipgloss.JoinVertical(
 			lipgloss.Left,
 			chatView,
