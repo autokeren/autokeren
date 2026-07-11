@@ -3,6 +3,7 @@ package ui
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -1404,7 +1405,12 @@ func parseStatusReply(statusReply map[string]interface{}, projectRoot string) St
 		version = "v" + version
 	}
 	if version == "" {
-		version = "v0.11.13" // fallback
+		version = os.Getenv("AUTOKEREN_VERSION")
+		if version == "" {
+			version = "v0.11.18" // fallback
+		} else if !strings.HasPrefix(version, "v") {
+			version = "v" + version
+		}
 	}
 	modelName := "?"
 	if mStatus, ok := statusReply["model_status"].(map[string]interface{}); ok {

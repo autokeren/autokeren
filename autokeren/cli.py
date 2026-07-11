@@ -639,6 +639,7 @@ def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
     from autokeren import __version__
 
     os.environ["AUTOKEREN_PYTHON_PATH"] = sys.executable
+    os.environ["AUTOKEREN_VERSION"] = __version__
     cache_dir = Path.home() / ".cache" / "autokeren" / "bin"
     ak_bin = cache_dir / ("ak.exe" if os.name == "nt" else "ak")
     version_file = cache_dir / "version.txt"

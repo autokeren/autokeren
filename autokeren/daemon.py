@@ -357,8 +357,13 @@ class JSONRPCDaemon:
             )
 
             # Start background system observer daemon (Fase 3 AGI)
-            self.observer = SystemObserver(str(project_path), self)
-            threading.Thread(target=self.observer.watch_loop, daemon=True).start()
+            def init_and_run_observer() -> None:
+                try:
+                    self.observer = SystemObserver(str(project_path), self)
+                    self.observer.watch_loop()
+                except Exception:
+                    pass
+            threading.Thread(target=init_and_run_observer, daemon=True).start()
 
             self.send_response(req_id, result="initialized")
         except Exception as e:
