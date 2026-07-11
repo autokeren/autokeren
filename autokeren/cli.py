@@ -165,7 +165,7 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
         if user_input in ("/quit", "/q"):
             break
         if user_input == "/help":
-            console.print("Perintah: /q /status /model /compact /deploy /rewind /genome /loop /review /security /spec /ghost /research /reset /memory /permissions /save /resume /sessions /diagram")
+            console.print("Perintah: /q /status /model /compact /deploy /rewind /genome /loop /review /security /spec /ghost /research /reset /debug /memory /permissions /save /resume /sessions /diagram")
             continue
         if user_input == "/model" or user_input.startswith("/model "):
             arg = user_input[6:].strip()
@@ -226,6 +226,20 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
             agent.reset()
             ui.reset_permissions()
             console.print("Sesi direset. Permission juga direset.")
+            continue
+        if user_input == "/debug":
+            import os
+            import logging
+            current_debug = os.environ.get("AUTOKEREN_DEBUG") == "1"
+            if current_debug:
+                os.environ.pop("AUTOKEREN_DEBUG", None)
+                logging.getLogger().setLevel(logging.WARNING)
+                console.print("[blue]Mode Debug NON-AKTIF. Traceback internal tidak akan ditampilkan secara detail.[/blue]")
+            else:
+                os.environ["AUTOKEREN_DEBUG"] = "1"
+                logging.basicConfig(filename="autokeren-debug.log", level=logging.DEBUG, force=True)
+                logging.debug("Debug mode activated in CLI.")
+                console.print("[blue]Mode Debug AKTIF. Traceback internal akan ditampilkan. Detail debug dicatat di autokeren-debug.log.[/blue]")
             continue
         if user_input.startswith("/rewind"):
             if not agent.checkpoints:

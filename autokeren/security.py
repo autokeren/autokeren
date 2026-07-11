@@ -88,7 +88,6 @@ _HARD_BLOCK_PATTERNS: list[tuple[str, str]] = [
 _EXFIL_PATTERNS: list[tuple[str, str]] = [
     (r"curl\s+.*\|\s*(?:sh|bash|zsh|python|perl|ruby)\b", "curl piped to shell"),
     (r"wget\s+.*\|\s*(?:sh|bash|zsh|python|perl|ruby)\b", "wget piped to shell"),
-    (r"curl\s+.*\|\s*(?:sh|bash|zsh|python|perl|ruby)\b", "curl piped to shell"),
     (r"\beval\s*\(", "eval() call"),
     (r"\beval\s+(?:\"\$|\$\()", "eval of variable/subshell"),
     (r"base64\s+.*\|\s*(?:sh|bash|zsh|python)\b", "base64 decoded to shell"),
