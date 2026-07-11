@@ -786,15 +786,19 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
-		case tea.KeyCtrlC, tea.KeyCtrlQ:
+		case tea.KeyCtrlC:
 			if m.AgentRunning {
 				go func() {
 					var reply string
 					_ = m.IPCClient.Call("agent.interrupt", map[string]interface{}{}, &reply)
 				}()
 				m.Chat.AppendMessage("system", "Interupsi dikirim ke agen...")
-				return m, nil
+			} else {
+				m.Chat.AppendMessage("system", "Agen sedang diam. Gunakan /q atau Ctrl+Q untuk keluar.")
 			}
+			return m, nil
+
+		case tea.KeyCtrlQ:
 			m.IPCClient.Close()
 			return m, tea.Quit
 			
