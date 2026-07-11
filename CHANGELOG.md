@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-07-11
+
+### Changed
+- feat: implementasi Ak-Kanban (Kanban Board SQLite-backed) di TUI dan Agent
+
 ## [0.10.10] - 2026-07-11
 
 ### Changed
