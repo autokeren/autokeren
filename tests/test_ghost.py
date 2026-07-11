@@ -117,3 +117,23 @@ def test_ghost_get_output(mock_run, tmp_path):
 def test_ghost_get_output_no_log(mock_run, tmp_path):
     gm = GhostManager(project_root=str(tmp_path))
     assert gm.get_output(999) == ""
+
+
+@patch("autokeren.ghost.manager.subprocess.run")
+def test_ghost_spawn_avoids_existing_tmux_sessions(mock_run, tmp_path):
+    def side_effect(args, **kwargs):
+        cmd = args[0]
+        subcmd = args[1]
+        if cmd == "tmux" and subcmd == "has-session":
+            target = args[3]
+            if target == "ak-ghost-1":
+                return MagicMock(returncode=0)
+            elif target == "ak-ghost-2":
+                return MagicMock(returncode=1)
+        return MagicMock(returncode=0)
+
+    mock_run.side_effect = side_effect
+    gm = GhostManager(project_root=str(tmp_path))
+    info = gm.spawn("task with existing session")
+    assert info.id == 2
+    assert info.status == "running"

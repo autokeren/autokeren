@@ -49,9 +49,18 @@ class GhostManager:
     def spawn(self, task: str) -> GhostAgentInfo:
         if len(self._agents) >= self.max_agents:
             raise RuntimeError(f"Maksimal {self.max_agents} ghost agent.")
+        
         agent_id = self._next_id
-        self._next_id += 1
-        session_name = f"{self.prefix}-{agent_id}"
+        while True:
+            session_name = f"{self.prefix}-{agent_id}"
+            check = subprocess.run(
+                ["tmux", "has-session", "-t", session_name], capture_output=True
+            )
+            if check.returncode != 0:
+                break
+            agent_id += 1
+        
+        self._next_id = agent_id + 1
         log_file = str(Path(self.project_root) / f".ak-ghost-{agent_id}.log")
         info = GhostAgentInfo(
             id=agent_id, task=task, status="running",
