@@ -571,6 +571,28 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	
+	// Forward scroll keys ke Chat.Viewport (pgup/pgdn/up/down saat tidak typing)
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		switch keyMsg.String() {
+		case "pgup", "ctrl+b":
+			m.Chat.Viewport, _ = m.Chat.Viewport.Update(msg)
+			return m, nil
+		case "pgdown", "ctrl+f":
+			m.Chat.Viewport, _ = m.Chat.Viewport.Update(msg)
+			return m, nil
+		case "up":
+			if !m.ShowAutocomplete && !m.ShowModelSelector && m.PermissionReq == nil {
+				m.Chat.Viewport, _ = m.Chat.Viewport.Update(msg)
+				return m, nil
+			}
+		case "down":
+			if !m.ShowAutocomplete && !m.ShowModelSelector && m.PermissionReq == nil {
+				m.Chat.Viewport, _ = m.Chat.Viewport.Update(msg)
+				return m, nil
+			}
+		}
+	}
+
 	if m.PermissionReq == nil {
 		m.TextInput, cmd = m.TextInput.Update(msg)
 	}
@@ -996,12 +1018,25 @@ func (m MainModel) connectToAgentCmd() tea.Cmd {
 			projectName = filepath.Base(m.ProjectRoot)
 		}
 
+		neuronsRemaining := 0
+		neuronsQuota := 0
+		if sbi, ok := statusReply["status_bar_info"].(map[string]interface{}); ok {
+			if nr, ok := sbi["neurons_remaining"].(float64); ok {
+				neuronsRemaining = int(nr)
+			}
+			if nq, ok := sbi["neurons_quota"].(float64); ok {
+				neuronsQuota = int(nq)
+			}
+		}
+
 		return StatusUpdateMsg{
-			ModelName:     modelName,
-			ProjectName:   projectName,
-			ContextUsed:   contextUsed,
-			ContextWindow: contextWindow,
-			ContextPct:   contextPct,
+			ModelName:        modelName,
+			ProjectName:      projectName,
+			ContextUsed:      contextUsed,
+			ContextWindow:    contextWindow,
+			ContextPct:       contextPct,
+			NeuronsRemaining: neuronsRemaining,
+			NeuronsQuota:     neuronsQuota,
 		}
 	}
 }
@@ -1052,12 +1087,25 @@ func (m MainModel) switchModelCmd(modelID string) tea.Cmd {
 			}
 		}
 
+		neuronsRemaining := 0
+		neuronsQuota := 0
+		if sbi, ok := statusReply["status_bar_info"].(map[string]interface{}); ok {
+			if nr, ok := sbi["neurons_remaining"].(float64); ok {
+				neuronsRemaining = int(nr)
+			}
+			if nq, ok := sbi["neurons_quota"].(float64); ok {
+				neuronsQuota = int(nq)
+			}
+		}
+
 		return StatusUpdateMsg{
-			ModelName:     modelID,
-			ProjectName:   projectName,
-			ContextUsed:   contextUsed,
-			ContextWindow: contextWindow,
-			ContextPct:    contextPct,
+			ModelName:        modelID,
+			ProjectName:      projectName,
+			ContextUsed:      contextUsed,
+			ContextWindow:    contextWindow,
+			ContextPct:       contextPct,
+			NeuronsRemaining: neuronsRemaining,
+			NeuronsQuota:     neuronsQuota,
 		}
 	}
 }
