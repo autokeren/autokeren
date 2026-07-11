@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.6] - 2026-07-11
+
+### Changed
+- feat: tambahkan fitur interupsi Ctrl+C untuk membatalkan loop agen yang stuck tanpa mematikan TUI
+
 ## [0.11.5] - 2026-07-11
 
 ### Changed
