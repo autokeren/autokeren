@@ -81,6 +81,18 @@ class TestToolRegistry:
         assert result.ok is True
         assert result.output == "dummy-ok"
 
+    def test_run_filters_unsupported_extra_args(self) -> None:
+        class _StrictTool(Tool):
+            name = "strict"
+            def run(self, arg1: str) -> ToolResult:
+                return ToolResult(output=f"ok-{arg1}")
+
+        registry = ToolRegistry()
+        registry.register(_StrictTool())
+        result = registry.run("strict", {"arg1": "hello"}, extra_arg="ignored", on_output=lambda x: None)
+        assert result.ok is True
+        assert result.output == "ok-hello"
+
     def test_run_catches_exception(self) -> None:
         registry = ToolRegistry()
         registry.register(_DummyTool())

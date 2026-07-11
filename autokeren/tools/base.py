@@ -87,10 +87,21 @@ class ToolRegistry:
         return False, ""
 
     def run(self, name: str, arguments: dict[str, Any], **extra: Any) -> ToolResult:
+        import inspect
         tool = self.get(name)
         if not tool:
             return ToolResult(error=f"tool tidak ditemukan: {name}", ok=False)
         try:
-            return tool.run(**arguments, **extra)
+            sig = inspect.signature(tool.run)
+            has_kwargs = any(p.kind == p.VAR_KEYWORD for p in sig.parameters.values())
+            
+            run_args = arguments.copy()
+            if has_kwargs:
+                run_args.update(extra)
+            else:
+                for k, v in extra.items():
+                    if k in sig.parameters:
+                        run_args[k] = v
+            return tool.run(**run_args)
         except Exception as e:
             return ToolResult(error=f"{type(e).__name__}: {e}", ok=False)
