@@ -27,15 +27,19 @@ class Agent:
         project_root: str,
         memory: MemoryManager | None = None,
         sessions: SessionManager | None = None,
+        role: str = "",
+        model_id: str | None = None,
     ):
         self.cfg = cfg
         self.tools = tools
         self.project_root = project_root
         self.router = ModelRouter(cfg)
+        if model_id:
+            self.router.switch_model(model_id)
         self.context = SessionContext(project_root=Path(project_root))
         self.memory = memory if memory is not None else MemoryManager(project_root)
         self.sessions = sessions if sessions is not None else SessionManager(project_root)
-        self._build_system_prompt()
+        self._build_system_prompt(role=role)
         self.context.messages.append({"role": "system", "content": self._system_prompt})
         self.plan_approved = not cfg.autokeren.plan_mode
         self._tool_call_count = 0
@@ -103,7 +107,7 @@ class Agent:
         self.permission_callback: Callable[[str, str, dict[str, Any]], bool] | None = None
         self._consecutive_no_tool_prompts = 0
 
-    def _build_system_prompt(self) -> None:
+    def _build_system_prompt(self, role: str = "") -> None:
         """Build system prompt dengan memory + AGENTS.md."""
         mem = self.memory.load() if self.cfg.autokeren.memory_enabled else ""
         self._system_prompt = build_system_prompt(
@@ -113,6 +117,12 @@ class Agent:
             memory=mem,
             max_tool_calls=self.cfg.autokeren.max_tool_calls,
         )
+        if role:
+            self._system_prompt += (
+                f"\n\n## Peran Spesifik Anda\n"
+                f"Anda bertindak sebagai sub-agent spesialis dengan peran: {role}.\n"
+                f"Fokuslah sepenuhnya pada tugas Anda dan kembalikan output terbaik sesuai dengan keahlian peran ini."
+            )
         
         # Tambahkan instruksi pemaksaan bahasa respon AI
         lang_code = self.cfg.autokeren.language

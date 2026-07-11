@@ -39,6 +39,16 @@ class SpawnAgentTool(Tool):
                 "description": "Konteks tambahan yang perlu diketahui sub-agent (opsional, misal: output tool sebelumnya).",
                 "default": "",
             },
+            "role": {
+                "type": "string",
+                "description": "Peran spesifik/persona dari sub-agent (misal: 'Expert Python Tester', 'Security Auditor').",
+                "default": "",
+            },
+            "model_id": {
+                "type": "string",
+                "description": "Custom Cloudflare/AI Studio model ID untuk override primary model sub-agent ini (opsional).",
+                "default": "",
+            },
         },
         "required": ["task"],
     }
@@ -52,9 +62,18 @@ class SpawnAgentTool(Tool):
     def permission_desc(self, **kwargs: object) -> str:
         name = kwargs.get("agent_name", "sub-agent")
         task = str(kwargs.get("task", ""))[:80]
-        return f"Spawn sub-agent '{name}' untuk: {task}..."
+        role = kwargs.get("role", "")
+        role_info = f" ({role})" if role else ""
+        return f"Spawn sub-agent '{name}'{role_info} untuk: {task}..."
 
-    def run(self, task: str, agent_name: str = "sub-agent", context: str = "") -> ToolResult:
+    def run(
+        self,
+        task: str,
+        agent_name: str = "sub-agent",
+        context: str = "",
+        role: str = "",
+        model_id: str = "",
+    ) -> ToolResult:
         from autokeren.cli import build_registry
         from autokeren.agent import Agent
         from pathlib import Path
@@ -65,7 +84,14 @@ class SpawnAgentTool(Tool):
 
         try:
             child_reg = build_registry(self._cfg, Path(self._project_root), self._memory)  # type: ignore[arg-type]
-            child_agent = Agent(self._cfg, child_reg, self._project_root, memory=self._memory)  # type: ignore[arg-type]
+            child_agent = Agent(
+                self._cfg,  # type: ignore[arg-type]
+                child_reg,
+                self._project_root,
+                memory=self._memory,  # type: ignore[arg-type]
+                role=role,
+                model_id=model_id if model_id else None,
+            )
             result = child_agent.run(full_task)
             output = result if isinstance(result, str) else str(result or "")
             return ToolResult(
