@@ -58,15 +58,28 @@ type PermissionConfirmReq struct {
 	RespChan    chan bool
 }
 
+type SlashCommandInfo struct {
+	Name        string
+	Description string
+}
+
+var slashCommands = []SlashCommandInfo{
+	{Name: "/model", Description: "Ganti model kecerdasan buatan (AI)"},
+	{Name: "/ghost", Description: "Kelola background agent (ghost)"},
+	{Name: "/compact", Description: "Ringkas riwayat percakapan"},
+	{Name: "/reset", Description: "Mulai ulang sesi & reset izin"},
+	{Name: "/q", Description: "Keluar dari TUI autokeren"},
+}
+
 type MainModel struct {
-	Chat          ChatModel
-	Sidebar       SidebarModel
-	TextInput     textinput.Model
-	IPCClient     *ipc.Client
-	GhostMgr      *ghost.GhostManager
-	ProjectRoot   string
-	ConfigPath    string
-	InitOpts      map[string]interface{}
+	Chat             ChatModel
+	Sidebar          SidebarModel
+	TextInput        textinput.Model
+	IPCClient        *ipc.Client
+	GhostMgr         *ghost.GhostManager
+	ProjectRoot      string
+	ConfigPath       string
+	InitOpts         map[string]interface{}
 	
 	Width  int
 	Height int
@@ -75,8 +88,11 @@ type MainModel struct {
 	PermissionReq  *PermissionConfirmReq
 	ActiveModelID  string
 	
-	Initialized    bool
-	InitError      string
+	Initialized      bool
+	InitError        string
+	ShowAutocomplete bool
+	SelectedCommand  int
+	ActiveEditingFile string
 }
 
 func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot, configPath string, opts map[string]interface{}) MainModel {
@@ -89,14 +105,17 @@ func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot,
 	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#00E5FF")).Bold(true)
 
 	return MainModel{
-		Chat:        NewChatModel(),
-		Sidebar:     NewSidebarModel(),
-		TextInput:   ti,
-		IPCClient:   client,
-		GhostMgr:    ghostMgr,
-		ProjectRoot: projectRoot,
-		ConfigPath:  configPath,
-		InitOpts:    opts,
+		Chat:              NewChatModel(),
+		Sidebar:           NewSidebarModel(),
+		TextInput:         ti,
+		IPCClient:         client,
+		GhostMgr:          ghostMgr,
+		ProjectRoot:       projectRoot,
+		ConfigPath:        configPath,
+		InitOpts:          opts,
+		ShowAutocomplete:  false,
+		SelectedCommand:   0,
+		ActiveEditingFile: "",
 	}
 }
 
@@ -153,8 +172,20 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		
 	case ToolStartMsg:
-		argsStr, _ := jsonMarshalIndent(msg.Args)
-		m.Chat.AppendMessage("tool", fmt.Sprintf("⏺ Memanggil %s(%s)...", msg.Name, argsStr))
+		if msg.Name == "write_file" || msg.Name == "patch_file" || msg.Name == "read_file" {
+			filePath, _ := msg.Args["path"].(string)
+			m.ActiveEditingFile = filePath
+			actionName := "MEMBACA"
+			if msg.Name == "write_file" {
+				actionName = "MENULIS"
+			} else if msg.Name == "patch_file" {
+				actionName = "MENYUNTING"
+			}
+			m.Chat.AppendMessage("tool", fmt.Sprintf("📝 %s BERKAS:\n  📂 Path: %s\n  ⚙ Status: Sedang diproses...", actionName, filePath))
+		} else {
+			argsStr, _ := jsonMarshalIndent(msg.Args)
+			m.Chat.AppendMessage("tool", fmt.Sprintf("⏺ Memanggil %s(%s)...", msg.Name, argsStr))
+		}
 		
 	case ToolEndMsg:
 		ok := true
@@ -163,10 +194,19 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				ok = b
 			}
 		}
-		if ok {
-			m.Chat.AppendMessage("tool", fmt.Sprintf("✓ %s selesai.", msg.Name))
+		if m.ActiveEditingFile != "" {
+			if ok {
+				m.Chat.AppendMessage("tool", fmt.Sprintf("✓ BERKAS SELESAI DIPROSES\n  📂 Path: %s", m.ActiveEditingFile))
+			} else {
+				m.Chat.AppendMessage("tool", fmt.Sprintf("✗ BERKAS GAGAL DIPROSES\n  📂 Path: %s\n  ⚠ Error: %v", m.ActiveEditingFile, msg.Result["error"]))
+			}
+			m.ActiveEditingFile = ""
 		} else {
-			m.Chat.AppendMessage("tool", fmt.Sprintf("✗ %s gagal: %v", msg.Name, msg.Result["error"]))
+			if ok {
+				m.Chat.AppendMessage("tool", fmt.Sprintf("✓ %s selesai.", msg.Name))
+			} else {
+				m.Chat.AppendMessage("tool", fmt.Sprintf("✗ %s gagal: %v", msg.Name, msg.Result["error"]))
+			}
 		}
 		
 	case ToolOutputMsg:
@@ -194,6 +234,38 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Chat.AppendMessage("system", fmt.Sprintf("⚡ KONFIRMASI IZIN: %s\nDeskripsi: %s", msg.Name, msg.Description))
 
 	case tea.KeyMsg:
+		// Jika autocomplete sedang tampil, tangani tombol navigasi khusus
+		if m.ShowAutocomplete {
+			switch msg.String() {
+			case "up", "shift+tab":
+				m.SelectedCommand--
+				if m.SelectedCommand < 0 {
+					m.SelectedCommand = len(slashCommands) - 1
+				}
+				return m, nil
+			case "down", "tab":
+				m.SelectedCommand++
+				if m.SelectedCommand >= len(slashCommands) {
+					m.SelectedCommand = 0
+				}
+				return m, nil
+			case "enter":
+				m.TextInput.SetValue(slashCommands[m.SelectedCommand].Name + " ")
+				m.ShowAutocomplete = false
+				return m, nil
+			case "esc":
+				m.ShowAutocomplete = false
+				return m, nil
+			case "1", "2", "3", "4", "5":
+				idx := int(msg.Runes[0] - '1')
+				if idx >= 0 && idx < len(slashCommands) {
+					m.TextInput.SetValue(slashCommands[idx].Name + " ")
+					m.ShowAutocomplete = false
+					return m, nil
+				}
+			}
+		}
+
 		// Jika dialog izin sedang aktif, tangani input persetujuan khusus
 		if m.PermissionReq != nil {
 			switch msg.String() {
@@ -306,6 +378,13 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	
 	if m.PermissionReq == nil {
 		m.TextInput, cmd = m.TextInput.Update(msg)
+		
+		val := m.TextInput.Value()
+		if strings.HasPrefix(val, "/") && !strings.Contains(val, " ") {
+			m.ShowAutocomplete = true
+		} else {
+			m.ShowAutocomplete = false
+		}
 	}
 	return m, cmd
 }
@@ -396,14 +475,48 @@ func (m MainModel) View() string {
 			Render(lipgloss.NewStyle().Foreground(lipgloss.Color("#FFB74D")).Bold(true).Render("Izinkan operasi di atas? [y] Ya / [n] Tidak: "))
 	}
 
-	mainLayout := lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		sidebarView,
-		lipgloss.JoinVertical(
+	// Render autocomplete dropdown overlay jika aktif
+	var autocompleteView string
+	if m.ShowAutocomplete {
+		var acSb strings.Builder
+		acStyle := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#00E5FF")).
+			Padding(0, 1).
+			Width(m.Width - m.Sidebar.Width - 4)
+
+		acSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888899")).Render("💡 PINTASAN SLASH (Tab/Panah navigasi, Enter/Angka pilih):") + "\n")
+		for i, cmd := range slashCommands {
+			numStr := fmt.Sprintf("%d. ", i+1)
+			if i == m.SelectedCommand {
+				acSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#00E5FF")).Bold(true).Render(fmt.Sprintf(" ▸ %s%s - %s", numStr, cmd.Name, cmd.Description)) + "\n")
+			} else {
+				acSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#E0E0E0")).Render(fmt.Sprintf("   %s%s - %s", numStr, cmd.Name, cmd.Description)) + "\n")
+			}
+		}
+		autocompleteView = acStyle.Render(acSb.String())
+	}
+
+	var rightPanel string
+	if m.ShowAutocomplete {
+		rightPanel = lipgloss.JoinVertical(
+			lipgloss.Left,
+			chatView,
+			autocompleteView,
+			inputView,
+		)
+	} else {
+		rightPanel = lipgloss.JoinVertical(
 			lipgloss.Left,
 			chatView,
 			inputView,
-		),
+		)
+	}
+
+	mainLayout := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		sidebarView,
+		rightPanel,
 	)
 
 	return mainLayout
