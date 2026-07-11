@@ -40,6 +40,9 @@ type RetryMsg struct {
 	Message string
 }
 type ErrorMsg struct{ Message string }
+type ModelsLoadedMsg struct {
+	Models []ModelSelectorItem
+}
 type StatusUpdateMsg struct {
 	ModelName        string
 	ProjectName      string
@@ -71,28 +74,38 @@ var slashCommands = []SlashCommandInfo{
 	{Name: "/q", Description: "Keluar dari TUI autokeren"},
 }
 
+type ModelSelectorItem struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Active bool   `json:"active"`
+}
+
 type MainModel struct {
-	Chat             ChatModel
-	Sidebar          SidebarModel
-	TextInput        textinput.Model
-	IPCClient        *ipc.Client
-	GhostMgr         *ghost.GhostManager
-	ProjectRoot      string
-	ConfigPath       string
-	InitOpts         map[string]interface{}
+	Chat              ChatModel
+	Sidebar           SidebarModel
+	TextInput         textinput.Model
+	IPCClient         *ipc.Client
+	GhostMgr          *ghost.GhostManager
+	ProjectRoot       string
+	ConfigPath        string
+	InitOpts          map[string]interface{}
 	
 	Width  int
 	Height int
 	
-	AgentRunning   bool
-	PermissionReq  *PermissionConfirmReq
-	ActiveModelID  string
+	AgentRunning      bool
+	PermissionReq     *PermissionConfirmReq
+	ActiveModelID     string
 	
-	Initialized      bool
-	InitError        string
-	ShowAutocomplete bool
-	SelectedCommand  int
+	Initialized       bool
+	InitError         string
+	ShowAutocomplete  bool
+	SelectedCommand   int
 	ActiveEditingFile string
+
+	ShowModelSelector  bool
+	SelectorModels     []ModelSelectorItem
+	SelectedModelIndex int
 }
 
 func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot, configPath string, opts map[string]interface{}) MainModel {
@@ -105,17 +118,20 @@ func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot,
 	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#00E5FF")).Bold(true)
 
 	return MainModel{
-		Chat:              NewChatModel(),
-		Sidebar:           NewSidebarModel(),
-		TextInput:         ti,
-		IPCClient:         client,
-		GhostMgr:          ghostMgr,
-		ProjectRoot:       projectRoot,
-		ConfigPath:        configPath,
-		InitOpts:          opts,
-		ShowAutocomplete:  false,
-		SelectedCommand:   0,
-		ActiveEditingFile: "",
+		Chat:               NewChatModel(),
+		Sidebar:            NewSidebarModel(),
+		TextInput:          ti,
+		IPCClient:          client,
+		GhostMgr:           ghostMgr,
+		ProjectRoot:        projectRoot,
+		ConfigPath:         configPath,
+		InitOpts:           opts,
+		ShowAutocomplete:   false,
+		SelectedCommand:    0,
+		ActiveEditingFile:  "",
+		ShowModelSelector:  false,
+		SelectorModels:     []ModelSelectorItem{},
+		SelectedModelIndex: 0,
 	}
 }
 
@@ -217,8 +233,19 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 	case ErrorMsg:
 		m.InitError = msg.Message
-		m.Chat.AppendMessage("system", fmt.Sprintf("⚠ Error Inisialisasi: %s", msg.Message))
+		m.Chat.AppendMessage("system", fmt.Sprintf("⚠ Error: %s", msg.Message))
 		
+	case ModelsLoadedMsg:
+		m.SelectorModels = msg.Models
+		m.ShowModelSelector = true
+		m.SelectedModelIndex = 0
+		for i, item := range m.SelectorModels {
+			if item.Active {
+				m.SelectedModelIndex = i
+				break
+			}
+		}
+
 	case StatusUpdateMsg:
 		m.Initialized = true
 		m.Sidebar.ModelName = msg.ModelName
@@ -234,6 +261,47 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Chat.AppendMessage("system", fmt.Sprintf("⚡ KONFIRMASI IZIN: %s\nDeskripsi: %s", msg.Name, msg.Description))
 
 	case tea.KeyMsg:
+		// Jika selector model sedang tampil, tangani navigasi selector model
+		if m.ShowModelSelector {
+			switch msg.String() {
+			case "up", "shift+tab":
+				m.SelectedModelIndex--
+				if m.SelectedModelIndex < 0 {
+					m.SelectedModelIndex = len(m.SelectorModels) - 1
+				}
+				return m, nil
+			case "down", "tab":
+				m.SelectedModelIndex++
+				if m.SelectedModelIndex >= len(m.SelectorModels) {
+					m.SelectedModelIndex = 0
+				}
+				return m, nil
+			case "enter":
+				if len(m.SelectorModels) > 0 {
+					selected := m.SelectorModels[m.SelectedModelIndex]
+					m.ShowModelSelector = false
+					m.Chat.AppendMessage("system", fmt.Sprintf("Mengganti model ke: %s...", selected.Name))
+					return m, m.switchModelCmd(selected.ID)
+				}
+				return m, nil
+			case "esc":
+				m.ShowModelSelector = false
+				return m, nil
+			default:
+				// Shortcut keyboard angka (1-9)
+				if len(msg.String()) == 1 && msg.String() >= "1" && msg.String() <= "9" {
+					idx := int(msg.String()[0] - '1')
+					if idx >= 0 && idx < len(m.SelectorModels) {
+						selected := m.SelectorModels[idx]
+						m.ShowModelSelector = false
+						m.Chat.AppendMessage("system", fmt.Sprintf("Mengganti model ke: %s...", selected.Name))
+						return m, m.switchModelCmd(selected.ID)
+					}
+				}
+			}
+			return m, nil
+		}
+
 		// Jika autocomplete sedang tampil, tangani tombol navigasi khusus
 		if m.ShowAutocomplete {
 			switch msg.String() {
@@ -310,21 +378,14 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if strings.HasPrefix(val, "/model") {
 				args := strings.TrimSpace(strings.TrimPrefix(val, "/model"))
 				if args == "" {
-					m.Chat.AppendMessage("system", "Gunakan: /model <nama_model>. Contoh: /model gemini-3.5-pro")
+					m.TextInput.SetValue("")
+					m.Chat.AppendMessage("system", "Memuat daftar model...")
+					return m, m.fetchModelsCmd()
 				} else {
-					m.AgentRunning = true
-					go func() {
-						var reply string
-						err := m.IPCClient.Call("agent.switch_model", map[string]interface{}{"model_id": args}, &reply)
-						if err == nil {
-							m.Chat.AppendMessage("system", fmt.Sprintf("Model aktif diganti ke: %s", args))
-							m.Sidebar.ModelName = args
-						} else {
-							m.Chat.AppendMessage("system", fmt.Sprintf("Gagal ganti model: %v", err))
-						}
-					}()
+					m.TextInput.SetValue("")
+					m.Chat.AppendMessage("system", fmt.Sprintf("Mengganti model ke: %s...", args))
+					return m, m.switchModelCmd(args)
 				}
-				return m, nil
 			}
 			
 			if val == "/compact" {
@@ -497,8 +558,42 @@ func (m MainModel) View() string {
 		autocompleteView = acStyle.Render(acSb.String())
 	}
 
+	// Render Model Selector overlay jika aktif
+	var modelSelectorView string
+	if m.ShowModelSelector {
+		var msSb strings.Builder
+		msStyle := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#00E5FF")).
+			Padding(1, 2).
+			Width(m.Width - m.Sidebar.Width - 4)
+
+		msSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#00E5FF")).Bold(true).Render("🤖 PILIH MODEL KECERDASAN BUATAN:") + "\n\n")
+		for i, item := range m.SelectorModels {
+			numStr := fmt.Sprintf("%d. ", i+1)
+			activeMarker := ""
+			if item.Active {
+				activeMarker = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF66")).Render(" (Aktif)")
+			}
+			if i == m.SelectedModelIndex {
+				msSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#00E5FF")).Bold(true).Render(fmt.Sprintf(" ▸ %s%s%s", numStr, item.Name, activeMarker)) + "\n")
+			} else {
+				msSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#E0E0E0")).Render(fmt.Sprintf("   %s%s%s", numStr, item.Name, activeMarker)) + "\n")
+			}
+		}
+		msSb.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888899")).Render("💡 Gunakan Tab/Panah navigasi, Enter pilih, Esc batal, 1-9 pilih cepat."))
+		modelSelectorView = msStyle.Render(msSb.String())
+	}
+
 	var rightPanel string
-	if m.ShowAutocomplete {
+	if m.ShowModelSelector {
+		rightPanel = lipgloss.JoinVertical(
+			lipgloss.Left,
+			chatView,
+			modelSelectorView,
+			inputView,
+		)
+	} else if m.ShowAutocomplete {
 		rightPanel = lipgloss.JoinVertical(
 			lipgloss.Left,
 			chatView,
@@ -657,6 +752,62 @@ func (m MainModel) connectToAgentCmd() tea.Cmd {
 			ContextUsed:   contextUsed,
 			ContextWindow: contextWindow,
 			ContextPct:   contextPct,
+		}
+	}
+}
+
+func (m MainModel) fetchModelsCmd() tea.Cmd {
+	return func() tea.Msg {
+		var reply []ModelSelectorItem
+		err := m.IPCClient.Call("agent.list_models", map[string]interface{}{}, &reply)
+		if err != nil {
+			return ErrorMsg{Message: fmt.Sprintf("Gagal memuat daftar model: %v", err)}
+		}
+		return ModelsLoadedMsg{Models: reply}
+	}
+}
+
+func (m MainModel) switchModelCmd(modelID string) tea.Cmd {
+	return func() tea.Msg {
+		var reply string
+		err := m.IPCClient.Call("agent.switch_model", map[string]interface{}{"model_id": modelID}, &reply)
+		if err != nil {
+			return ErrorMsg{Message: fmt.Sprintf("Gagal mengganti model: %v", err)}
+		}
+
+		var statusReply map[string]interface{}
+		err = m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply)
+		if err != nil {
+			return StatusUpdateMsg{
+				ModelName:   modelID,
+				ProjectName: filepath.Base(m.ProjectRoot),
+			}
+		}
+
+		projectName := filepath.Base(m.ProjectRoot)
+		contextUsed := 0
+		contextWindow := 262144
+		contextPct := 0.0
+		
+		contextInfo, _ := statusReply["context_info"].(map[string]interface{})
+		if contextInfo != nil {
+			if u, ok := contextInfo["tokens"].(float64); ok {
+				contextUsed = int(u)
+			}
+			if w, ok := contextInfo["window"].(float64); ok {
+				contextWindow = int(w)
+			}
+			if p, ok := contextInfo["pct"].(float64); ok {
+				contextPct = p
+			}
+		}
+
+		return StatusUpdateMsg{
+			ModelName:     modelID,
+			ProjectName:   projectName,
+			ContextUsed:   contextUsed,
+			ContextWindow: contextWindow,
+			ContextPct:    contextPct,
 		}
 	}
 }

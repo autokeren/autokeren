@@ -102,6 +102,8 @@ class JSONRPCDaemon:
             self.handle_agent_reset(req_id)
         elif method == "agent.switch_model":
             self.handle_agent_switch_model(req_id, params)
+        elif method == "agent.list_models":
+            self.handle_agent_list_models(req_id)
         else:
             self.send_response(
                 req_id,
@@ -275,6 +277,50 @@ class JSONRPCDaemon:
                 self.send_response(req_id, result="switch_success")
             else:
                 self.send_response(req_id, error={"code": -32001, "message": f"Failed to switch to model: {model_id}"})
+        except Exception as e:
+            self.send_response(req_id, error={"code": -32603, "message": str(e)})
+
+    def handle_agent_list_models(self, req_id: str | int | None) -> None:
+        if not self.agent:
+            self.send_response(req_id, error={"code": -32000, "message": "Agent not initialized"})
+            return
+        try:
+            cfg = self.agent.cfg
+            all_models = []
+            
+            # Ambil daftar model sesuai mode auth
+            if cfg.auth.mode == "antigravity":
+                from autokeren.models.antigravity import fetch_antigravity_models
+                # Panggil fetch
+                try:
+                    all_models = fetch_antigravity_models()
+                except Exception:
+                    all_models = [{"id": "kimi-code", "name": "Kimi K2.7-Code"}, {"id": "glm-5.2", "name": "GLM 5.2"}]
+            elif cfg.auth.mode == "aistudio":
+                from autokeren.models.aistudio import fetch_aistudio_models
+                try:
+                    all_models = fetch_aistudio_models(cfg)
+                except Exception:
+                    all_models = [{"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro"}, {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash"}]
+            else:
+                from autokeren.models.cloudflare import fetch_available_models
+                try:
+                    all_models = fetch_available_models(cfg)
+                except Exception:
+                    all_models = [{"id": "@cf/meta/llama-3-8b-instruct", "name": "Llama 3 8B"}, {"id": "@cf/qwen/qwen1.5-14b-chat", "name": "Qwen 1.5 14B"}]
+
+            current = self.agent.router.current_model_id()
+            result = []
+            for m in all_models:
+                m_id = m.get("id", "")
+                m_name = m.get("name", m_id)
+                result.append({
+                    "id": m_id,
+                    "name": m_name,
+                    "active": m_id == current
+                })
+                
+            self.send_response(req_id, result=result)
         except Exception as e:
             self.send_response(req_id, error={"code": -32603, "message": str(e)})
 
