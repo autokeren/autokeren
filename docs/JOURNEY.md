@@ -55,18 +55,22 @@ Timeline milestones & learning. Update tiap fase major.
 
 ---
 
-## Phase 3: DX Polish (July 2026) ← CURRENT
-**Goal:** Developer experience yang bikin orang betah.
+## Phase 3: DX Polish & AGI Evolution (July 2026) ← CURRENT
+**Goal:** Developer experience yang bikin orang betah + pondasi AGI.
 
 **Done:**
 - Mermaid diagram renderer (visual boxes + arrows di terminal)
 - Interactive model selector (fetch dari API, nomor + enter)
 - Error handling di agent loop (ga diam pas API error)
-- CLI open source ready (README, CONTRIBUTING, AGENTS.md, CI/CD)
+- **Fase 1 AGI:** Dynamic Tool Synthesis (Hot-loading kustom tool dari `.ak-tools/`)
+- **Fase 2 AGI:** Local-First Memory Store (SQLite `memory.db` & TF-IDF Semantic VSM Cosine Search)
+- **Fase 3 AGI:** Continuous Lifelong Daemon (Log Tailing & Filesystem Watcher)
+- **Fase 4 AGI:** Self-Refactoring Loop (Self-Evolution & Auto-Patching via `run_self_improvement`)
 
-**In Progress:**
-- Dokumentasi lengkap (runbook, roadmap, decisions)
-- Per-minute rate limiting (burst protection)
+**Learned:**
+- Pencarian semantik TF-IDF lokal murni Python sangat cepat (<10ms) dan mandiri tanpa perlu kunci API pihak ketiga.
+- Logging percakapan lengkap ke SQLite memudahkan audit performa agen dan transfer pelajaran lintas-sesi.
+- Daemon background observer mampu mendeteksi error logs dan file kode yang terhapus, lalu secara otomatis meluncurkan proses penyembuhan mandiri (*self-healing*).
 
 ---
 

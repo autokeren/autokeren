@@ -107,6 +107,10 @@ Prioritas feature, quarter by quarter.
 - [x] Tool calls forwarding di API gateway
 - [x] 7 model terbaru (kimi-code, glm-5.2, nemotron, dll)
 - [x] D1-backed model management
+- [x] AGI Fase 1: Dynamic Tool Synthesis (Hot-loading dari `.ak-tools/`)
+- [x] AGI Fase 2: Local-First Memory Store & TF-IDF Semantic VSM Search
+- [x] AGI Fase 3: Continuous Lifelong Daemon (Log Tailing & File Watcher)
+- [x] AGI Fase 4: Self-Refactoring & Self-Evolution Loop
 
 ### June 2026
 - [x] CLI v0.4: 18 tools, streaming, session, memory
