@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,99 @@ from autokeren.cli import build_registry
 from autokeren.kanban import KanbanDB
 
 
+class SystemObserver:
+    """Mengamati perubahan sistem secara offline dan real-time.
+    
+    1. Filesystem Watcher: Memantau perubahan/penghapusan file kode.
+    2. Log Watcher: Memantau file log (*.log, *.txt) untuk error kritis.
+    """
+
+    def __init__(self, project_root: str, daemon: JSONRPCDaemon):
+        self.project_root = Path(project_root)
+        self.daemon = daemon
+        self.running = True
+        self.last_mtimes: dict[Path, float] = {}
+        self.log_file_pointers: dict[Path, int] = {}
+        self.log_files: list[Path] = []
+        self._scan_files()
+
+    def _scan_files(self) -> None:
+        # Scan file log di project root
+        for ext in ("*.log", "*.txt", "*.txt.log"):
+            for path in self.project_root.glob(ext):
+                p_str = str(path)
+                if ".venv" not in p_str and "node_modules" not in p_str and ".git" not in p_str:
+                    try:
+                        self.log_files.append(path)
+                        self.log_file_pointers[path] = path.stat().st_size
+                    except Exception:
+                        pass
+
+        # Scan code files untuk mtime tracking
+        for ext in ("*.py", "*.js", "*.ts", "*.go"):
+            for path in self.project_root.rglob(ext):
+                p_str = str(path)
+                if ".venv" not in p_str and "node_modules" not in p_str and ".git" not in p_str:
+                    try:
+                        self.last_mtimes[path] = path.stat().st_mtime
+                    except Exception:
+                        pass
+
+    def watch_loop(self) -> None:
+        """Main loop pemantau berkas."""
+        while self.running:
+            time.sleep(5)
+            try:
+                self._check_logs()
+                self._check_file_modifications()
+            except Exception:
+                pass
+
+    def _check_logs(self) -> None:
+        for path in list(self.log_files):
+            if not path.exists():
+                continue
+            try:
+                curr_size = path.stat().st_size
+                prev_size = self.log_file_pointers.get(path, 0)
+                if curr_size > prev_size:
+                    with open(path, "r", encoding="utf-8", errors="replace") as f:
+                        f.seek(prev_size)
+                        new_content = f.read(curr_size - prev_size)
+                        self.log_file_pointers[path] = curr_size
+                        
+                        # Cek keyword error kritis
+                        critical_keywords = ["exception", "traceback", "error 500", "fatal error", "critical error"]
+                        if any(kw in new_content.lower() for kw in critical_keywords):
+                            self.daemon.trigger_auto_diagnose(
+                                f"Ditemukan error kritis di file log: {path.name}",
+                                context=f"Isi Log Baru:\n{new_content}"
+                            )
+            except Exception:
+                pass
+
+    def _check_file_modifications(self) -> None:
+        for path in list(self.last_mtimes.keys()):
+            if not path.exists():
+                # File terhapus secara tidak terduga
+                try:
+                    del self.last_mtimes[path]
+                except KeyError:
+                    pass
+                self.daemon.trigger_auto_diagnose(
+                    f"File penting terhapus: {path.name}",
+                    context=f"Lokasi file yang hilang: {path}"
+                )
+                continue
+            try:
+                curr_mtime = path.stat().st_mtime
+                prev_mtime = self.last_mtimes[path]
+                if curr_mtime > prev_mtime:
+                    self.last_mtimes[path] = curr_mtime
+            except Exception:
+                pass
+
+
 class JSONRPCDaemon:
     def __init__(self) -> None:
         self.agent: Agent | None = None
@@ -21,6 +115,8 @@ class JSONRPCDaemon:
         self.request_responses: dict[str | int, Any] = {}
         self.lock = threading.Lock()
         self.next_client_req_id = 1000
+        self.observer: SystemObserver | None = None
+        self._diagnosing = False
 
     def send_notification(self, method: str, params: dict[str, Any]) -> None:
         """Kirim notifikasi JSON-RPC ke standard output."""
@@ -75,6 +171,38 @@ class JSONRPCDaemon:
 
         sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
         sys.stdout.flush()
+
+    def trigger_auto_diagnose(self, issue: str, context: str) -> None:
+        """Picu diagnosa mandiri background jika terjadi anomali sistem (RAG/Self-Healing)."""
+        agent = self.agent
+        if not agent or self._diagnosing:
+            return
+        self._diagnosing = True
+
+        def _run() -> None:
+            try:
+                self.send_notification("ui.on_tool_output", {
+                    "name": "daemon_observer",
+                    "line": f"⚡ [bold yellow]ALARM OBSERVER:[/bold yellow] {issue}. Menjalankan diagnosa mandiri..."
+                })
+                
+                goal = f"Diagnosa dan perbaiki masalah berikut secara mandiri: {issue}"
+                result = agent.run_autonomous(goal, context=context)
+                
+                summary = result.get("reflection_summary", "Self-healing selesai dilakukan.")
+                self.send_notification("ui.on_tool_output", {
+                    "name": "daemon_observer",
+                    "line": f"✅ [bold green]DIAGNOSA SELESAI:[/bold green] {summary}"
+                })
+            except Exception as e:
+                self.send_notification("ui.on_tool_output", {
+                    "name": "daemon_observer",
+                    "line": f"❌ [bold red]DIAGNOSA GAGAL:[/bold red] {e}"
+                })
+            finally:
+                self._diagnosing = False
+
+        threading.Thread(target=_run, daemon=True).start()
 
     def handle_request(self, req: dict[str, Any]) -> None:
         req_id = req.get("id")
@@ -216,6 +344,10 @@ class JSONRPCDaemon:
                 }
             )
 
+            # Start background system observer daemon (Fase 3 AGI)
+            self.observer = SystemObserver(str(project_path), self)
+            threading.Thread(target=self.observer.watch_loop, daemon=True).start()
+
             self.send_response(req_id, result="initialized")
         except Exception as e:
             self.send_response(req_id, error={"code": -32603, "message": str(e)})
@@ -312,7 +444,6 @@ class JSONRPCDaemon:
             # Ambil daftar model sesuai mode auth
             if cfg.auth.mode == "antigravity":
                 from autokeren.models.antigravity import fetch_antigravity_models
-                # Panggil fetch
                 try:
                     all_models = fetch_antigravity_models()
                 except Exception:
@@ -417,7 +548,6 @@ class JSONRPCDaemon:
         except Exception as e:
             self.send_response(req_id, error={"code": -32603, "message": str(e)})
 
-
     def run(self) -> None:
         """Main loop membaca JSON-RPC baris demi baris dari stdin."""
         for line in sys.stdin:
@@ -432,11 +562,10 @@ class JSONRPCDaemon:
 
 
 if __name__ == "__main__":
-    # Bersihkan buffer output agar real-time streaming lancar
     if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(line_buffering=True) # type: ignore[attr-defined]
+        sys.stdout.reconfigure(line_buffering=True)  # type: ignore[attr-defined]
     if hasattr(sys.stdin, "reconfigure"):
-        sys.stdin.reconfigure(line_buffering=True)  # type: ignore[attr-defined]
+        sys.stdin.reconfigure(line_buffering=True)   # type: ignore[attr-defined]
     
     daemon = JSONRPCDaemon()
     daemon.run()
