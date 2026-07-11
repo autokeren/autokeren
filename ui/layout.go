@@ -756,6 +756,14 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyCtrlQ:
+			if m.AgentRunning {
+				go func() {
+					var reply string
+					_ = m.IPCClient.Call("agent.interrupt", map[string]interface{}{}, &reply)
+				}()
+				m.Chat.AppendMessage("system", "Interupsi dikirim ke agen...")
+				return m, nil
+			}
 			m.IPCClient.Close()
 			return m, tea.Quit
 			

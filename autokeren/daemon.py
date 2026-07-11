@@ -95,6 +95,8 @@ class JSONRPCDaemon:
         elif method == "agent.run":
             # Jalankan di background thread agar tidak memblokir input stdin selanjutnya
             threading.Thread(target=self.handle_agent_run, args=(req_id, params), daemon=True).start()
+        elif method == "agent.interrupt":
+            self.handle_agent_interrupt(req_id)
         elif method == "agent.compact":
             self.handle_agent_compact(req_id)
         elif method == "agent.status":
@@ -237,6 +239,16 @@ class JSONRPCDaemon:
                     } if resp.usage else None
                 }
             )
+        except Exception as e:
+            self.send_response(req_id, error={"code": -32603, "message": str(e)})
+
+    def handle_agent_interrupt(self, req_id: str | int | None) -> None:
+        if not self.agent:
+            self.send_response(req_id, error={"code": -32000, "message": "Agent not initialized"})
+            return
+        try:
+            self.agent.interrupted = True
+            self.send_response(req_id, result="Interrupted")
         except Exception as e:
             self.send_response(req_id, error={"code": -32603, "message": str(e)})
 

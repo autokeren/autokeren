@@ -165,236 +165,232 @@ class Agent:
 
     def run(self, user_input: str) -> ModelResponse:
         self.context.add_user(user_input)
-        for iteration in range(self.cfg.autokeren.max_iterations):
-            try:
+        try:
+            for iteration in range(self.cfg.autokeren.max_iterations):
                 self.check_interrupt()
-            except KeyboardInterrupt:
-                return ModelResponse(content="[dibatalkan user]")
 
-            if self.on_model_start:
-                self.on_model_start()
+                if self.on_model_start:
+                    self.on_model_start()
 
-            def _on_chunk(text: str) -> None:
-                self.check_interrupt()
-                if self.on_chunk:
-                    self.on_chunk(text)
+                def _on_chunk(text: str) -> None:
+                    self.check_interrupt()
+                    if self.on_chunk:
+                        self.on_chunk(text)
 
-            try:
-                resp = self.router.complete(
-                    self.context.messages,
-                    tools=self.tools.schemas(),
-                    max_tokens=self.cfg.cloudflare.max_tokens,
-                    temperature=self.cfg.cloudflare.temperature,
-                    on_chunk=_on_chunk,
-                    on_retry=self.on_retry,
-                )
-            except KeyboardInterrupt:
-                if self.on_model_end:
-                    self.on_model_end(ModelResponse(content=""))
-                return ModelResponse(content="[dibatalkan user]")
-            except Exception as e:
-                import os
-                if os.environ.get("AUTOKEREN_DEBUG") == "1":
-                    raise
-                err_msg = str(e) or type(e).__name__
-                if iteration < self.cfg.autokeren.max_iterations - 1:
-                    if self.on_retry:
-                        self.on_retry(iteration + 1, 3.0, f"Error: {err_msg} | Mencoba berpindah model...")
-                    import time
-                    time.sleep(3.0)
-                    self.router.swap_models()
-                    continue
-                if self.on_model_end:
-                    self.on_model_end(ModelResponse(content=""))
-                return ModelResponse(content=f"[red]⚠ Model error: {err_msg}[/red]\n\nCoba ganti model dengan /model, atau ulangi pertanyaan.")
-            if self.on_model_end:
-                self.on_model_end(resp)
-
-            if resp.neurons_remaining is not None:
-                self._last_neuron_remaining = resp.neurons_remaining
-                self._last_neuron_quota = resp.neurons_quota
-
-            # Plan mode: before approval, return the response without executing tools.
-            if self.cfg.autokeren.plan_mode and not self.plan_approved:
-                self.context.add_assistant(resp)
-                return resp  # caller will ask user for approval
-
-            if not resp.tool_calls:
-                has_run_tools = any(isinstance(m, dict) and m.get("role") == "tool" for m in self.context.messages)
-                if has_run_tools and self._consecutive_no_tool_prompts < 2 and iteration < self.cfg.autokeren.max_iterations - 1:
-                    continuation_keywords = ["akan", "mari", "selanjutnya", "berikutnya", "mencoba", "perlu", "harus", "apology", "maaf"]
-                    content_lower = (resp.content or "").lower()
-                    needs_continue = any(kw in content_lower for kw in continuation_keywords)
-                    if needs_continue:
-                        self._consecutive_no_tool_prompts += 1
-                        self.context.add_assistant(resp)
-                        self.context.messages.append({
-                            "role": "system",
-                            "content": (
-                                "⚠️ KAMU SEDANG DALAM MODE OTONOM. Jangan sekadar menjelaskan langkah selanjutnya "
-                                "atau meminta maaf. Gunakan tool yang sesuai secara langsung untuk melanjutkan tugas "
-                                "sampai selesai sepenuhnya."
-                            )
-                        })
+                try:
+                    resp = self.router.complete(
+                        self.context.messages,
+                        tools=self.tools.schemas(),
+                        max_tokens=self.cfg.cloudflare.max_tokens,
+                        temperature=self.cfg.cloudflare.temperature,
+                        on_chunk=_on_chunk,
+                        on_retry=self.on_retry,
+                    )
+                except Exception as e:
+                    import os
+                    if os.environ.get("AUTOKEREN_DEBUG") == "1":
+                        raise
+                    err_msg = str(e) or type(e).__name__
+                    if iteration < self.cfg.autokeren.max_iterations - 1:
+                        if self.on_retry:
+                            self.on_retry(iteration + 1, 3.0, f"Error: {err_msg} | Mencoba berpindah model...")
+                        import time
+                        time.sleep(3.0)
+                        self.router.swap_models()
                         continue
+                    if self.on_model_end:
+                        self.on_model_end(ModelResponse(content=""))
+                    return ModelResponse(content=f"[red]⚠ Model error: {err_msg}[/red]\n\nCoba ganti model dengan /model, atau ulangi pertanyaan.")
+
+                if self.on_model_end:
+                    self.on_model_end(resp)
+
+                if resp.neurons_remaining is not None:
+                    self._last_neuron_remaining = resp.neurons_remaining
+                    self._last_neuron_quota = resp.neurons_quota
+
+                # Plan mode: sebelum persetujuan, kembalikan respon tanpa jalankan tool
+                if self.cfg.autokeren.plan_mode and not self.plan_approved:
+                    self.context.add_assistant(resp)
+                    return resp
+
+                if not resp.tool_calls:
+                    has_run_tools = any(isinstance(m, dict) and m.get("role") == "tool" for m in self.context.messages)
+                    if has_run_tools and self._consecutive_no_tool_prompts < 2 and iteration < self.cfg.autokeren.max_iterations - 1:
+                        continuation_keywords = ["akan", "mari", "selanjutnya", "berikutnya", "mencoba", "perlu", "harus", "apology", "maaf"]
+                        content_lower = (resp.content or "").lower()
+                        needs_continue = any(kw in content_lower for kw in continuation_keywords)
+                        if needs_continue:
+                            self._consecutive_no_tool_prompts += 1
+                            self.context.add_assistant(resp)
+                            self.context.messages.append({
+                                "role": "system",
+                                "content": (
+                                    "⚠️ KAMU SEDANG DALAM MODE OTONOM. Jangan sekadar menjelaskan langkah selanjutnya "
+                                    "atau meminta maaf. Gunakan tool yang sesuai secara langsung untuk melanjutkan tugas "
+                                    "sampai selesai sepenuhnya."
+                                )
+                            })
+                            continue
+
+                    self._consecutive_no_tool_prompts = 0
+                    self.context.add_assistant(resp)
+                    return resp
 
                 self._consecutive_no_tool_prompts = 0
                 self.context.add_assistant(resp)
-                return resp
-
-            self._consecutive_no_tool_prompts = 0
-            self.context.add_assistant(resp)
-            for tc in resp.tool_calls:
-                try:
+                for tc in resp.tool_calls:
                     self.check_interrupt()
-                except KeyboardInterrupt:
-                    return ModelResponse(content="[dibatalkan user]")
 
-                self._tool_call_count += 1
-                if self._max_tool_calls > 0 and self._tool_call_count > self._max_tool_calls:
-                    limit_msg = ToolResult(error=f"batas tool call tercapai ({self._max_tool_calls}). Selesaikan tanpa tool.", ok=False)
-                    self.context.add_tool_result(tc.id, tc.name, limit_msg.to_dict(), False)
-                    return ModelResponse(content=f"Batas {self._max_tool_calls} tool call tercapai. Selesaikan tugas dengan informasi yang sudah ada.")
-                needs_perm, desc = self.tools.check_permission(tc.name, tc.arguments)
-                if needs_perm:
-                    allowed = self.permission_callback(tc.name, desc, tc.arguments) if self.permission_callback else True
-                    if not allowed:
-                        denied = ToolResult(error="ditolak oleh user", ok=False)
-                        if self.on_tool_end:
-                            self.on_tool_end(tc.name, denied)
-                        self.context.add_tool_result(tc.id, tc.name, denied.to_dict(), denied.ok)
-                        continue
-                if self.on_tool_start:
-                    self.on_tool_start(tc.name, tc.arguments)
-                # Architecture Guardian: check sebelum write/patch
-                if (
-                    self.guardian_enabled
-                    and self._genome_scanner
-                    and tc.name in ("write_file", "patch_file")
-                ):
-                    self._ensure_genome_scanned()
-                    _gpath = tc.arguments.get("path", "")
-                    _gcontent = tc.arguments.get("content", tc.arguments.get("new_string", ""))
-                    if _gpath and _gcontent and self._guardian_checker:
-                        guard = self._guardian_checker.check_before_write(_gpath, _gcontent)
-                        if guard.blocked:
-                            blocked_result = ToolResult(
-                                error=f"⚠️ ARCHITECTURE GUARDIAN BLOCKED:\n{guard.reason}\n\nSaran: {guard.suggestion}",
-                                ok=False,
-                            )
+                    self._tool_call_count += 1
+                    if self._max_tool_calls > 0 and self._tool_call_count > self._max_tool_calls:
+                        limit_msg = ToolResult(error=f"batas tool call tercapai ({self._max_tool_calls}). Selesaikan tanpa tool.", ok=False)
+                        self.context.add_tool_result(tc.id, tc.name, limit_msg.to_dict(), False)
+                        return ModelResponse(content=f"Batas {self._max_tool_calls} tool call tercapai. Selesaikan tugas dengan informasi yang sudah ada.")
+                    needs_perm, desc = self.tools.check_permission(tc.name, tc.arguments)
+                    if needs_perm:
+                        allowed = self.permission_callback(tc.name, desc, tc.arguments) if self.permission_callback else True
+                        if not allowed:
+                            denied = ToolResult(error="ditolak oleh user", ok=False)
                             if self.on_tool_end:
-                                self.on_tool_end(tc.name, blocked_result)
-                            self.context.add_tool_result(tc.id, tc.name, blocked_result.to_dict(), False)
+                                self.on_tool_end(tc.name, denied)
+                            self.context.add_tool_result(tc.id, tc.name, denied.to_dict(), denied.ok)
                             continue
-                        if guard.warnings:
-                            self.context.messages.append({
-                                "role": "system",
-                                "content": "ℹ️ Guardian warning: " + "; ".join(guard.warnings),
-                            })
-                # Live Enforcement: check rules sebelum write/patch
-                if (
-                    self.enforcer
-                    and tc.name in ("write_file", "patch_file")
-                ):
-                    _epath = tc.arguments.get("path", "")
-                    _econtent = tc.arguments.get("content", tc.arguments.get("new_string", ""))
-                    if _epath and _econtent:
-                        enfo = self.enforcer.check_before_write(_epath, _econtent)
-                        if enfo.blocked:
-                            block_msgs = [v.message for v in enfo.violations if v.action == "block"]
-                            blocked_result = ToolResult(
-                                error="⛔ LIVE ENFORCEMENT BLOCKED:\n" + "\n".join(f"  • {m}" for m in block_msgs),
-                                ok=False,
-                            )
-                            if self.on_tool_end:
-                                self.on_tool_end(tc.name, blocked_result)
-                            self.context.add_tool_result(tc.id, tc.name, blocked_result.to_dict(), False)
-                            continue
-                _before_snap: dict[str, str | None] | None = None
-                if self.checkpoints and self.checkpoints.auto_checkpoint and tc.name in ("write_file", "patch_file"):
-                    _path = tc.arguments.get("path", "")
-                    if _path:
-                        _before_snap = self.checkpoints.snapshot_files([_path])
-                try:
+                    if self.on_tool_start:
+                        self.on_tool_start(tc.name, tc.arguments)
+                    # Architecture Guardian: check sebelum write/patch
+                    if (
+                        self.guardian_enabled
+                        and self._genome_scanner
+                        and tc.name in ("write_file", "patch_file")
+                    ):
+                        self._ensure_genome_scanned()
+                        _gpath = tc.arguments.get("path", "")
+                        _gcontent = tc.arguments.get("content", tc.arguments.get("new_string", ""))
+                        if _gpath and _gcontent and self._guardian_checker:
+                            guard = self._guardian_checker.check_before_write(_gpath, _gcontent)
+                            if guard.blocked:
+                                blocked_result = ToolResult(
+                                    error=f"⚠️ ARCHITECTURE GUARDIAN BLOCKED:\n{guard.reason}\n\nSaran: {guard.suggestion}",
+                                    ok=False,
+                                )
+                                if self.on_tool_end:
+                                    self.on_tool_end(tc.name, blocked_result)
+                                self.context.add_tool_result(tc.id, tc.name, blocked_result.to_dict(), False)
+                                continue
+                            if guard.warnings:
+                                self.context.messages.append({
+                                    "role": "system",
+                                    "content": "ℹ️ Guardian warning: " + "; ".join(guard.warnings),
+                                })
+                    # Live Enforcement: check rules sebelum write/patch
+                    if (
+                        self.enforcer
+                        and tc.name in ("write_file", "patch_file")
+                    ):
+                        _epath = tc.arguments.get("path", "")
+                        _econtent = tc.arguments.get("content", tc.arguments.get("new_string", ""))
+                        if _epath and _econtent:
+                            enfo = self.enforcer.check_before_write(_epath, _econtent)
+                            if enfo.blocked:
+                                block_msgs = [v.message for v in enfo.violations if v.action == "block"]
+                                blocked_result = ToolResult(
+                                    error="⛔ LIVE ENFORCEMENT BLOCKED:\n" + "\n".join(f"  • {m}" for m in block_msgs),
+                                    ok=False,
+                                )
+                                if self.on_tool_end:
+                                    self.on_tool_end(tc.name, blocked_result)
+                                self.context.add_tool_result(tc.id, tc.name, blocked_result.to_dict(), False)
+                                continue
+                    _before_snap: dict[str, str | None] | None = None
+                    if self.checkpoints and self.checkpoints.auto_checkpoint and tc.name in ("write_file", "patch_file"):
+                        _path = tc.arguments.get("path", "")
+                        if _path:
+                            _before_snap = self.checkpoints.snapshot_files([_path])
+                    
                     def _on_output(line: str, _name: str = tc.name) -> None:
                         self.check_interrupt()
                         if self.on_tool_output:
                             self.on_tool_output(_name, line)
+                    
                     raw_result = self.tools.run(tc.name, tc.arguments, on_output=_on_output)
-                except KeyboardInterrupt:
-                    raw_result = ToolResult(error="dibatalkan user", ok=False)
-                if self.on_tool_end:
-                    self.on_tool_end(tc.name, raw_result)
-                # Loop Breaker: track errors
-                if self.loop_breaker and not raw_result.ok:
-                    lb_action = self.loop_breaker.track_error(
-                        error=raw_result.error or str(raw_result.to_dict()),
-                        tool_name=tc.name,
-                        context={"args": tc.arguments},
-                    )
-                    if lb_action.action == "break":
-                        self.context.messages.append({
-                            "role": "system",
-                            "content": lb_action.suggestion,
-                        })
-                        if lb_action.switch_model:
-                            self.router.swap_models()
-                        if lb_action.clear_context:
-                            self.compact()
-                        self.loop_breaker.reset()
-                # Pattern Detector: track all tool calls
-                if self._pattern_detector:
-                    from autokeren.loop.patterns import ToolCallEntry
-                    self._pattern_detector.track(ToolCallEntry(
-                        name=tc.name,
-                        args=tc.arguments,
-                        success=raw_result.ok,
-                        message="",
-                    ))
-                    pat = self._pattern_detector.detect()
-                    if pat.detected:
-                        self.context.messages.append({
-                            "role": "system",
-                            "content": f"⚠️ PATTERN DETECTED: {pat.pattern} — {pat.detail}. Coba pendekatan berbeda.",
-                        })
-                        self._pattern_detector.reset()
-                if self.checkpoints and self.checkpoints.auto_checkpoint:
-                    self.checkpoints.save(
-                        tool_name=tc.name,
-                        tool_args=tc.arguments,
-                        tool_result=raw_result.to_dict(),
-                        tool_ok=raw_result.ok,
-                        before_snapshot=_before_snap,
-                    )
-                # Vibe-Security: scan after write
-                if (
-                    self.security_scanner
-                    and tc.name in ("write_file", "patch_file")
-                    and raw_result.ok
-                ):
-                    _sec_path = tc.arguments.get("path", "")
-                    _sec_content = tc.arguments.get("content", tc.arguments.get("new_string", ""))
-                    if _sec_path and _sec_content:
-                        findings = self.security_scanner.scan(_sec_path, _sec_content)
-                        if findings:
-                            critical = [f for f in findings if f.severity == "CRITICAL"]
-                            if critical:
-                                warn_text = SecurityScanner.format_findings(findings)
-                                self.context.messages.append({
+                    
+                    if self.on_tool_end:
+                        self.on_tool_end(tc.name, raw_result)
+                    # Loop Breaker: track errors
+                    if self.loop_breaker and not raw_result.ok:
+                        lb_action = self.loop_breaker.track_error(
+                            error=raw_result.error or str(raw_result.to_dict()),
+                            tool_name=tc.name,
+                            context={"args": tc.arguments},
+                        )
+                        if lb_action.action == "break":
+                            self.context.messages.append({
                                     "role": "system",
-                                    "content": f"🛡️ SECURITY ALERT:\n{warn_text}\n\nFix critical issues sebelum lanjut.",
+                                    "content": lb_action.suggestion,
                                 })
-                # Architecture Guardian: auto-rescan genome
-                if self.guardian_enabled and self._genome_scanner and tc.name in ("write_file", "patch_file"):
-                    self._tool_calls_since_scan += 1
-                    ag_cfg = self.cfg.autokeren.architecture_guardian
-                    if self._tool_calls_since_scan >= ag_cfg.scan_interval:
-                        self._genome = self._genome_scanner.scan()
-                        self._guardian_checker = GuardianChecker(self._genome, block_duplicates=ag_cfg.block_duplicates)
-                        self._tool_calls_since_scan = 0
-                self.context.add_tool_result(tc.id, tc.name, raw_result.to_dict(), raw_result.ok)
+                            if lb_action.switch_model:
+                                self.router.swap_models()
+                            if lb_action.clear_context:
+                                self.compact()
+                            self.loop_breaker.reset()
+                    # Pattern Detector: track all tool calls
+                    if self._pattern_detector:
+                        from autokeren.loop.patterns import ToolCallEntry
+                        self._pattern_detector.track(ToolCallEntry(
+                            name=tc.name,
+                            args=tc.arguments,
+                            success=raw_result.ok,
+                            message="",
+                        ))
+                        pat = self._pattern_detector.detect()
+                        if pat.detected:
+                            self.context.messages.append({
+                                "role": "system",
+                                "content": f"⚠️ PATTERN DETECTED: {pat.pattern} — {pat.detail}. Coba pendekatan berbeda.",
+                            })
+                            self._pattern_detector.reset()
+                    if self.checkpoints and self.checkpoints.auto_checkpoint:
+                        self.checkpoints.save(
+                            tool_name=tc.name,
+                            tool_args=tc.arguments,
+                            tool_result=raw_result.to_dict(),
+                            tool_ok=raw_result.ok,
+                            before_snapshot=_before_snap,
+                        )
+                    # Vibe-Security: scan after write
+                    if (
+                        self.security_scanner
+                        and tc.name in ("write_file", "patch_file")
+                        and raw_result.ok
+                    ):
+                        _sec_path = tc.arguments.get("path", "")
+                        _sec_content = tc.arguments.get("content", tc.arguments.get("new_string", ""))
+                        if _sec_path and _sec_content:
+                            findings = self.security_scanner.scan(_sec_path, _sec_content)
+                            if findings:
+                                critical = [f for f in findings if f.severity == "CRITICAL"]
+                                if critical:
+                                    warn_text = SecurityScanner.format_findings(findings)
+                                    self.context.messages.append({
+                                        "role": "system",
+                                        "content": f"🛡️ SECURITY ALERT:\n{warn_text}\n\nFix critical issues sebelum lanjut.",
+                                    })
+                    # Architecture Guardian: auto-rescan genome
+                    if self.guardian_enabled and self._genome_scanner and tc.name in ("write_file", "patch_file"):
+                        self._tool_calls_since_scan += 1
+                        ag_cfg = self.cfg.autokeren.architecture_guardian
+                        if self._tool_calls_since_scan >= ag_cfg.scan_interval:
+                            self._genome = self._genome_scanner.scan()
+                            self._guardian_checker = GuardianChecker(self._genome, block_duplicates=ag_cfg.block_duplicates)
+                            self._tool_calls_since_scan = 0
+                    self.context.add_tool_result(tc.id, tc.name, raw_result.to_dict(), raw_result.ok)
 
-        return ModelResponse(content="Mencapai batas iterasi maksimum tanpa jawaban final.")
+            return ModelResponse(content="Mencapai batas iterasi maksimum tanpa jawaban final.")
+        except KeyboardInterrupt:
+            if self.on_model_end:
+                self.on_model_end(ModelResponse(content=""))
+            return ModelResponse(content="[dibatalkan user]")
 
 
     def approve_plan(self) -> None:
