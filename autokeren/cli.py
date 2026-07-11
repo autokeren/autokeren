@@ -627,13 +627,31 @@ def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
     import platform
     import subprocess
     from pathlib import Path
+    from autokeren import __version__
 
     os.environ["AUTOKEREN_PYTHON_PATH"] = sys.executable
     cache_dir = Path.home() / ".cache" / "autokeren" / "bin"
     ak_bin = cache_dir / ("ak.exe" if os.name == "nt" else "ak")
+    version_file = cache_dir / "version.txt"
 
-    # 1. Cek apakah biner di cache sudah ada
-    if not ak_bin.exists():
+    # Cek apakah cache version cocok dengan versi package saat ini
+    cache_valid = False
+    if version_file.exists():
+        try:
+            cached_version = version_file.read_text().strip()
+            if cached_version == __version__:
+                cache_valid = True
+        except Exception:
+            pass
+
+    # Jika cache version tidak cocok atau biner tidak ada, hapus cache lama dan tandai untuk update
+    if not cache_valid or not ak_bin.exists():
+        if ak_bin.exists():
+            try:
+                ak_bin.unlink()
+            except Exception:
+                pass
+        
         cache_dir.mkdir(parents=True, exist_ok=True)
         
         # 2. Coba muat biner pre-built dari package folder 'bin'
@@ -693,6 +711,13 @@ def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
                     return False
             else:
                 return False  # Tidak ada Go compiler, dan tidak ada prebuilt, fallback ke Python TUI
+
+        # Tulis penanda versi baru ke cache setelah biner terpasang
+        if ak_bin.exists():
+            try:
+                version_file.write_text(__version__)
+            except Exception:
+                pass
 
     if ak_bin.exists():
         argv = [str(ak_bin)] + sys_argv[1:]
