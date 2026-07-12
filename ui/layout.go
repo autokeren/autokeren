@@ -26,6 +26,13 @@ type ActionFinishedMsg struct {
 	Err    error
 }
 
+// StartupResumeMsg dikirim saat resume otomatis sewaktu startup selesai
+type StartupResumeMsg struct {
+	Status        StatusUpdateMsg
+	ResumeMessage string
+	RawMessages   interface{}
+}
+
 // PeriodicTickMsg adalah tick periodik untuk refresh status & ghost agents
 type PeriodicTickMsg struct {
 	Status      map[string]interface{}
@@ -453,6 +460,36 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Sidebar.Todos = msg.Todos
 		m.KanbanTasks = msg.KanbanTasks
 		m.Sidebar.Version = msg.Version
+
+	case StartupResumeMsg:
+		m.Initialized = true
+		m.Sidebar.ModelName = msg.Status.ModelName
+		m.Sidebar.ProjectName = msg.Status.ProjectName
+		m.Sidebar.ContextUsed = msg.Status.ContextUsed
+		m.Sidebar.ContextWindow = msg.Status.ContextWindow
+		m.Sidebar.ContextPct = msg.Status.ContextPct
+		m.Sidebar.NeuronsRemaining = msg.Status.NeuronsRemaining
+		m.Sidebar.NeuronsQuota = msg.Status.NeuronsQuota
+		m.Sidebar.Todos = msg.Status.Todos
+		m.KanbanTasks = msg.Status.KanbanTasks
+		m.Sidebar.Version = msg.Status.Version
+
+		m.Chat.AppendMessage("system", msg.ResumeMessage)
+		if rawMsgs, ok := msg.RawMessages.([]interface{}); ok {
+			newMsgs := []ChatMessage{}
+			for _, raw := range rawMsgs {
+				if mObj, ok := raw.(map[string]interface{}); ok {
+					role, _ := mObj["role"].(string)
+					content, _ := mObj["content"].(string)
+					newMsgs = append(newMsgs, ChatMessage{
+						Role:    role,
+						Content: content,
+					})
+				}
+			}
+			m.Chat.Messages = newMsgs
+		}
+		m.Chat.UpdateViewport()
 
 	case PeriodicTickMsg:
 		m.Sidebar.GhostAgents = msg.GhostAgents
@@ -1463,7 +1500,23 @@ func (m MainModel) connectToAgentCmd() tea.Cmd {
 			return ErrorMsg{Message: fmt.Sprintf("Gagal mengambil status awal agen: %v", err)}
 		}
 
-		return parseStatusReply(statusReply, m.ProjectRoot)
+		parsedStatus := parseStatusReply(statusReply, m.ProjectRoot)
+
+		resumeSession, _ := m.InitOpts["resume_session"].(string)
+		if resumeSession != "" {
+			var resumeReply map[string]interface{}
+			params := map[string]interface{}{"identifier": resumeSession}
+			err = m.IPCClient.Call("agent.resume_session", params, &resumeReply)
+			if err == nil {
+				return StartupResumeMsg{
+					Status:        parsedStatus,
+					ResumeMessage: resumeReply["message"].(string),
+					RawMessages:   resumeReply["messages"],
+				}
+			}
+		}
+
+		return parsedStatus
 	}
 }
 

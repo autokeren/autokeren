@@ -22,6 +22,7 @@ var (
 	planMode       bool
 	nonInteractive bool
 	taskPrompt     string
+	resumeSession  string
 )
 
 var rootCmd = &cobra.Command{
@@ -114,6 +115,9 @@ var rootCmd = &cobra.Command{
 		}
 		if planMode {
 			opts["plan"] = true
+		}
+		if resumeSession != "" {
+			opts["resume_session"] = resumeSession
 		}
 
 		// 3. Eksekusi Non-Interactive Mode jika ada prompt/task
@@ -229,4 +233,5 @@ func init() {
 	rootCmd.Flags().BoolVar(&planMode, "plan", false, "Mulai dalam plan mode")
 	rootCmd.Flags().BoolVar(&nonInteractive, "non-interactive", false, "Jalankan single task tanpa REPL")
 	rootCmd.Flags().StringVar(&taskPrompt, "task", "", "Deskripsi task untuk dijalankan")
+	rootCmd.Flags().StringVarP(&resumeSession, "resume", "r", "", "Resume sesi percakapan dari disk")
 }

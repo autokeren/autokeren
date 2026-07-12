@@ -769,6 +769,7 @@ def main() -> int:
     parser.add_argument("--aistudio", action="store_true", help="Otomatis gunakan Google AI Studio backend")
     parser.add_argument("--non-interactive", action="store_true", help="Run single task, no REPL (for ghost agent)")
     parser.add_argument("--task", help="Task untuk non-interactive mode")
+    parser.add_argument("--resume", "-r", help="Resume sesi percakapan dari disk")
     parser.add_argument("prompt", nargs="?", help="Single prompt to run non-interactively")
     args = parser.parse_args()
 
@@ -877,6 +878,13 @@ def main() -> int:
             summarize=rc.summarize,
             min_comment_score=rc.min_comment_score,
         ))
+
+    if args.resume:
+        try:
+            msg = agent.resume_session(args.resume)
+            console.print(f"[green]{msg}[/green]")
+        except Exception as e:
+            console.print(f"[red]Resume gagal:[/red] {e}")
 
     ui = AgentUI(console)
     ui.set_model_name(agent.router.current_model_id())
