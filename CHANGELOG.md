@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.25] - 2026-07-12
+
+### Changed
+- make camofox tool self-contained by calling the browser server REST API directly
+
 ## [0.11.24] - 2026-07-12
 
 ### Changed
