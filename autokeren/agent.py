@@ -281,6 +281,7 @@ class Agent:
                     if self._max_tool_calls > 0 and self._tool_call_count > self._max_tool_calls:
                         limit_msg = ToolResult(error=f"batas tool call tercapai ({self._max_tool_calls}). Selesaikan tanpa tool.", ok=False)
                         self.context.add_tool_result(tc.id, tc.name, limit_msg.to_dict(), False)
+                        self._auto_save_session()
                         return ModelResponse(content=f"Batas {self._max_tool_calls} tool call tercapai. Selesaikan tugas dengan informasi yang sudah ada.")
                     needs_perm, desc = self.tools.check_permission(tc.name, tc.arguments)
                     if needs_perm:
@@ -434,10 +435,12 @@ class Agent:
                         self._run_cf_verify_after_deploy(raw_result)
                     self.context.add_tool_result(tc.id, tc.name, raw_result.to_dict(), raw_result.ok)
 
+            self._auto_save_session()
             return ModelResponse(content="Mencapai batas iterasi maksimum tanpa jawaban final.")
         except KeyboardInterrupt:
             if self.on_model_end:
                 self.on_model_end(ModelResponse(content=""))
+            self._auto_save_session()
             return ModelResponse(content="[dibatalkan user]")
 
 
