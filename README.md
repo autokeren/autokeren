@@ -1,8 +1,10 @@
 # autokeren
 
-**Cloudflare-first agentic coding CLI dengan antarmuka TUI interaktif untuk developer Indonesia dan global.**
+**Cloudflare-first agentic coding CLI with an interactive TUI for developers worldwide.**
 
-autokeren adalah CLI agentic coding yang dirancang khusus untuk stack Cloudflare-first. Dibangun dengan Python, autokeren menghadirkan antarmuka **Text User Interface (TUI) interaktif** yang membagi layar menjadi panel status statis dan area obrolan dinamis, mendukung 7 model AI dengan fallback otomatis, dilengkapi tools bawaan untuk file, shell, git, deploy Cloudflare, serta PaaS built-in.
+**English** | [Bahasa Indonesia](README.id.md)
+
+`autokeren` is an agentic coding CLI specifically designed for the Cloudflare-first stack. Built with Python, `autokeren` provides an interactive **Text User Interface (TUI)** that splits the screen into a static status panel and a dynamic chat area. It supports 7 AI models with automatic fallback, and comes equipped with built-in tools for file management, shell execution, git control, Cloudflare deployments, and a built-in PaaS.
 
 [![CI](https://github.com/autokeren/autokeren/actions/workflows/ci.yml/badge.svg)](https://github.com/autokeren/autokeren/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -11,127 +13,126 @@ autokeren adalah CLI agentic coding yang dirancang khusus untuk stack Cloudflare
 
 ![autokeren TUI Screenshot](docs/assets/autogen-ui-preview.jpg)
 
-
 ---
 
-## Fitur Utama
+## Key Features
 
-- **7 model AI** — kimi-code, kimi-2.6, glm-5.2, glm-flash, llama-4-scout, gemma-4, nemotron dengan fallback otomatis.
-- **PaaS built-in** — deploy aplikasi ke Cloudflare Workers langsung dari terminal, auto D1 + R2 + AI bindings.
-- **Multi-Agent Mode & Auto Spawn** — Jalankan beberapa agent secara paralel via `/project`, atau biarkan agent utama secara dinamis memanggil sub-agent menggunakan tool `spawn_agent`.
-- **MCP Server Support** — Integrasikan tool eksternal pihak ketiga dengan Model Context Protocol (MCP) dan kelola via `/mcp`.
-- **Input History** — Navigasi perintah sebelumnya dengan tombol arah `↑` / `↓` di terminal.
-- **Export Chat** — Export seluruh riwayat percakapan menjadi file `.md` menggunakan perintah `/export`.
-- **Streaming output** — respons token-by-token langsung di terminal.
-- **Permission system** — konfirmasi sebelum menjalankan command berbahaya atau menulis file.
-- **Cross-session memory** — ingatan per-project tersimpan otomatis, dimuat tiap startup.
-- **Session save/resume (SQLite)** — simpan status percakapan ke database SQLite lokal secara transaksional (aman dari kerusakan file), dan lanjutkan kapan saja dengan perintah slash atau langsung dari terminal menggunakan flag `-r`.
-- **Context tracking + /compact** — pantau pemakaian context window, ringkas otomatis atau manual.
-- **AGENTS.md support** — instruksi per-project untuk AI agent dimuat otomatis.
-- **Markdown rendering** — output model dirender dengan warna (heading, table, code block).
-- **KV/D1/PaaS tools** — baca/tulis KV, query D1, create/deploy project langsung dari agent.
-- **Tmux supervisor** — spawn dan monitor long-running agent yang survive terminal close.
-- **CF Pages/Workers deploy** — helper deploy + build terintegrasi.
-- **File Explorer (F7)** — toggle folder/file tree di panel kiri TUI, click file → auto baca isi.
+- **7 AI models** — kimi-code, kimi-2.6, glm-5.2, glm-flash, llama-4-scout, gemma-4, and nemotron with automatic fallback.
+- **Built-in PaaS** — deploy applications to Cloudflare Workers directly from the terminal, with automatic D1 + R2 + AI bindings.
+- **Multi-Agent Mode & Auto Spawn** — Run multiple agents in parallel via `/project`, or let the primary agent dynamically call sub-agents using the `spawn_agent` tool.
+- **MCP Server Support** — Integrate third-party external tools via Model Context Protocol (MCP) and manage them with `/mcp`.
+- **Input History** — Navigate previous command entries using the `↑` / `↓` arrow keys in the terminal.
+- **Export Chat** — Export the entire chat history as a Markdown file using the `/export` command.
+- **Streaming Output** — Token-by-token response rendering in real-time.
+- **Permission System** — Prompts for confirmation before executing potentially dangerous shell commands or modifying files.
+- **Cross-Session Memory** — Automatically stores and loads project-specific persistent memory upon startup.
+- **Session Save/Resume (SQLite)** — Save conversation state to a transactional local SQLite database (`sessions.db`) and resume anytime using slash commands or the `-r` CLI flag.
+- **Context Tracking + /compact** — Monitor context window usage and summarize history automatically or manually.
+- **AGENTS.md Support** — Automatically loads project-specific instructions for the AI agent.
+- **Markdown Rendering** — Rich terminal formatting for headings, tables, and syntax-highlighted code blocks.
+- **KV/D1/PaaS Tools** — Read/write KV pairs, run D1 database queries, and manage projects directly from the agent.
+- **Tmux Supervisor** — Spawn and monitor long-running background agents that survive terminal closure.
+- **CF Pages/Workers Deploy** — Integrated helper tools for building and deploying to Cloudflare.
+- **File Explorer (F7)** — Toggle the folder/file tree on the left TUI panel, click a file to automatically read its content.
 
 ## Vibe Coding Features (v0.8.0)
 
-9 fitur original yang tidak ada di CLI coding tool manapun (Claude Code, Aider, Cursor, opencode, Cline):
+9 original features not found in other coding CLIs (Claude Code, Aider, Cursor, Cline):
 
 ### Time-Travel `/rewind`
-Undo tool calls dan restore codebase ke checkpoint sebelumnya. Auto-checkpoint setelah setiap write/patch.
+Undo tool calls and restore the codebase to previous checkpoints. Automatically saves a checkpoint after every file write/patch.
 ```bash
 /rewind        # undo 1 tool call
 /rewind 3      # undo 3 tool calls
-/rewind list   # lihat semua checkpoint
+/rewind list   # list all available checkpoints
 ```
 
 ### Architecture Guardian
-Scan project genome (modules, functions, dependencies), block duplikat function/module sebelum ditulis.
+Index project genome (modules, functions, dependencies) and block duplicate functions/modules before they are written.
 ```bash
-/genome         # lihat project genome
-/genome rescan  # rescan project
-/genome check   # cek duplikat
+/genome         # view project genome
+/genome rescan  # rescan project genome
+/genome check   # check for duplicate functions
 ```
 
 ### Loop Breaker
-Deteksi agent stuck di loop (same error, apology loop, file thrashing). Auto-swap model.
+Detect when the agent is stuck in an error/apology/file-thrashing loop. Automatically swaps the active AI model.
 ```bash
-/loop status    # lihat error history
-/loop reset     # reset tracker
+/loop status    # view loop breaker error history
+/loop reset     # reset loop tracker
 /loop break     # manual break — swap model + reset
 ```
 
 ### Cross-Model Auto-Review
-Review diff dengan model dari vendor berbeda untuk catch blind spots.
+Review unstaged or staged diffs using an AI model from a different vendor to catch blind spots.
 ```bash
-/review         # review unstaged diff
-/review staged  # review staged diff
+/review         # review unstaged diffs
+/review staged  # review staged diffs
 ```
 
 ### Vibe-Security Guard
-Scan otomatis setiap file write untuk secrets, SQLi, XSS, forbidden code.
+Automatically scan every file write for secrets, SQL injection, XSS, and forbidden patterns.
 ```bash
-/security           # scan semua file
-/security app.py    # scan file tertentu
+/security           # scan the entire project
+/security app.py    # scan a specific file
 ```
 
 ### Live Architecture Enforcement
-Rules-based enforcement via `.ak-rules.yaml` — max file lines, forbidden patterns, import restrictions.
+Rules-based enforcement via `.ak-rules.yaml` (e.g., maximum file lines, forbidden patterns, import limits).
 
 ### Spec-Driven Auto-Planning
-AI interview user dengan 20 pertanyaan, generate plan.md + technical-plan.md.
+AI-guided user interview with 20 questions to automatically generate `plan.md` and `technical-plan.md`.
 ```bash
-/spec build a REST API     # mulai interview
-/spec answer jawaban saya   # jawab pertanyaan
-/spec generate              # generate plan
-/spec show                  # lihat plan
-/spec progress              # lihat progress
+/spec build a REST API     # start interview
+/spec answer my answer     # answer interview questions
+/spec generate              # generate implementation plan
+/spec show                  # view implementation plan
+/spec progress              # track implementation progress
 ```
 
 ### Ghost Agent
-Spawn background agent di tmux untuk parallel work.
+Spawn background agents in tmux for parallel task execution.
 ```bash
-/ghost fix bug di login.py  # spawn ghost agent
-/ghost list                 # lihat semua ghost agent
-/ghost show 1               # lihat output ghost #1
+/ghost fix bug in login.py  # spawn ghost agent
+/ghost list                 # list all background agents
+/ghost show 1               # view output of ghost #1
 /ghost kill 1               # kill ghost #1
-/ghost kill all             # kill semua
+/ghost kill all             # kill all background agents
 ```
 
 ### Research Tool
-Deep research ke Reddit, Hacker News, dan Web. Fetch threads + comments, LLM rangkum.
+Deep web search querying Reddit, Hacker News, and Google Web search.
 ```bash
-/research python coding tools     # cari semua sources
-/research reddit asyncio tips     # cari Reddit saja
-/research hn AI coding CLI        # cari HN saja
-/research web best practices      # cari web saja
+/research python coding tools     # search all sources
+/research reddit asyncio tips     # search Reddit only
+/research hn AI coding CLI        # search Hacker News only
+/research web best practices      # search Google Web only
 ```
 
 ## AGI Evolution & Self-Healing (v0.11.0+)
 
-Membawa Autokeren CLI menuju level otonom sejati dengan 5 fitur kecerdasan buatan mandiri:
+Bringing autonomous artificial intelligence to Autokeren CLI:
 
 ### 1. Continuous Lifelong Daemon & Observer
-Mempunyai `SystemObserver` (asynchronous background thread) yang berjalan secara offline untuk memantau perubahan/penghapusan file kode Anda serta melakukan tailing log error kritis secara real-time. Jika terdeteksi anomali atau error fatal, observer secara otomatis memicu proses perbaikan otonom (*auto-diagnose*).
+An asynchronous background system observer tailing critical error logs and file changes to trigger self-healing processes.
 
 ### 2. Self-Evolution / Auto-Refactoring Loop
-Jika agen mendeteksi kegagalan berulang pada pemanggilan tool, sistem akan memicu `run_self_improvement` untuk merefaktor file Python tool yang rusak secara otonom, memvalidasinya dengan unit test pytest baru, dan melakukan *hot-reload* memuat ulang registry tool secara instan.
+Automatically refactors broken Python tools, validates them with new pytest unit tests, and hot-reloads the tool registry.
 
 ### 3. Local TF-IDF Semantic Memory
-Pencarian semantik berkinerja tinggi yang berjalan 100% lokal di mesin Anda menggunakan Vector Space Model (VSM) dengan pembobotan TF-IDF dan Cosine Similarity pada SQLite database (`memory.db`). Tidak perlu API key berbayar untuk kalkulasi embedding!
+High-performance local semantic search using Vector Space Model (VSM) with TF-IDF weighting and Cosine Similarity in a local SQLite database (`memory.db`). No API keys required!
 
 ### 4. Interactive Kanban TUI Board (`Ctrl+K`)
-Kelola task list Anda secara visual langsung di terminal. Papan Kanban interaktif (Todo, In Progress, Done) disinkronkan secara real-time dengan SQLite lokal. Cukup tekan **`Ctrl+K`** untuk berpindah layar kapan saja.
+Manage project task lists visually inside the terminal, synchronized with local SQLite. Press **`Ctrl+K`** to toggle the board at any time.
 
 ### 5. Live Multi-Agent Debate View (`Ctrl+D`)
-Pantau hasil diskusi, koordinasi, dan log pengerjaan tugas dari beberapa Ghost Agent yang berjalan di background secara real-time. Cukup tekan **`Ctrl+D`** untuk beralih ke panel debat.
+Monitor discussions, coordination, and work logs of background Ghost Agents in real-time. Press **`Ctrl+D`** to toggle the debate view.
 
-## Cara Mulai
+## Installation & Setup
 
-### 1. Dapatkan API Key (gratis)
+### 1. Get a Free API Key
 
-Daftar di **[developers.autokeren.com](https://developers.autokeren.com)** untuk dapatkan API key gratis.
+Sign up at **[developers.autokeren.com](https://developers.autokeren.com)** to get your API key.
 
 ### 2. Install
 
@@ -141,29 +142,28 @@ Daftar di **[developers.autokeren.com](https://developers.autokeren.com)** untuk
 pipx install autokeren
 ```
 
-> Kalau belum punya pipx: `sudo apt install pipx && pipx ensurepath` (Linux) atau `brew install pipx` (macOS)
-> Alternatif: `pip install --user autokeren`
+> If you don't have pipx: `sudo apt install pipx && pipx ensurepath` (Linux) or `brew install pipx` (macOS)
+> Alternative: `pip install --user autokeren`
 
 #### Windows (PowerShell)
 
-**Langkah 1** — Install pipx via pip:
+**Step 1** — Install pipx via pip:
 
 ```powershell
 python -m pip install --user pipx
 ```
 
-**Langkah 2** — Daftarkan pipx ke PATH Windows:
+**Step 2** — Add pipx to Windows PATH:
 
 ```powershell
 python -m pipx ensurepath
 ```
 
-**Langkah 3** — Restart PowerShell (tutup dan buka kembali, wajib agar PATH terdeteksi).
+**Step 3** — Restart PowerShell (close and reopen the terminal).
 
-**Langkah 4** — Verifikasi & pasang autokeren:
+**Step 4** — Install autokeren:
 
 ```powershell
-pipx --version
 pipx install autokeren
 ```
 
@@ -173,9 +173,9 @@ pipx install autokeren
 autokeren --login
 ```
 
-Masukkan API key dari developers.autokeren.com. Selesai.
+Enter your API key from developers.autokeren.com.
 
-### 4. Mulai ngoding
+### 4. Start Coding
 
 ```bash
 autokeren
@@ -185,66 +185,56 @@ autokeren
 
 ### Interactive TUI Chat (Default)
 
-Menjalankan perintah tanpa argumen akan membuka antarmuka TUI interaktif:
+Launch the interactive TUI interface:
 ```bash
 autokeren
 ```
 
-### Single prompt (Non-interactive)
+### Single Prompt (Non-interactive)
 
 ```bash
-autokeren "buat file hello.py yang cetak hello world"
+autokeren "create a hello.py file that prints hello world"
 ```
 
-### Plan mode
+### Plan Mode
 
 ```bash
 autokeren --plan
 ```
 
-### Resume Sesi Tersimpan
+### Resume Saved Session
 
-Melanjutkan sesi percakapan lama langsung dari terminal:
+Resume a saved session directly from the terminal startup:
 ```bash
-autokeren --resume nama-sesi
-# atau alias pendek
-autokeren -r nama-sesi
+autokeren --resume my-session-name
+# or using the short flag
+autokeren -r my-session-name
 ```
 
-### Pilih model
+### Choose Model
 
 ```bash
-autokeren -m glm "refactor fungsi ini"
-autokeren -m kimi "tulis unit test untuk modul tools"
+autokeren -m glm "refactor this function"
+autokeren -m kimi "write unit tests for the tools module"
 ```
 
-### Mode Google AI Studio (Gemini API)
+### Google AI Studio Mode (Gemini API)
 
-autokeren mendukung pemanggilan model langsung ke Google AI Studio dengan API Key Anda sendiri. Cukup jalankan:
+Run autokeren directly using your own Google AI Studio API key:
 ```bash
 autokeren --aistudio
 ```
-Jika API Key belum diset, Anda akan diminta memasukkannya secara interaktif dan akan disimpan secara otomatis ke `config.yaml`. Anda juga bisa menggunakan environment variable `GEMINI_API_KEY`.
+If your API key is not configured, you will be prompted to enter it. Alternatively, set the `GEMINI_API_KEY` environment variable.
 
-### Deploy aplikasi
+### Deploy Application
 
 ```bash
-autokeren "deploy toko sepatu sederhana dengan HTML+CSS, pakai D1 untuk produk"
+autokeren "deploy a simple shoe shop with HTML+CSS, using D1 for products"
 ```
 
-Agent akan otomatis create project, tulis kode, dan deploy ke Cloudflare Workers dengan D1 + R2 bindings.
+The agent will automatically create the project, write the code, and deploy to Cloudflare Workers with D1 and R2 bindings.
 
-### Contoh percakapan
-
-```
-> baca pyproject.toml dan tambahkan field authors
-> deploy project ini ke Cloudflare Pages
-> jalankan pytest dan perbaiki test yang gagal
-> buat web toko sederhana, deploy langsung
-> simpan preferensi build ini ke memory
-```
-
-## Model Tersedia
+## Available Models
 
 | Alias | Model |
 |---|---|
@@ -256,128 +246,92 @@ Agent akan otomatis create project, tulis kode, dan deploy ke Cloudflare Workers
 | `gemma-4` | Google Gemma 4 |
 | `nemotron` | NVIDIA Nemotron |
 
-Jalur tambahan:
+Additional paths:
 
 | Alias | Model |
 |---|---|
 | `gemini-3.5-flash` | Google Gemini 3.5 Flash via AI Studio (`--aistudio`) |
 | `gemini-3.5-pro` | Google Gemini 3.5 Pro via AI Studio (`--aistudio`) |
 
-Pilih dengan `-m <alias>`. Default: `kimi-code` dengan fallback ke `glm-5.2`.
+Select a model with `-m <alias>`. Default: `kimi-code` with fallback to `glm-5.2`.
 
 ## Commands & Shortcuts
 
-Di mode interaktif TUI, Anda dapat menggunakan tombol pintas keyboard (*hotkeys*) dan perintah slash berikut:
+Use the following keyboard shortcuts and slash commands in TUI mode:
 
-### Tombol Pintas Keyboard (Hotkeys)
+### Keyboard Shortcuts (Hotkeys)
 
-| Tombol | Aksi | Deskripsi |
+| Key | Action | Description |
 |---|---|---|
-| **`F1`** | Help | Tampilkan daftar bantuan perintah dan shortcut |
-| **`F2`** | Ganti Model | Memunculkan modal dialog interaktif untuk memilih model AI |
-| **`F3`** | Reset Sesi | Mereset seluruh percakapan dan status izin tool |
-| **`F4`** | Salin Respon | Menyalin pesan/jawaban terakhir AI ke clipboard sistem |
-| **`F5`** | Compact | Meringkas riwayat context window percakapan |
-| **`F6`** | Ganti Bahasa | Memunculkan modal dialog interaktif untuk memilih bahasa UI |
-| **`F7`** | File Explorer | Toggle file/folder tree di panel kiri (click file → auto baca) |
-| **`Ctrl+K`**| Kanban Board | Toggle papan Kanban proyek secara langsung (kapan saja) |
-| **`Ctrl+D`**| Debate Log | Toggle log perdebatan multi-agent di background (kapan saja) |
-| **`Ctrl+C`**| Batal / Stop | Menghentikan proses AI atau tool yang aktif (tanpa keluar aplikasi) |
-| **`Ctrl+Q`**| Keluar CLI | Keluar paksa dari aplikasi autokeren secara instan |
+| **`F1`** | Help | Toggle help dialog listing commands and shortcuts |
+| **`F2`** | Switch Model | Open an interactive modal to switch AI models |
+| **`F3`** | Reset Session | Reset the conversation history and tool permissions |
+| **`F4`** | Copy Response | Copy the last AI message response to the clipboard |
+| **`F5`** | Compact | Compact/summarize the conversation history |
+| **`F6`** | Switch Language | Open a modal to change the TUI language interface |
+| **`F7`** | File Explorer | Toggle the file tree sidebar on the left panel |
+| **`Ctrl+K`**| Kanban Board | Toggle the project Kanban board panel |
+| **`Ctrl+D`**| Debate View | Toggle the multi-agent background debate view |
+| **`Ctrl+C`**| Cancel / Stop | Stop the active AI generation or running shell tool |
+| **`Ctrl+Q`**| Force Quit | Force quit the autokeren CLI application |
 
-### Perintah Slash
+### Slash Commands
 
-Dapat diketik langsung di kotak input chat (mendukung *autocomplete* otomatis menggunakan tombol Tab atau Panah Kanan):
+Enter slash commands directly into the chat input box (Tab autocomplete is supported):
 
-| Perintah | Deskripsi |
+| Command | Description |
 |---|---|
-| `/help` | Tampilkan bantuan dan daftar perintah |
-| `/q` atau `/quit` | Keluar dari sesi |
-| `/model [nama]` | Ganti model aktif (buka modal pop-up jika nama kosong) |
-| `/lang [kode]` | Ganti bahasa UI (buka modal pop-up jika kode kosong, misal: `/lang en`) |
-| `/export [nama]` | Ekspor percakapan ke file Markdown (default: auto-timestamp) |
-| `/copy [last\|N]` | Salin pesan ke clipboard (`last` = pesan terakhir, `N` = indeks pesan) |
-| `/mcp` | Membuka manager interaktif MCP Server |
-| `/project <subcommand>`| Manajemen project Multi-Agent |
-| `/compact` | Ringkas history percakapan |
-| `/reset` | Reset sesi percakapan saat ini |
-| `/memory` | Tampilkan isi memory per-project |
-| `/permissions` | Tampilkan daftar tool yang diizinkan |
-| `/save [nama]` | Simpan sesi saat ini |
-| `/resume <nama\|id>` | Lanjutkan sesi tersimpan |
-| `/sessions` | Daftar semua sesi tersimpan |
-| `/rewind [N]` | Undo N tool calls, restore ke checkpoint |
-| `/rewind list` | Lihat semua checkpoint |
-| `/genome` | Lihat project genome (modules, functions) |
-| `/genome rescan` | Rescan project genome |
-| `/genome check` | Cek duplikat function |
-| `/loop status` | Lihat error history loop breaker |
-| `/loop reset` | Reset loop breaker tracker |
-| `/loop break` | Manual break — swap model + reset |
-| `/review [staged]` | Cross-model review diff |
-| `/security [file]` | Scan security issues |
-| `/spec <request>` | Mulai spec interview |
-| `/spec answer <text>` | Jawab pertanyaan interview |
-| `/spec generate` | Generate plan.md + technical-plan.md |
-| `/spec show` | Tampilkan plan |
-| `/spec progress` | Lihat progress plan |
-| `/ghost <task>` | Spawn background ghost agent |
-| `/ghost list` | Lihat semua ghost agent |
-| `/ghost show <id>` | Lihat output ghost agent |
-| `/ghost kill <id\|all>` | Kill ghost agent |
-| `/research <query>` | Riset ke Reddit + HN + Web |
-| `/research reddit\|hn\|web <q>` | Riset ke source tertentu |
-| `/deploy <deskripsi>` | Bikin app + deploy ke Cloudflare (auto create_project → write_file → deploy) |
+| `/help` | Display help guidelines |
+| `/q` or `/quit` | Exit the CLI session |
+| `/model [name]` | Switch AI model (opens pop-up if name is omitted) |
+| `/lang [code]` | Switch TUI language (opens pop-up if code is omitted, e.g. `/lang id`) |
+| `/export [name]` | Export conversation to a Markdown file |
+| `/copy [last\|N]` | Copy a specific message to the clipboard |
+| `/mcp` | Open the interactive Model Context Protocol (MCP) server manager |
+| `/project <subcommand>`| Multi-agent project management command |
+| `/compact` | Compact conversation history |
+| `/reset` | Reset the active session |
+| `/memory` | View stored cross-session memory for the project |
+| `/permissions` | View currently granted tool execution permissions |
+| `/save [name]` | Save the current session state |
+| `/resume <name\|id>` | Resume a saved session |
+| `/sessions` | List all saved sessions |
+| `/rewind [N]` | Undo N tool calls and restore codebase to a checkpoint |
+| `/rewind list` | List all available checkpoints |
+| `/genome` | View codebase structural genome |
+| `/genome rescan` | Rescan codebase architecture genome |
+| `/genome check` | Scan for duplicate functions |
+| `/loop status` | View loop breaker error history |
+| `/loop reset` | Reset loop breaker statistics |
+| `/loop break` | Break loop manually (swaps active model) |
+| `/review [staged]` | Run cross-model code review |
+| `/security [file]` | Run security audit scanner on a file |
+| `/spec <request>` | Start requirements gathering interview |
+| `/spec answer <text>` | Submit answer to interview question |
+| `/spec generate` | Generate plan.md and technical-plan.md |
+| `/spec show` | View implementation plan |
+| `/spec progress` | Track implementation progress |
+| `/ghost <task>` | Launch a background ghost agent |
+| `/ghost list` | List all running background ghost agents |
+| `/ghost show <id>` | View logs of a specific background ghost agent |
+| `/ghost kill <id\|all>` | Terminate background ghost agents |
+| `/research <query>` | Search Reddit, Hacker News, and Google Web |
+| `/deploy <desc>` | Create project and deploy directly to Cloudflare Pages/Workers |
 
-## Tools
+## Stored Configurations
 
-autokeren membawa 28 tools bawaan dengan permission check dan schema function-calling.
-
-| Tool | Deskripsi |
-|---|---|
-| `read_file` | Baca isi file |
-| `write_file` | Tulis file baru atau overwrite |
-| `patch_file` | Patch file dengan search-and-replace |
-| `list_files` | List file dalam direktori (glob pattern) |
-| `run_shell` | Jalankan shell command dengan allowlist + blocklist |
-| `search_code` | Cari konten file dengan regex |
-| `fetch_url` | Ambil konten URL |
-| `git_status` | Status working tree git |
-| `git_diff` | Diff git (staged/unstaged) |
-| `git_commit` | Commit perubahan |
-| `git_log` | Riwayat commit git (commit logs) |
-| `git_branch` | Daftar, buat, atau switch git branch |
-| `cf_deploy` | Deploy ke Cloudflare Pages/Workers via wrangler |
-| `cf_build_next` | Build Next.js dengan next-on-pages |
-| `cf_kv` | Baca/tulis Cloudflare KV namespace |
-| `cf_d1` | Jalankan query Cloudflare D1 |
-| `create_project` | Buat project PaaS baru (auto D1 + R2 + AI bindings) |
-| `deploy_project` | Deploy code ke project PaaS |
-| `list_projects` | Daftar project PaaS yang sudah dibuat |
-| `spawn_agent` | Spawn sub-agent secara dinamis untuk memparalelkan task |
-| `tmux` | Supervisor long-running task via tmux |
-| `todo` | Kelola todo list multi-step |
-| `remember` | Simpan info ke cross-session memory |
-| `rewind` | Undo tool calls, restore ke checkpoint |
-| `genome` | Lihat/rescan project architecture genome |
-| `review` | Cross-model code review |
-| `research` | Deep research ke Reddit, HN, dan Web |
-| `camofox` | Browser automation via Camofox |
-
-## Konfigurasi
-
-Konfigurasi disimpan di `~/.config/autokeren/config.yaml`.
+Config file is stored at `~/.config/autokeren/config.yaml`.
 
 ```yaml
 auth:
-  mode: "platform"       # "platform" (default), "direct", atau "aistudio"
-  api_key: ""            # API key dari developers.autokeren.com
-  gemini_api_key: ""     # API Key Google AI Studio (hanya untuk mode "aistudio")
+  mode: "platform"       # "platform" (default), "direct", or "aistudio"
+  api_key: ""            # API key from developers.autokeren.com
+  gemini_api_key: ""     # Google AI Studio API key (only for "aistudio" mode)
 
 cloudflare:
   primary_model: "kimi-code"
   secondary_model: "glm-5.2"
-  max_tokens: 16384
+max_tokens: 16384
   temperature: 0.3
   timeout: 120.0
 
@@ -400,7 +354,7 @@ autokeren:
   compact_tail_turns: 6
   auto_compact: false
   auto_compact_threshold: 0.8
-  # Vibe coding features (v0.8.0+)
+  # Vibe coding features
   time_travel:
     enabled: true
     max_checkpoints: 50
@@ -447,37 +401,38 @@ mcp_servers:
     env: {}
 ```
 
-### Environment variables
+### Environment Variables
 
-| Variable | Deskripsi |
+| Variable | Description |
 |---|---|
-| `AUTOKEREN_API_KEY` | API key dari developers.autokeren.com (override config) |
-| `GEMINI_API_KEY` | API key Google AI Studio (Gemini API) |
-| `AUTOKEREN_CONFIG_DIR` | Direktori konfigurasi custom (default `~/.config/autokeren`) |
+| `AUTOKEREN_API_KEY` | Overrides configuration API key |
+| `GEMINI_API_KEY` | Google AI Studio API key |
+| `AUTOKEREN_CONFIG_DIR` | Custom config directory path (default `~/.config/autokeren`) |
 
 ## Update
 
+To upgrade to the latest version:
 ```bash
 pipx upgrade autokeren
 ```
 
-## Arsitektur Hybrid (Go + Python)
+## Hybrid Go + Python Architecture
 
-`autokeren` menggunakan arsitektur hybrid berkinerja tinggi yang menggabungkan kecepatan driver antarmuka Go dengan fleksibilitas AI Core Python:
+`autokeren` utilizes a high-performance hybrid architecture that combines a fast Go interface driver with the flexibility of a Python AI Core:
 
-1.  **Frontend & TUI (Go):** 
-    Ditulis menggunakan framework **Bubble Tea** dan **Lip Gloss**. Mengelola visual terminal (Layout, File Explorer, Kanban Board, Debate View, input history) dan mengontrol subprocess browser Go-Rod untuk e2e testing.
-2.  **Core AI & Brain (Python):** 
-    Menangani logika multi-turn agentic loop, multi-model fallback routing, static analysis (AST parsing), dan permission screening.
-3.  **Jalur IPC (Inter-Process Communication):**
-    Menggunakan protokol **JSON-RPC 2.0** yang dialirkan secara asinkron melalui **Local TCP Socket** pada port dinamis.
+1.  **Frontend & TUI (Go):**
+    Built using **Bubble Tea** and **Lip Gloss**. Manages layout, file explorer tree, input command history, Kanban board, debate panels, and controls the Go-Rod browser automation process.
+2.  **Core AI & Brain (Python):**
+    Manages the multi-turn agentic loop, multi-model fallback router, static analysis (AST parsing), and security scanning.
+3.  **IPC (Inter-Process Communication):**
+    Asynchronous **JSON-RPC 2.0** connection established over a **Local TCP Socket** on a dynamic random local port.
     
-    *Mengapa menggunakan Local TCP Socket?*  
-    Ini memisahkan data komunikasi JSON-RPC utama dari standard output (stdout) terminal Python. Jika dependensi Python atau kode program mencetak output acak (`print()`), output tersebut akan keluar di stderr background tanpa mencemari data obrolan TUI, menghindarkan crash atau pembekuan antarmuka (*TUI freeze*).
+    *Why Local TCP Socket?*
+    This isolates JSON-RPC data packets from the standard output (stdout) stream of the Python process. Any accidental outputs (`print()`) or warnings printed by dependencies are piped directly to background stderr, eliminating parser crashes and TUI freeze bugs.
 
 ## Contributing
 
-Kontribusi sangat diterima. Fork, buat branch, kirim PR.
+Contributions are welcome! Please fork the repo, create a feature branch, and submit a PR.
 
 ```bash
 git clone https://github.com/autokeren/autokeren.git
@@ -487,12 +442,12 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-Sebelum commit, pastikan `ruff check .`, `mypy autokeren`, dan `pytest` semua lulus.
+Before committing code, make sure `ruff check .`, `mypy autokeren`, and `pytest` all pass successfully.
 
 ## License
 
-MIT — lihat [LICENSE](LICENSE).
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Disclaimer
 
-autokeren adalah proyek independen dan **tidak berafiliasi dengan, diendorsing oleh, atau sponsori oleh Cloudflare, Inc.** "Cloudflare" serta produk terkait adalah merek dagang Cloudflare, Inc. autokeren menggunakan infrastruktur dan API publik Cloudflare (Workers AI, D1, R2, KV, Pages) sebagai layanan pihak ketiga.
+autokeren is an independent project and is **not affiliated with, endorsed by, or sponsored by Cloudflare, Inc.** "Cloudflare" and its associated product names are trademarks of Cloudflare, Inc. autokeren uses public Cloudflare APIs and workers infrastructure as a third-party client.
