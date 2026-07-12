@@ -121,3 +121,19 @@ def test_camofox_tool_on_output():
     assert res.ok
     assert len(outputs) == 1
     assert "Navigasi ke https://google.com" in outputs[0]
+
+
+def test_camofox_tool_screenshot_default_path():
+    cfg = MockConfig()
+    tool = CamofoxTool(cfg)
+    
+    dummy_bytes = b"dummy_png_data"
+    dummy_b64 = base64.b64encode(dummy_bytes).decode()
+    
+    def mock_rpc(action: str, args: dict[str, Any]) -> dict[str, Any]:
+        return {"ok": True, "output": {"bytes": len(dummy_bytes), "base64": dummy_b64}}
+        
+    tool.set_rpc_callback(mock_rpc)
+    res = tool.run("screenshot", save_path="")
+    assert res.ok
+    assert "/tmp/autokeren-camofox-" in res.output["screenshot_path"]

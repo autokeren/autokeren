@@ -179,7 +179,11 @@ class CamofoxTool(Tool):
 
             # Post-process screenshot to write file locally
             if action == "screenshot" and ok:
-                save_path = kwargs.get("save_path") or f"/tmp/autokeren-camofox-{now_iso()}.png"
+                sp = kwargs.get("save_path")
+                if not sp or not str(sp).strip():
+                    save_path = f"/tmp/autokeren-camofox-{now_iso().replace(':', '-')}.png"
+                else:
+                    save_path = str(sp).strip()
                 try:
                     if isinstance(output, dict) and "base64" in output:
                         img_bytes = base64.b64decode(output["base64"])

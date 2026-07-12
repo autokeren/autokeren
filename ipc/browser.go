@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -88,8 +89,7 @@ func (bm *BrowserManager) Execute(action string, args map[string]interface{}) (i
 	case "snapshot":
 		// Evaluasi JS untuk mengekstrak struktur DOM visual
 		// Kita berikan ref id unik pada elemen interaktif
-		jsSnippet := `
-		(function() {
+		jsSnippet := `() => {
 			const elements = document.querySelectorAll('a, button, input, select, textarea, [role="button"], [contenteditable="true"]');
 			let output = [];
 			elements.forEach((el, index) => {
@@ -107,8 +107,7 @@ func (bm *BrowserManager) Execute(action string, args map[string]interface{}) (i
 				output.push("[" + ref + "] " + label.toUpperCase() + ": " + (text || '[kosong]'));
 			});
 			return output.join('\n');
-		})()
-		`
+		}`
 		res, err := page.Eval(jsSnippet)
 		if err != nil {
 			return nil, err
@@ -177,7 +176,22 @@ func (bm *BrowserManager) Execute(action string, args map[string]interface{}) (i
 		if expression == "" {
 			return nil, errors.New("expression parameter is required")
 		}
-		res, err := page.Eval(expression)
+
+		// Bungkus ekspresi JS dalam arrow function agar executor Go-Rod tidak melempar error
+		// "TypeError: ...apply is not a function" saat mengevaluasi nilai non-fungsi.
+		wrappedExpr := expression
+		trimmed := strings.TrimSpace(expression)
+		if !strings.HasPrefix(trimmed, "function") && !strings.HasPrefix(trimmed, "()") && !strings.Contains(trimmed, "=>") {
+			if (strings.HasPrefix(trimmed, "(") && strings.HasSuffix(trimmed, ")")) || (!strings.Contains(trimmed, "return") && !strings.Contains(trimmed, ";")) {
+				wrappedExpr = fmt.Sprintf("() => (%s)", expression)
+			} else if strings.Contains(trimmed, "return") {
+				wrappedExpr = fmt.Sprintf("() => { %s }", expression)
+			} else {
+				wrappedExpr = fmt.Sprintf("() => { return (%s); }", expression)
+			}
+		}
+
+		res, err := page.Eval(wrappedExpr)
 		if err != nil {
 			return nil, err
 		}
