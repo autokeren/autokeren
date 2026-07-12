@@ -18,6 +18,52 @@ except ImportError:
     _HAS_SIGNING = False
 
 
+
+def _git_blob_backup(project_root: Path, filepath: Path) -> str | None:
+    import subprocess
+    try:
+        res = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            cwd=str(project_root),
+            capture_output=True,
+            text=True
+        )
+        if res.returncode != 0 or res.stdout.strip() != "true":
+            return None
+
+        if not filepath.exists():
+            return None
+
+        res_hash = subprocess.run(
+            ["git", "hash-object", "-w", str(filepath)],
+            cwd=str(project_root),
+            capture_output=True,
+            text=True
+        )
+        if res_hash.returncode == 0:
+            return res_hash.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
+def _git_blob_diff(project_root: Path, filepath: Path, backup_sha: str) -> str | None:
+    import subprocess
+    try:
+        rel_path = filepath.relative_to(project_root)
+        res_diff = subprocess.run(
+            ["git", "diff", "-U0", backup_sha, "--", str(rel_path)],
+            cwd=str(project_root),
+            capture_output=True,
+            text=True
+        )
+        if res_diff.returncode in (0, 1):
+            return res_diff.stdout
+    except Exception:
+        pass
+    return None
+
+
 class ReadFileTool(Tool):
     name = "read_file"
     description = "Read text from a file with optional offset/limit."
@@ -92,6 +138,8 @@ class WriteFileTool(Tool):
         if blocked:
             return ToolResult(error=reason, ok=False)
         target.parent.mkdir(parents=True, exist_ok=True)
+        
+        backup_sha = _git_blob_backup(self.project_root, target)
         bak = make_backup(target) if target.exists() else None
         try:
             if _HAS_SIGNING:
@@ -99,10 +147,15 @@ class WriteFileTool(Tool):
                     content = _signing.sign_content(path, content)
             target.write_text(content, encoding="utf-8")
             lines = content.count("\n") + (1 if content and not content.endswith("\n") else 0)
+            
+            git_diff = _git_blob_diff(self.project_root, target, backup_sha) if backup_sha else None
+            
             return ToolResult(output={
                 "path": str(target),
                 "lines": lines,
                 "backup": str(bak) if bak else None,
+                "backup_sha": backup_sha,
+                "git_diff": git_diff,
                 "content": content,
             })
         except Exception as e:
@@ -160,12 +213,18 @@ class PatchFileTool(Tool):
             context_after_idx = len(lines_before) + old_lines_count
             context_after = all_lines[context_after_idx:context_after_idx + 2]
 
+            backup_sha = _git_blob_backup(self.project_root, target)
             bak = make_backup(target)
             text = text.replace(old_string, new_string, 1)
             target.write_text(text, encoding="utf-8")
+            
+            git_diff = _git_blob_diff(self.project_root, target, backup_sha) if backup_sha else None
+            
             return ToolResult(output={
                 "path": str(target),
                 "backup": str(bak) if bak else None,
+                "backup_sha": backup_sha,
+                "git_diff": git_diff,
                 "start_line": start_line,
                 "context_before": context_before,
                 "context_after": context_after,
