@@ -72,6 +72,20 @@ mypy autokeren
 pytest
 ```
 
+## Prosedur Rilis & Versi
+
+Setiap kali melakukan pembaruan versi (release), **wajib** menggunakan script rilis otomatis agar seluruh versi Python/Go sinkron dan biner Go terkompilasi silang dengan benar untuk semua platform.
+
+```bash
+./scripts/release.sh <patch|minor|major|versi_spesifik> [deskripsi_changelog]
+```
+
+Script ini otomatis:
+1. Menyelaraskan versi di `autokeren/__init__.py`, `pyproject.toml`, `ui/layout.go`, dan `ui/sidebar.go`.
+2. Menjalankan `make build-prebuilt` untuk mengompilasi silang biner Go lintas platform.
+3. Melakukan pengujian & linting.
+4. Men-stage semua berkas versi dan biner terkompilasi baru ke dalam Git commit, membuat tag rilis, serta mendorongnya ke remote GitHub untuk men-trigger workflow publikasi otomatis ke PyPI.
+
 ## Aturan Penting
 
 - **Jangan pernah mengubah signature tool yang sudah ada** tanpa pertimbangan matang. Agent dan config bergantung pada `name`, `parameters`, dan `run` kwargs.
