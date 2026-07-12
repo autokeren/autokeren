@@ -71,6 +71,9 @@ func (bm *BrowserManager) Execute(action string, args map[string]interface{}) (i
 		return nil, fmt.Errorf("failed to get browser page: %v", err)
 	}
 
+	// Gunakan timeout 15 detik untuk semua interaksi agar tidak terjadi hanging permanen
+	page = page.Timeout(15 * time.Second)
+
 	switch action {
 	case "navigate":
 		url, _ := args["url"].(string)
