@@ -102,3 +102,22 @@ def test_camofox_tool_screenshot(tmp_path):
     assert save_file.exists()
     assert save_file.read_bytes() == dummy_bytes
     assert res.output["screenshot_path"] == str(save_file.resolve())
+
+
+def test_camofox_tool_on_output():
+    cfg = MockConfig()
+    tool = CamofoxTool(cfg)
+    
+    outputs = []
+    def mock_on_output(line: str) -> None:
+        outputs.append(line)
+        
+    def mock_rpc(action: str, args: dict[str, Any]) -> dict[str, Any]:
+        return {"ok": True, "output": "ok"}
+        
+    tool.set_rpc_callback(mock_rpc)
+    res = tool.run("navigate", url="https://google.com", on_output=mock_on_output)
+    
+    assert res.ok
+    assert len(outputs) == 1
+    assert "Navigasi ke https://google.com" in outputs[0]

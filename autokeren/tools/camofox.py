@@ -60,7 +60,27 @@ class CamofoxTool(Tool):
             )
 
         # Hapus callback internal agar tidak menyebabkan error serialisasi JSON
-        kwargs.pop("on_output", None)
+        on_output = kwargs.pop("on_output", None)
+        if on_output:
+            if action == "navigate":
+                on_output(f"Navigasi ke {kwargs.get('url')}")
+            elif action == "snapshot":
+                on_output("Mengambil snapshot DOM halaman web")
+            elif action == "click":
+                target = f"ref #{kwargs.get('ref')}" if kwargs.get('ref') else f"selector '{kwargs.get('selector')}'"
+                on_output(f"Mengklik elemen {target}")
+            elif action == "type":
+                target = f"ref #{kwargs.get('ref')}" if kwargs.get('ref') else f"selector '{kwargs.get('selector')}'"
+                on_output(f"Mengetik '{kwargs.get('text')}' ke {target}")
+            elif action == "eval":
+                expr_snippet = kwargs.get('expression', '')[:50]
+                on_output(f"Mengevaluasi Javascript: {expr_snippet}...")
+            elif action == "screenshot":
+                on_output("Mengambil screenshot halaman")
+            elif action == "assert":
+                on_output(f"Memverifikasi asersi: {kwargs.get('assertion')}")
+            else:
+                on_output(f"Menjalankan aksi browser: {action}")
 
         try:
             # Map action helpers
