@@ -406,6 +406,14 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
+		case "run":
+			if reply, ok := msg.Reply.(map[string]interface{}); ok {
+				if modelID, exists := reply["model_id"].(string); exists && modelID == "system" {
+					if content, exists := reply["content"].(string); exists {
+						m.Chat.AppendMessage("system", content)
+					}
+				}
+			}
 		}
 
 	case ToolStartMsg:
