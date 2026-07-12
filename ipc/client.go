@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // JSONRPCMessage mewakili request, response, atau notification JSON-RPC 2.0
@@ -44,8 +46,7 @@ type IPCCallbacks struct {
 
 type Client struct {
 	cmd       *exec.Cmd
-	stdin     io.WriteCloser
-	stdout    io.ReadCloser
+	conn      net.Conn
 	callbacks *IPCCallbacks
 
 	pending     map[int64]chan *JSONRPCMessage
@@ -64,6 +65,20 @@ func NewClient(callbacks *IPCCallbacks) *Client {
 }
 
 func (c *Client) Start(projectRoot string, configPath string, opts map[string]interface{}) error {
+	if c.cmd != nil {
+		return errors.New("client sudah berjalan")
+	}
+
+	// 1. Buat TCP Listener pada localhost port random
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return fmt.Errorf("gagal membuat TCP listener: %v", err)
+	}
+	defer listener.Close()
+
+	addr := listener.Addr().(*net.TCPAddr)
+	port := addr.Port
+
 	// Dapatkan path interpreter Python dari parent process
 	pythonPath := os.Getenv("AUTOKEREN_PYTHON_PATH")
 	if pythonPath == "" {
@@ -91,29 +106,32 @@ func (c *Client) Start(projectRoot string, configPath string, opts map[string]in
 		}
 	}
 
-	// Gunakan PYTHONPATH=. agar Python menemukan modul autokeren
-	// Gunakan PYTHONUNBUFFERED=1 agar output stdout langsung dialirkan secara real-time ke TUI
-	c.cmd = exec.Command(pythonPath, "-m", "autokeren.daemon")
+	// 2. Jalankan subprocess Python daemon dengan melewatkan argumen port
+	c.cmd = exec.Command(pythonPath, "-m", "autokeren.daemon", "--port", strconv.Itoa(port))
 	c.cmd.Env = append(os.Environ(), "PYTHONPATH=.", "PYTHONUNBUFFERED=1")
+	
+	// Alihkan stdout & stderr daemon ke os.Stderr
+	// Ini memisahkan stdout/print() Python biasa agar tidak mencemari JSON-RPC
+	c.cmd.Stdout = os.Stderr
 	c.cmd.Stderr = os.Stderr
-
-	stdin, err := c.cmd.StdinPipe()
-	if err != nil {
-		return fmt.Errorf("gagal membuat stdin pipe: %v", err)
-	}
-	c.stdin = stdin
-
-	stdout, err := c.cmd.StdoutPipe()
-	if err != nil {
-		return fmt.Errorf("gagal membuat stdout pipe: %v", err)
-	}
-	c.stdout = stdout
 
 	if err := c.cmd.Start(); err != nil {
 		return fmt.Errorf("gagal menjalankan daemon: %v", err)
 	}
 
-	// Mulai mendengarkan stdout daemon di goroutine background
+	// 3. Terima koneksi incoming dari Python daemon
+	// Set deadline agar tidak gantung selamanya jika daemon gagal meluncur
+	if tcpListener, ok := listener.(*net.TCPListener); ok {
+		tcpListener.SetDeadline(time.Now().Add(10 * time.Second))
+	}
+	conn, err := listener.Accept()
+	if err != nil {
+		c.cmd.Process.Kill()
+		return fmt.Errorf("gagal menerima koneksi dari daemon: %v", err)
+	}
+	c.conn = conn
+
+	// Mulai mendengarkan data di goroutine background
 	go c.listen()
 
 	// Kirim inisialisasi awal
@@ -139,11 +157,8 @@ func (c *Client) Start(projectRoot string, configPath string, opts map[string]in
 
 func (c *Client) Close() {
 	if atomic.CompareAndSwapInt32(&c.isClosed, 0, 1) {
-		if c.stdin != nil {
-			c.stdin.Close()
-		}
-		if c.stdout != nil {
-			c.stdout.Close()
+		if c.conn != nil {
+			c.conn.Close()
 		}
 		if c.cmd != nil && c.cmd.Process != nil {
 			c.cmd.Process.Kill()
@@ -166,7 +181,7 @@ func (c *Client) send(msg *JSONRPCMessage) error {
 		return errors.New("ipc client closed")
 	}
 
-	_, err = c.stdin.Write(data)
+	_, err = c.conn.Write(data)
 	return err
 }
 
@@ -354,7 +369,7 @@ func (c *Client) handleRequest(msg *JSONRPCMessage) {
 }
 
 func (c *Client) listen() {
-	scanner := bufio.NewScanner(c.stdout)
+	scanner := bufio.NewScanner(c.conn)
 	// Set buffer limit to 64MB to handle large payloads (like screenshots or file diffs)
 	const maxCapacity = 64 * 1024 * 1024
 	buf := make([]byte, 0, 64*1024)

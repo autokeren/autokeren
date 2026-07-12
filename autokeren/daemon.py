@@ -5,6 +5,8 @@ import json
 import sys
 import threading
 import time
+import socket
+import argparse
 from pathlib import Path
 from typing import Any
 
@@ -121,7 +123,7 @@ class SystemObserver:
 
 
 class JSONRPCDaemon:
-    def __init__(self) -> None:
+    def __init__(self, port: int | None = None) -> None:
         self.agent: Agent | None = None
         self.pending_requests: dict[str | int, threading.Event] = {}
         self.request_responses: dict[str | int, Any] = {}
@@ -129,17 +131,29 @@ class JSONRPCDaemon:
         self.next_client_req_id = 1000
         self.observer: SystemObserver | None = None
         self._diagnosing = False
+        
+        self.port = port
+        self.reader: Any = None
+        self.writer: Any = None
+        if port is not None:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.connect(("127.0.0.1", port))
+            self.reader = self.socket.makefile("r", encoding="utf-8")
+            self.writer = self.socket.makefile("w", encoding="utf-8")
+        else:
+            self.reader = sys.stdin
+            self.writer = sys.stdout
 
     def send_notification(self, method: str, params: dict[str, Any]) -> None:
-        """Kirim notifikasi JSON-RPC ke standard output."""
+        """Kirim notifikasi JSON-RPC ke client."""
         payload = {
             "jsonrpc": "2.0",
             "method": method,
             "params": params
         }
         with self.lock:
-            sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
-            sys.stdout.flush()
+            self.writer.write(json.dumps(payload, ensure_ascii=False) + "\n")
+            self.writer.flush()
 
     def send_request(self, method: str, params: dict[str, Any]) -> Any:
         """Kirim request ke client Go (misal konfirmasi izin) dan tunggu respon."""
@@ -155,8 +169,8 @@ class JSONRPCDaemon:
                 "params": params,
                 "id": req_id
             }
-            sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
-            sys.stdout.flush()
+            self.writer.write(json.dumps(payload, ensure_ascii=False) + "\n")
+            self.writer.flush()
 
         # Tunggu sampai client mengirimkan response balik ke stdin
         evt.wait()
@@ -183,8 +197,8 @@ class JSONRPCDaemon:
             payload["result"] = result
 
         with self.lock:
-            sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
-            sys.stdout.flush()
+            self.writer.write(json.dumps(payload, ensure_ascii=False) + "\n")
+            self.writer.flush()
 
     def trigger_auto_diagnose(self, issue: str, context: str) -> None:
         """Picu diagnosa mandiri background jika terjadi anomali sistem (RAG/Self-Healing)."""
@@ -625,8 +639,8 @@ class JSONRPCDaemon:
             self.send_response(req_id, error={"code": -32603, "message": str(e)})
 
     def run(self) -> None:
-        """Main loop membaca JSON-RPC baris demi baris dari stdin."""
-        for line in sys.stdin:
+        """Main loop membaca JSON-RPC baris demi baris dari reader."""
+        for line in self.reader:
             line = line.strip()
             if not line:
                 continue
@@ -638,10 +652,15 @@ class JSONRPCDaemon:
 
 
 if __name__ == "__main__":
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(line_buffering=True)  # type: ignore[attr-defined]
-    if hasattr(sys.stdin, "reconfigure"):
-        sys.stdin.reconfigure(line_buffering=True)   # type: ignore[attr-defined]
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, help="Port TCP untuk koneksi IPC")
+    args = parser.parse_args()
+
+    if args.port is None:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(line_buffering=True)  # type: ignore[attr-defined]
+        if hasattr(sys.stdin, "reconfigure"):
+            sys.stdin.reconfigure(line_buffering=True)   # type: ignore[attr-defined]
     
-    daemon = JSONRPCDaemon()
+    daemon = JSONRPCDaemon(port=args.port)
     daemon.run()
