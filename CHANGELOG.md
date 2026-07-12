@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.24] - 2026-07-12
+
+### Changed
+- add RepoMapTool for codebase structural map indexing and inject curated design presets (Neo-Brutalism, Glassmorphism, Swiss Minimalist) into system prompt
+
 ## [0.11.23] - 2026-07-12
 
 ### Changed
