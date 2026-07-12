@@ -6,38 +6,44 @@ Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan
 
 ## [0.11.37] - 2026-07-12
 
-### Changed
-- migrate to sqlite session database ## [ local tcp socket ipc
+### Added
+- Integrasi komunikasi IPC menggunakan **Local TCP Sockets** pada port dinamis, menggantikan komunikasi stdio. Ini menyelesaikan masalah *Stdout Pollution* (TUI freeze/crash jika interpreter Python atau dependensi eksternal mencetak data tak terduga ke stdout).
+- Migrasi penyimpanan sesi (`save`/`resume`) dari file JSON mentah menjadi database transaksional **SQLite (`sessions.db`)** yang aman dari kerusakan berkas jika proses terputus di tengah jalan.
+- Fitur migrasi otomatis untuk memindahkan file sesi JSON lama secara instan ke database SQLite pada awal peluncuran aplikasi.
+
+### Fixed
+- Penanganan potensi tabrakan ID sesi pada database SQLite jika pemanggilan penyimpanan dilakukan dengan kecepatan tinggi (milidetik).
 
 ## [0.11.36] - 2026-07-12
 
-### Changed
-- display active session name and ID in the sidebar
+### Added
+- Tampilan status sesi aktif (`session`) secara real-time pada panel sidebar TUI, yang otomatis sinkron dengan perintah `/save`, `/resume`, dan `/reset`.
 
 ## [0.11.35] - 2026-07-12
 
-### Changed
-- add --resume/-r command-line flag for resuming sessions directly on startup
+### Added
+- Parameter baris perintah `--resume` / `-r` di CLI Python dan Cobra Go untuk memulihkan sesi obrolan lama langsung dari startup terminal (contoh: `autokeren -r revisi-landing`).
 
 ## [0.11.34] - 2026-07-12
 
-### Changed
-- add /save, /resume, and /sessions slash commands support in TUI mode
+### Added
+- Dukungan perintah slash `/save`, `/resume`, dan `/sessions` langsung ke dalam antarmuka TUI Bubble Tea.
 
 ## [0.11.33] - 2026-07-12
 
-### Changed
-- fix infinite browser page query hang by adding a default 15s timeout
+### Fixed
+- Memperbaiki hang tanpa batas pada elemen kueri browser Go-Rod dengan menerapkan durasi batas waktu (*default timeout*) selama 15 detik.
 
 ## [0.11.32] - 2026-07-12
 
-### Changed
-- fix thread safety of JSON-RPC daemon writes and prevent blocked stdin loops
+### Fixed
+- Memperbaiki thread-safety pemrosesan JSON-RPC pada daemon Python dengan membungkus write stdout ke dalam *thread lock* untuk mencegah terjadinya korupsi byte stream.
+- Mengalihkan penanganan perintah pemblokiran panjang (`/compact`, `/reset`, `/save`, dll.) ke background threads agar loop stdin daemon tidak terblokir.
 
 ## [0.11.31] - 2026-07-12
 
-### Changed
-- fix premature input box activation in TUI during multi-turn agent loops
+### Fixed
+- Menghindari aktivasi dini pada input box TUI sebelum seluruh siklus eksekusi agen (multi-turn loop) benar-benar selesai.
 
 ## [0.11.30] - 2026-07-12
 

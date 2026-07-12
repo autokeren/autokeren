@@ -25,7 +25,7 @@ autokeren adalah CLI agentic coding yang dirancang khusus untuk stack Cloudflare
 - **Streaming output** — respons token-by-token langsung di terminal.
 - **Permission system** — konfirmasi sebelum menjalankan command berbahaya atau menulis file.
 - **Cross-session memory** — ingatan per-project tersimpan otomatis, dimuat tiap startup.
-- **Session save/resume** — simpan state percakapan, lanjutkan kapan saja.
+- **Session save/resume (SQLite)** — simpan status percakapan ke database SQLite lokal secara transaksional (aman dari kerusakan file), dan lanjutkan kapan saja dengan perintah slash atau langsung dari terminal menggunakan flag `-r`.
 - **Context tracking + /compact** — pantau pemakaian context window, ringkas otomatis atau manual.
 - **AGENTS.md support** — instruksi per-project untuk AI agent dimuat otomatis.
 - **Markdown rendering** — output model dirender dengan warna (heading, table, code block).
@@ -200,6 +200,15 @@ autokeren "buat file hello.py yang cetak hello world"
 
 ```bash
 autokeren --plan
+```
+
+### Resume Sesi Tersimpan
+
+Melanjutkan sesi percakapan lama langsung dari terminal:
+```bash
+autokeren --resume nama-sesi
+# atau alias pendek
+autokeren -r nama-sesi
 ```
 
 ### Pilih model
@@ -452,16 +461,19 @@ mcp_servers:
 pipx upgrade autokeren
 ```
 
-## Arsitektur
+## Arsitektur Hybrid (Go + Python)
 
-```
-cli.py ──> tui.py (TUI wrapper) ──> agent.py (core loop) ──> models/ (Cloudflare client + router + retry)
-                                                              tools/ (Tool base + registry + 24 tools)
-                                                              context.py (session memory + token tracking)
-                                                              memory.py (cross-session memory)
-                                                              session.py (save/resume)
-                                                              ui.py (fallback Rich CLI + markdown)
-```
+`autokeren` menggunakan arsitektur hybrid berkinerja tinggi yang menggabungkan kecepatan driver antarmuka Go dengan fleksibilitas AI Core Python:
+
+1.  **Frontend & TUI (Go):** 
+    Ditulis menggunakan framework **Bubble Tea** dan **Lip Gloss**. Mengelola visual terminal (Layout, File Explorer, Kanban Board, Debate View, input history) dan mengontrol subprocess browser Go-Rod untuk e2e testing.
+2.  **Core AI & Brain (Python):** 
+    Menangani logika multi-turn agentic loop, multi-model fallback routing, static analysis (AST parsing), dan permission screening.
+3.  **Jalur IPC (Inter-Process Communication):**
+    Menggunakan protokol **JSON-RPC 2.0** yang dialirkan secara asinkron melalui **Local TCP Socket** pada port dinamis.
+    
+    *Mengapa menggunakan Local TCP Socket?*  
+    Ini memisahkan data komunikasi JSON-RPC utama dari standard output (stdout) terminal Python. Jika dependensi Python atau kode program mencetak output acak (`print()`), output tersebut akan keluar di stderr background tanpa mencemari data obrolan TUI, menghindarkan crash atau pembekuan antarmuka (*TUI freeze*).
 
 ## Contributing
 
