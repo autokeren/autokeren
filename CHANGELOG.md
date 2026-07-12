@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.33] - 2026-07-12
+
+### Changed
+- fix infinite browser page query hang by adding a default 15s timeout
+
 ## [0.11.32] - 2026-07-12
 
 ### Changed
