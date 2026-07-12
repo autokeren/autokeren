@@ -326,6 +326,11 @@ func (c *Client) handleRequest(msg *JSONRPCMessage) {
 
 func (c *Client) listen() {
 	scanner := bufio.NewScanner(c.stdout)
+	// Set buffer limit to 64MB to handle large payloads (like screenshots or file diffs)
+	const maxCapacity = 64 * 1024 * 1024
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, maxCapacity)
+	
 	for scanner.Scan() {
 		data := scanner.Bytes()
 		if len(data) == 0 {
