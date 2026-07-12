@@ -81,3 +81,4 @@ scratch/
 *.db
 .ak-kanban.db
 
+.ak-verification/

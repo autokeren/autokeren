@@ -15,10 +15,11 @@ def _config_path() -> Path:
 
 
 class AuthConfig(BaseModel):
-    mode: str = "platform"  # "platform" (default), "direct" (CF sendiri), "antigravity" (Google Antigravity), atau "aistudio" (Google AI Studio)
+    mode: str = "platform"  # "platform" (default), "direct" (CF sendiri), "antigravity" (Google Antigravity), "aistudio" (Google AI Studio), atau "local" (Local LLM)
     api_key: str = ""       # ak_live_... dari developers.autokeren.com
     base_url: str = "https://api.developers.autokeren.com"
     gemini_api_key: str = "" # API Key untuk Google AI Studio
+    local_endpoint: str = "http://localhost:11434" # Endpoint untuk Local LLM (Ollama/LocalAI)
 
 
 class CloudflareConfig(BaseModel):
@@ -89,6 +90,20 @@ class SpecDrivenConfig(BaseModel):
     technical_file: str = "technical-plan.md"
 
 
+class GitAutoCommitConfig(BaseModel):
+    enabled: bool = False
+    commit_on_write: bool = True
+    push_after_commit: bool = False
+    branch: str = ""
+
+
+class CfVerifyConfig(BaseModel):
+    enabled: bool = True
+    auto_verify_after_deploy: bool = True
+    wait_seconds: float = 3.0
+    save_dir: str = ".ak-verification"
+
+
 class GhostAgentConfig(BaseModel):
     enabled: bool = True
     max_background: int = 3
@@ -133,6 +148,8 @@ class AutokerenConfig(BaseModel):
     spec_driven: SpecDrivenConfig = Field(default_factory=SpecDrivenConfig)
     ghost_agent: GhostAgentConfig = Field(default_factory=GhostAgentConfig)
     research: ResearchConfig = Field(default_factory=ResearchConfig)
+    git_auto_commit: GitAutoCommitConfig = Field(default_factory=GitAutoCommitConfig)
+    cf_verify: CfVerifyConfig = Field(default_factory=CfVerifyConfig)
 
 
 class CamofoxConfig(BaseModel):

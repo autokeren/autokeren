@@ -4,7 +4,7 @@ from autokeren.tools.camofox import CamofoxTool
 from autokeren.tools.cf_infra import CloudflareD1Tool, CloudflareKVTool
 from autokeren.tools.cloudflare import CloudflareBuildTool, CloudflareDeployTool
 from autokeren.tools.file import ListFilesTool, PatchFileTool, ReadFileTool, WriteFileTool
-from autokeren.tools.git import GitBranchTool, GitCommitTool, GitDiffTool, GitLogTool, GitStatusTool
+from autokeren.tools.git import GitAutoCommitTool, GitBranchTool, GitCommitTool, GitDiffTool, GitLogTool, GitStatusTool
 from autokeren.tools.project import CreateProjectTool, DeployProjectTool, ListProjectsTool
 from autokeren.tools.genome import GenomeTool
 from autokeren.tools.remember import RememberTool
@@ -21,6 +21,7 @@ from autokeren.tools.todo import TodoTool
 from autokeren.tools.kanban import KanbanTool
 from autokeren.tools.collaborate import CollaborateTool
 from autokeren.tools.web import FetchURLTool
+from autokeren.tools.cf_verify import CfVerifyTool
 
 __all__ = [
     "Tool",
@@ -40,6 +41,7 @@ __all__ = [
     "GitCommitTool",
     "GitLogTool",
     "GitBranchTool",
+    "GitAutoCommitTool",
     "CamofoxTool",
     "CloudflareDeployTool",
     "CloudflareBuildTool",
@@ -58,4 +60,5 @@ __all__ = [
     "GenomeTool",
     "ReviewTool",
     "ResearchTool",
+    "CfVerifyTool",
 ]

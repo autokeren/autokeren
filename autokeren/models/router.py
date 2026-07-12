@@ -31,6 +31,19 @@ class ModelRouter:
                     timeout=self.cfg.cloudflare.timeout,
                 )
                 self.models = [primary, secondary]
+            elif self.cfg.auth.mode == "local":
+                from autokeren.models.local import LocalModel
+                primary = LocalModel(
+                    model_id=self.cfg.cloudflare.primary_model,
+                    endpoint=getattr(self.cfg.auth, "local_endpoint", "http://localhost:11434") or "http://localhost:11434",
+                    timeout=self.cfg.cloudflare.timeout,
+                )
+                secondary = LocalModel(
+                    model_id=self.cfg.cloudflare.secondary_model,
+                    endpoint=getattr(self.cfg.auth, "local_endpoint", "http://localhost:11434") or "http://localhost:11434",
+                    timeout=self.cfg.cloudflare.timeout,
+                )
+                self.models = [primary, secondary]
             elif self.cfg.auth.mode == "aistudio":
                 from autokeren.models.aistudio import AIStudioModel
                 primary = AIStudioModel(
@@ -106,6 +119,21 @@ class ModelRouter:
                 timeout=self.cfg.cloudflare.timeout,
             )
             self.models.insert(0, new_agy_model)
+            self.breakers.setdefault(model_id, CircuitBreaker(
+                failure_threshold=self.cfg.retry.circuit_failure_threshold,
+                open_seconds=float(self.cfg.retry.circuit_open_seconds),
+            ))
+            if len(self.models) > 5:
+                self.models = self.models[:5]
+            return True
+        elif self.cfg.auth.mode == "local":
+            from autokeren.models.local import LocalModel
+            new_local_model = LocalModel(
+                model_id=model_id,
+                endpoint=getattr(self.cfg.auth, "local_endpoint", "http://localhost:11434") or "http://localhost:11434",
+                timeout=self.cfg.cloudflare.timeout,
+            )
+            self.models.insert(0, new_local_model)
             self.breakers.setdefault(model_id, CircuitBreaker(
                 failure_threshold=self.cfg.retry.circuit_failure_threshold,
                 open_seconds=float(self.cfg.retry.circuit_open_seconds),

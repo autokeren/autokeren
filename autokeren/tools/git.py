@@ -128,3 +128,60 @@ class GitBranchTool(_GitBase):
     def needs_permission(self, action: str = "", **_: object) -> bool:
         return action != "list"
 
+
+class GitAutoCommitTool(_GitBase):
+    name = "git_auto_commit"
+    description = "Auto-stage and commit modified files with an auto-generated Conventional Commits message."
+    requires_permission = False
+    parameters = {
+        "type": "object",
+        "properties": {
+            "files": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "List of modified file paths to stage and commit.",
+            },
+            "summary": {"type": "string", "description": "Short task summary used to build the commit message."},
+        },
+        "required": ["files", "summary"],
+    }
+
+    def run(self, files: list[str], summary: str, **_: object) -> ToolResult:
+        if not files:
+            return ToolResult(output="Tidak ada file dimodifikasi, skip commit.", ok=True)
+        check = self._git(["rev-parse", "--is-inside-work-tree"])
+        if not check.ok:
+            return ToolResult(error="Bukan git repository, auto-commit dilewati.", ok=False)
+        has_changes = self._git(["status", "--porcelain"])
+        if not has_changes.ok or not str(has_changes.output or "").strip():
+            return ToolResult(output="Tidak ada perubahan untuk di-commit.", ok=True)
+        prefix = self._infer_prefix(files)
+        scope = self._infer_scope(files)
+        scope_str = f"({scope})" if scope else ""
+        msg = f"{prefix}{scope_str}: {summary[:72]}"
+        body_lines = [f"- {f}" for f in files[:20]]
+        full_msg = msg + "\n\n" + "\n".join(body_lines)
+        stage = self._git(["add"] + [str(f) for f in files])
+        if not stage.ok:
+            return stage
+        return self._git(["commit", "-m", full_msg])
+
+    def _infer_prefix(self, files: list[str]) -> str:
+        names = " ".join(files).lower()
+        if "test" in names:
+            return "test"
+        if any(k in names for k in ("readme", ".md", "docs", "changelog")):
+            return "docs"
+        if any(k in names for k in ("config", "yaml", "toml", "pyproject")):
+            return "chore"
+        return "feat"
+
+    def _infer_scope(self, files: list[str]) -> str:
+        parts: list[str] = []
+        for f in files:
+            p = Path(f)
+            if len(p.parts) > 1:
+                parts.append(p.parts[-2])
+        unique = list(dict.fromkeys(parts))
+        return ",".join(unique[:2])
+

@@ -17,6 +17,7 @@ from autokeren.models.router import ModelRouter
 from autokeren.prompts import build_system_prompt
 from autokeren.session import SessionManager
 from autokeren.tools import ToolRegistry, ToolResult
+from autokeren.tools.git import GitAutoCommitTool
 
 
 class Agent:
@@ -108,6 +109,12 @@ class Agent:
         self.on_retry: Callable[[int, float, str], None] | None = None
         self.permission_callback: Callable[[str, str, dict[str, Any]], bool] | None = None
         self._consecutive_no_tool_prompts = 0
+
+        # Git Auto-Commit tracker (Pillar B)
+        self._modified_files: list[str] = []
+        gac = cfg.autokeren.git_auto_commit
+        self._git_auto_commit_enabled = gac.enabled and gac.commit_on_write
+        self._git_auto_commit_push = gac.push_after_commit
 
     def _build_system_prompt(self, role: str = "") -> None:
         """Build system prompt dengan memory + AGENTS.md."""
@@ -255,6 +262,7 @@ class Agent:
 
                     self._consecutive_no_tool_prompts = 0
                     self._add_assistant_and_log(resp)
+                    self._run_git_auto_commit(resp.content or "")
                     return resp
 
                 self._consecutive_no_tool_prompts = 0
@@ -409,6 +417,14 @@ class Agent:
                             self._genome = self._genome_scanner.scan()
                             self._guardian_checker = GuardianChecker(self._genome, block_duplicates=ag_cfg.block_duplicates)
                             self._tool_calls_since_scan = 0
+                    # Pillar B: track modified files for auto-commit
+                    if self._git_auto_commit_enabled and tc.name in ("write_file", "patch_file") and raw_result.ok:
+                        _written = str(tc.arguments.get("path", ""))
+                        if _written and _written not in self._modified_files:
+                            self._modified_files.append(_written)
+                    # Pillar C: auto-verify after deploy
+                    if tc.name == "cf_deploy" and raw_result.ok:
+                        self._run_cf_verify_after_deploy(raw_result)
                     self.context.add_tool_result(tc.id, tc.name, raw_result.to_dict(), raw_result.ok)
 
             return ModelResponse(content="Mencapai batas iterasi maksimum tanpa jawaban final.")
@@ -417,6 +433,44 @@ class Agent:
                 self.on_model_end(ModelResponse(content=""))
             return ModelResponse(content="[dibatalkan user]")
 
+
+    def _run_cf_verify_after_deploy(self, deploy_result: ToolResult) -> None:
+        cv_cfg = self.cfg.autokeren.cf_verify
+        if not cv_cfg.enabled or not cv_cfg.auto_verify_after_deploy:
+            return
+        import re
+        output_text = str(deploy_result.output or "")
+        urls = re.findall(r"https://[^\s\"']+\.(?:pages|workers)\.dev[^\s\"']*", output_text)
+        if not urls:
+            return
+        target_url = urls[0].rstrip("/")
+        from autokeren.tools.cf_verify import CfVerifyTool
+        verifier = CfVerifyTool(project_root=self.project_root)
+        result = verifier.run(url=target_url, wait_seconds=cv_cfg.wait_seconds)
+        status_icon = "✅" if result.ok else "⚠️"
+        self.context.messages.append({
+            "role": "system",
+            "content": (
+                f"{status_icon} AUTO-VERIFY {target_url}:\n"
+                f"{result.output or result.error or 'Tidak ada output'}"
+            ),
+        })
+
+    def _run_git_auto_commit(self, summary: str) -> None:
+        if not self._git_auto_commit_enabled or not self._modified_files:
+            return
+        files = list(self._modified_files)
+        self._modified_files.clear()
+        short_summary = (summary.strip().splitlines()[0] if summary.strip() else "auto-commit")[:80]
+        tool = GitAutoCommitTool(project_root=Path(self.project_root))
+        result = tool.run(files=files, summary=short_summary)
+        if self._git_auto_commit_push and result.ok:
+            import subprocess
+            subprocess.run(
+                ["git", "-C", self.project_root, "push"],
+                capture_output=True,
+                timeout=30,
+            )
 
     def approve_plan(self) -> None:
         self.plan_approved = True
