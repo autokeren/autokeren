@@ -658,8 +658,38 @@ def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
         except Exception:
             pass
 
-    # Jika cache version tidak cocok atau biner tidak ada, hapus cache lama dan tandai untuk update
-    if not cache_valid or not ak_bin.exists():
+    # Resolve pre-built binary path
+    package_dir = Path(__file__).parent
+    os_name = platform.system().lower()
+    arch = platform.machine().lower()
+    
+    prebuilt_name = ""
+    if os_name == "windows":
+        if "amd64" in arch or "x86_64" in arch:
+            prebuilt_name = "ak-windows-amd64.exe"
+    elif os_name == "linux":
+        if "amd64" in arch or "x86_64" in arch:
+            prebuilt_name = "ak-linux-amd64"
+    elif os_name == "darwin":
+        if "arm64" in arch or "aarch64" in arch:
+            prebuilt_name = "ak-darwin-arm64"
+        elif "amd64" in arch or "x86_64" in arch:
+            prebuilt_name = "ak-darwin-amd64"
+
+    prebuilt_path = package_dir / "bin" / prebuilt_name if prebuilt_name else None
+    if prebuilt_path and not prebuilt_path.exists():
+        prebuilt_path = package_dir.parent / "autokeren" / "bin" / prebuilt_name
+
+    # Cek apakah biner prebuilt lebih baru dari biner cached (untuk development mode)
+    prebuilt_is_newer = False
+    if prebuilt_path and prebuilt_path.exists() and ak_bin.exists():
+        try:
+            prebuilt_is_newer = prebuilt_path.stat().st_mtime > ak_bin.stat().st_mtime
+        except Exception:
+            pass
+
+    # Jika cache version tidak cocok, biner tidak ada, atau prebuilt lebih baru, salin ulang biner
+    if not cache_valid or not ak_bin.exists() or prebuilt_is_newer:
         if ak_bin.exists():
             try:
                 ak_bin.unlink()
@@ -668,31 +698,6 @@ def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
         
         cache_dir.mkdir(parents=True, exist_ok=True)
         
-        # 2. Coba muat biner pre-built dari package folder 'bin'
-        package_dir = Path(__file__).parent
-        os_name = platform.system().lower()
-        arch = platform.machine().lower()
-        
-        prebuilt_name = ""
-        if os_name == "windows":
-            if "amd64" in arch or "x86_64" in arch:
-                prebuilt_name = "ak-windows-amd64.exe"
-        elif os_name == "linux":
-            if "amd64" in arch or "x86_64" in arch:
-                prebuilt_name = "ak-linux-amd64"
-        elif os_name == "darwin":
-            if "arm64" in arch or "aarch64" in arch:
-                prebuilt_name = "ak-darwin-arm64"
-            elif "amd64" in arch or "x86_64" in arch:
-                prebuilt_name = "ak-darwin-amd64"
-
-        prebuilt_path = package_dir / "bin" / prebuilt_name if prebuilt_name else None
-        
-        # Jika pre-built tidak ditemukan di package_dir/bin (misalnya karena development mode),
-        # coba cek di root repo /autokeren/bin/
-        if prebuilt_path and not prebuilt_path.exists():
-            prebuilt_path = package_dir.parent / "autokeren" / "bin" / prebuilt_name
-
         # Jika biner prebuilt ada, salin ke cache_dir
         if prebuilt_path and prebuilt_path.exists():
             try:
@@ -700,6 +705,8 @@ def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
                 # Set permission executable di Linux/macOS
                 if os.name != "nt":
                     os.chmod(str(ak_bin), 0o755)
+                # Tulis file versi untuk mencatat kecocokan cache
+                version_file.write_text(__version__)
             except Exception:
                 pass
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/input"
+	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 )
 
@@ -45,8 +46,8 @@ func (bm *BrowserManager) Close() {
 
 func (bm *BrowserManager) getPage() (*rod.Page, error) {
 	if bm.browser == nil {
-		// Launch browser. rod will automatically download Chromium if not found!
-		browser := rod.New().MustConnect()
+		u := launcher.New().NoSandbox(true).MustLaunch()
+		browser := rod.New().ControlURL(u).MustConnect()
 		bm.browser = browser
 	}
 	if bm.page == nil {
