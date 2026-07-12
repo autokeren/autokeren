@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.47] - 2026-07-13
+
+### Changed
+- fix(session): auto-save sesi aktif di semua return path termasuk tool call ## [ interrupt
+
 ## [0.11.46] - 2026-07-13
 
 ### Changed
