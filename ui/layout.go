@@ -104,6 +104,9 @@ var slashCommands = []SlashCommandInfo{
 	{Name: "/debate", Description: "Lihat visualisasi diskusi multi-agent (Shortcut: Ctrl+D)"},
 	{Name: "/compact", Description: "Kompak/ringkas konteks percakapan"},
 	{Name: "/reset", Description: "Reset sesi percakapan baru"},
+	{Name: "/save", Description: "Simpan sesi percakapan aktif ke disk"},
+	{Name: "/resume", Description: "Lanjutkan sesi percakapan yang disimpan"},
+	{Name: "/sessions", Description: "Tampilkan semua sesi percakapan yang disimpan"},
 	{Name: "/q", Description: "Keluar dari autokeren"},
 }
 
@@ -328,6 +331,53 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "reset":
 			m.Chat.Messages = []ChatMessage{}
 			m.Chat.AppendMessage("system", "Sesi berhasil direset.")
+		case "save":
+			if reply, ok := msg.Reply.(map[string]interface{}); ok {
+				if msgStr, exists := reply["message"].(string); exists {
+					m.Chat.AppendMessage("system", msgStr)
+				}
+			}
+		case "resume":
+			if reply, ok := msg.Reply.(map[string]interface{}); ok {
+				if msgStr, exists := reply["message"].(string); exists {
+					m.Chat.AppendMessage("system", msgStr)
+				}
+				if rawMsgs, exists := reply["messages"].([]interface{}); exists {
+					newMsgs := []ChatMessage{}
+					for _, raw := range rawMsgs {
+						if mObj, ok := raw.(map[string]interface{}); ok {
+							role, _ := mObj["role"].(string)
+							content, _ := mObj["content"].(string)
+							newMsgs = append(newMsgs, ChatMessage{
+								Role:    role,
+								Content: content,
+							})
+						}
+					}
+					m.Chat.Messages = newMsgs
+				}
+			}
+		case "sessions":
+			if reply, ok := msg.Reply.(map[string]interface{}); ok {
+				if rawSessions, exists := reply["sessions"].([]interface{}); exists {
+					if len(rawSessions) == 0 {
+						m.Chat.AppendMessage("system", "Belum ada saved session.")
+					} else {
+						var sb strings.Builder
+						sb.WriteString("Saved Sessions:\n")
+						for _, rawS := range rawSessions {
+							if sObj, ok := rawS.(map[string]interface{}); ok {
+								id, _ := sObj["id"].(string)
+								name, _ := sObj["name"].(string)
+								created, _ := sObj["created_at"].(string)
+								msgCount, _ := sObj["message_count"].(float64)
+								sb.WriteString(fmt.Sprintf("- %s (ID: %s) — %d pesan (%s)\n", name, id, int(msgCount), created))
+							}
+						}
+						m.Chat.AppendMessage("system", sb.String())
+					}
+				}
+			}
 		}
 
 	case ToolStartMsg:
@@ -873,6 +923,53 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					var reply string
 					err := m.IPCClient.Call("agent.reset", map[string]interface{}{}, &reply)
 					return ActionFinishedMsg{Action: "reset", Reply: reply, Err: err}
+				}
+				return m, cmd
+			}
+
+			if strings.HasPrefix(val, "/save") {
+				args := strings.TrimSpace(strings.TrimPrefix(val, "/save"))
+				m.AgentRunning = true
+				m.TextInput.SetValue("")
+				m.Chat.AppendMessage("system", fmt.Sprintf("Menyimpan sesi %s...", args))
+				cmd := func() tea.Msg {
+					var reply map[string]interface{}
+					params := map[string]interface{}{}
+					if args != "" {
+						params["name"] = args
+					}
+					err := m.IPCClient.Call("agent.save_session", params, &reply)
+					return ActionFinishedMsg{Action: "save", Reply: reply, Err: err}
+				}
+				return m, cmd
+			}
+
+			if strings.HasPrefix(val, "/resume") {
+				args := strings.TrimSpace(strings.TrimPrefix(val, "/resume"))
+				m.TextInput.SetValue("")
+				if args == "" {
+					m.Chat.AppendMessage("system", "Gunakan: /resume <id_atau_nama_session>")
+					return m, nil
+				}
+				m.AgentRunning = true
+				m.Chat.AppendMessage("system", fmt.Sprintf("Meresume sesi %s...", args))
+				cmd := func() tea.Msg {
+					var reply map[string]interface{}
+					params := map[string]interface{}{"identifier": args}
+					err := m.IPCClient.Call("agent.resume_session", params, &reply)
+					return ActionFinishedMsg{Action: "resume", Reply: reply, Err: err}
+				}
+				return m, cmd
+			}
+
+			if val == "/sessions" {
+				m.AgentRunning = true
+				m.TextInput.SetValue("")
+				m.Chat.AppendMessage("system", "Memuat daftar sesi...")
+				cmd := func() tea.Msg {
+					var reply map[string]interface{}
+					err := m.IPCClient.Call("agent.list_sessions", map[string]interface{}{}, &reply)
+					return ActionFinishedMsg{Action: "sessions", Reply: reply, Err: err}
 				}
 				return m, cmd
 			}

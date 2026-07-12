@@ -249,6 +249,12 @@ class JSONRPCDaemon:
             threading.Thread(target=self.handle_agent_switch_model, args=(req_id, params), daemon=True).start()
         elif method == "agent.list_models":
             threading.Thread(target=self.handle_agent_list_models, args=(req_id,), daemon=True).start()
+        elif method == "agent.save_session":
+            threading.Thread(target=self.handle_agent_save_session, args=(req_id, params), daemon=True).start()
+        elif method == "agent.resume_session":
+            threading.Thread(target=self.handle_agent_resume_session, args=(req_id, params), daemon=True).start()
+        elif method == "agent.list_sessions":
+            threading.Thread(target=self.handle_agent_list_sessions, args=(req_id,), daemon=True).start()
         elif method == "kanban.list":
             threading.Thread(target=self.handle_kanban_list, args=(req_id,), daemon=True).start()
         elif method == "kanban.add":
@@ -577,6 +583,44 @@ class JSONRPCDaemon:
                 self.send_response(req_id, result={"id": task_id, "status": "deleted"})
             else:
                 self.send_response(req_id, error={"code": -32002, "message": f"Task {task_id} not found"})
+        except Exception as e:
+            self.send_response(req_id, error={"code": -32603, "message": str(e)})
+
+    def handle_agent_save_session(self, req_id: str | int | None, params: dict[str, Any]) -> None:
+        if not self.agent:
+            self.send_response(req_id, error={"code": -32000, "message": "Agent not initialized"})
+            return
+        try:
+            name = params.get("name")
+            if not name:
+                name = f"session-{len(self.agent.sessions.list()) + 1}"
+            sid = self.agent.save_session(name)
+            self.send_response(req_id, result={"message": f"Session '{name}' disimpan.", "session_id": sid})
+        except Exception as e:
+            self.send_response(req_id, error={"code": -32603, "message": str(e)})
+
+    def handle_agent_resume_session(self, req_id: str | int | None, params: dict[str, Any]) -> None:
+        if not self.agent:
+            self.send_response(req_id, error={"code": -32000, "message": "Agent not initialized"})
+            return
+        try:
+            identifier = params.get("identifier")
+            if not identifier:
+                self.send_response(req_id, error={"code": -32602, "message": "identifier parameter is required"})
+                return
+            msg = self.agent.resume_session(identifier)
+            messages = [{"role": m.get("role", ""), "content": m.get("content", "")} for m in self.agent.context.messages]
+            self.send_response(req_id, result={"message": msg, "messages": messages})
+        except Exception as e:
+            self.send_response(req_id, error={"code": -32603, "message": str(e)})
+
+    def handle_agent_list_sessions(self, req_id: str | int | None) -> None:
+        if not self.agent:
+            self.send_response(req_id, error={"code": -32000, "message": "Agent not initialized"})
+            return
+        try:
+            sessions = self.agent.sessions.list()
+            self.send_response(req_id, result={"sessions": sessions})
         except Exception as e:
             self.send_response(req_id, error={"code": -32603, "message": str(e)})
 
