@@ -801,18 +801,32 @@ class MCPManageScreen(ModalScreen[str]):
         try:
             from autokeren.config import save_config
             from autokeren.config import MCPServerConfig
-            # Tambah ke config
+            from autokeren.mcp import MCPClient, MCPTool
+            # Simpan ke config
             new_srv = MCPServerConfig(name=name, command=command)
             self.tui.cfg.mcp_servers.append(new_srv)
             save_config(self.tui.cfg)
+            # Langsung start tanpa restart
+            client = MCPClient(name=name, command=command)
+            client.start()
+            self._clients.append(client)
+            # Register tools ke agent (via cli._mcp_clients + registry)
+            try:
+                import autokeren.cli as _cli
+                _cli._mcp_clients.append(client)
+                if hasattr(self.tui, "_agent") and hasattr(self.tui._agent, "registry"):
+                    for tool_schema in client.tools():
+                        self.tui._agent.registry.register(MCPTool(client, tool_schema))
+            except Exception:
+                pass
             self.tui.append_chat_message(
                 "system",
-                f"[green]✓ Server '[bold]{name}[/bold]' ditambahkan ke config.yaml.[/green]\n"
-                f"  Restart autokeren untuk mengaktifkannya.",
+                f"[green]✅ Server '[bold]{name}[/bold]' aktif — {len(client.tools())} tools terdaftar.[/green]",
             )
         except Exception as exc:
-            self.tui.append_chat_message("system", f"[red]Gagal simpan: {exc}[/red]")
+            self.tui.append_chat_message("system", f"[red]Gagal mulai server: {exc}[/red]")
         self.dismiss("saved")
+
 
     def on_key(self, event: Any) -> None:
         if event.key == "escape":
