@@ -135,7 +135,7 @@ class AutokerenConfig(BaseModel):
     auto_compact: bool = False
     auto_compact_threshold: float = 0.8
     memory_enabled: bool = True
-    auto_save_session: bool = False
+    auto_save_session: bool = True
     max_tool_calls: int = 0
     mermaid_render: bool = False
     language: str = ""

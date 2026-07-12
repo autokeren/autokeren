@@ -116,6 +116,10 @@ class Agent:
         self._git_auto_commit_enabled = gac.enabled and gac.commit_on_write
         self._git_auto_commit_push = gac.push_after_commit
 
+        # Auto-Save Session
+        self._session_auto_saved = False
+        self._session_first_user_input: str = ""
+
     def _build_system_prompt(self, role: str = "") -> None:
         """Build system prompt dengan memory + AGENTS.md."""
         mem = self.memory.load() if self.cfg.autokeren.memory_enabled else ""
@@ -178,6 +182,8 @@ class Agent:
             self.memory.log_message(session_id="default", role="assistant", content=resp.content)
 
     def run(self, user_input: str) -> ModelResponse:
+        if not self._session_first_user_input:
+            self._session_first_user_input = user_input
         self.context.add_user(user_input)
         if self.cfg.autokeren.memory_enabled:
             self.memory.log_message(session_id="default", role="user", content=user_input)
@@ -263,6 +269,7 @@ class Agent:
                     self._consecutive_no_tool_prompts = 0
                     self._add_assistant_and_log(resp)
                     self._run_git_auto_commit(resp.content or "")
+                    self._auto_save_session()
                     return resp
 
                 self._consecutive_no_tool_prompts = 0
@@ -433,6 +440,22 @@ class Agent:
                 self.on_model_end(ModelResponse(content=""))
             return ModelResponse(content="[dibatalkan user]")
 
+
+    def _auto_save_session(self) -> None:
+        """Auto-save session setelah respons pertama AI jika auto_save_session aktif."""
+        if not self.cfg.autokeren.auto_save_session:
+            return
+        if self._session_auto_saved:
+            return
+        import datetime
+        import re
+        first_input = self._session_first_user_input.strip()
+        words = re.sub(r"[^\w\s]", "", first_input).split()
+        slug_words = "-".join(w.lower() for w in words[:3] if w) or "session"
+        ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        name = f"{ts}-{slug_words}"[:80]
+        self.save_session(name)
+        self._session_auto_saved = True
 
     def _run_cf_verify_after_deploy(self, deploy_result: ToolResult) -> None:
         cv_cfg = self.cfg.autokeren.cf_verify
