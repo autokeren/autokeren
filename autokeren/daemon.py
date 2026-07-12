@@ -439,6 +439,8 @@ class JSONRPCDaemon:
                 result={
                     "content": resp.content,
                     "model_id": resp.model_id,
+                    "session_id": self.agent.current_session_id,
+                    "session_name": self.agent.current_session_name,
                     "usage": {
                         "prompt": resp.usage.prompt,
                         "completion": resp.usage.completion,

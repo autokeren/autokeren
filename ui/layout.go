@@ -436,6 +436,12 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.Chat.AppendMessage("system", content)
 					}
 				}
+				if sid, exists := reply["session_id"].(string); exists && sid != "" && sid != "default" {
+					m.Sidebar.SessionID = sid
+				}
+				if sname, exists := reply["session_name"].(string); exists && sname != "" && sname != "default" {
+					m.Sidebar.SessionName = sname
+				}
 			}
 		}
 
