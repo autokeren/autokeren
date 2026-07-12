@@ -79,6 +79,8 @@ type StatusUpdateMsg struct {
 	Todos            []TodoItem
 	KanbanTasks      []KanbanTask
 	Version          string
+	SessionID        string
+	SessionName      string
 }
 
 // PermissionConfirmReq mewakili request izin masuk yang harus direspon balik
@@ -338,16 +340,30 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "reset":
 			m.Chat.Messages = []ChatMessage{}
 			m.Chat.AppendMessage("system", "Sesi berhasil direset.")
+			m.Sidebar.SessionID = "default"
+			m.Sidebar.SessionName = "default"
 		case "save":
 			if reply, ok := msg.Reply.(map[string]interface{}); ok {
 				if msgStr, exists := reply["message"].(string); exists {
 					m.Chat.AppendMessage("system", msgStr)
+				}
+				if sid, exists := reply["session_id"].(string); exists {
+					m.Sidebar.SessionID = sid
+				}
+				if sname, exists := reply["name"].(string); exists {
+					m.Sidebar.SessionName = sname
 				}
 			}
 		case "resume":
 			if reply, ok := msg.Reply.(map[string]interface{}); ok {
 				if msgStr, exists := reply["message"].(string); exists {
 					m.Chat.AppendMessage("system", msgStr)
+				}
+				if sid, exists := reply["session_id"].(string); exists {
+					m.Sidebar.SessionID = sid
+				}
+				if sname, exists := reply["session_name"].(string); exists {
+					m.Sidebar.SessionName = sname
 				}
 				if rawMsgs, exists := reply["messages"].([]interface{}); exists {
 					newMsgs := []ChatMessage{}
@@ -460,6 +476,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Sidebar.Todos = msg.Todos
 		m.KanbanTasks = msg.KanbanTasks
 		m.Sidebar.Version = msg.Version
+		m.Sidebar.SessionID = msg.SessionID
+		m.Sidebar.SessionName = msg.SessionName
 
 	case StartupResumeMsg:
 		m.Initialized = true
@@ -473,6 +491,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Sidebar.Todos = msg.Status.Todos
 		m.KanbanTasks = msg.Status.KanbanTasks
 		m.Sidebar.Version = msg.Status.Version
+		m.Sidebar.SessionID = msg.Status.SessionID
+		m.Sidebar.SessionName = msg.Status.SessionName
 
 		m.Chat.AppendMessage("system", msg.ResumeMessage)
 		if rawMsgs, ok := msg.RawMessages.([]interface{}); ok {
@@ -505,6 +525,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Sidebar.Todos = parsed.Todos
 			m.KanbanTasks = parsed.KanbanTasks
 			m.Sidebar.Version = parsed.Version
+			m.Sidebar.SessionID = parsed.SessionID
+			m.Sidebar.SessionName = parsed.SessionName
 		}
 		return m, m.pollPeriodicCmd()
 
@@ -1645,6 +1667,15 @@ func parseStatusReply(statusReply map[string]interface{}, projectRoot string) St
 		}
 	}
 
+	sessionID, _ := statusReply["session_id"].(string)
+	sessionName, _ := statusReply["session_name"].(string)
+	if sessionID == "" {
+		sessionID = "default"
+	}
+	if sessionName == "" {
+		sessionName = "default"
+	}
+
 	return StatusUpdateMsg{
 		ModelName:        modelName,
 		ProjectName:      projectName,
@@ -1656,6 +1687,8 @@ func parseStatusReply(statusReply map[string]interface{}, projectRoot string) St
 		Todos:            todos,
 		KanbanTasks:      kanbanTasks,
 		Version:          version,
+		SessionID:        sessionID,
+		SessionName:      sessionName,
 	}
 }
 

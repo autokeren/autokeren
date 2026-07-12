@@ -28,6 +28,8 @@ type SidebarModel struct {
 	GhostAgents      []*ghost.GhostAgentInfo
 	Todos            []TodoItem
 	Version          string
+	SessionID        string
+	SessionName      string
 }
 
 func NewSidebarModel() SidebarModel {
@@ -42,6 +44,8 @@ func NewSidebarModel() SidebarModel {
 		ProjectName:   "—",
 		ContextWindow: 262144,
 		Version:       version,
+		SessionID:     "default",
+		SessionName:   "default",
 	}
 }
 
@@ -120,6 +124,14 @@ func (m SidebarModel) View() string {
 		modelDisplay = modelDisplay[idx+1:]
 	}
 	sb.WriteString(accentStyle.Render(truncate(modelDisplay, w-4)) + "\n\n")
+
+	// Session
+	sb.WriteString(labelStyle.Render("session") + "\n")
+	sessionDisplay := m.SessionName
+	if m.SessionID != "" && m.SessionID != "default" {
+		sessionDisplay = fmt.Sprintf("%s (%s)", m.SessionName, m.SessionID)
+	}
+	sb.WriteString(okStyle.Render(truncate(sessionDisplay, w-4)) + "\n\n")
 
 	// ── Context ──
 	sb.WriteString(labelStyle.Render("context") + "\n")

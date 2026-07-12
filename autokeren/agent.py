@@ -37,6 +37,8 @@ class Agent:
         if model_id:
             self.router.switch_model(model_id)
         self.context = SessionContext(project_root=Path(project_root))
+        self.current_session_id: str = "default"
+        self.current_session_name: str = "default"
         self.memory = memory if memory is not None else MemoryManager(project_root)
         self.sessions = sessions if sessions is not None else SessionManager(project_root)
         self._build_system_prompt(role=role)
@@ -423,6 +425,8 @@ class Agent:
     def reset(self) -> None:
         """Reset session context, reload memory + system prompt."""
         self.context.reset()
+        self.current_session_id = "default"
+        self.current_session_name = "default"
         self._build_system_prompt()
         self.context.messages.append({"role": "system", "content": self._system_prompt})
         self.plan_approved = not self.cfg.autokeren.plan_mode
@@ -434,7 +438,10 @@ class Agent:
             "completion": self.router.usage_total.completion,
             "total": self.router.usage_total.total,
         }
-        return self.sessions.save(name, self.context.messages, usage)
+        sid = self.sessions.save(name, self.context.messages, usage)
+        self.current_session_id = sid
+        self.current_session_name = name
+        return sid
 
     def resume_session(self, identifier: str) -> str:
         """Resume session dari disk. Return status message."""
@@ -450,6 +457,8 @@ class Agent:
         self.context.messages = messages
         self.plan_approved = not self.cfg.autokeren.plan_mode
         name = data.get("name", "unknown")
+        self.current_session_id = data.get("id", "default")
+        self.current_session_name = name
         ts = data.get("timestamp", "")
         n = len(messages)
         return f"Session '{name}' di-resume ({n} pesan, saved {ts})."
@@ -568,6 +577,8 @@ class Agent:
             "todos": todos,
             "kanban_tasks": kanban_tasks,
             "version": __version__,
+            "session_id": self.current_session_id,
+            "session_name": self.current_session_name,
         }
 
     def run_autonomous(self, goal: str, context: str = "") -> dict[str, Any]:
