@@ -19,6 +19,13 @@ import (
 // SpinnerTickMsg adalah tick untuk animasi spinner
 type SpinnerTickMsg struct{}
 
+// ActionFinishedMsg dikirim setelah panggilan RPC asinkron selesai
+type ActionFinishedMsg struct {
+	Action string
+	Reply  interface{}
+	Err    error
+}
+
 // PeriodicTickMsg adalah tick periodik untuk refresh status & ghost agents
 type PeriodicTickMsg struct {
 	Status      map[string]interface{}
@@ -286,7 +293,6 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Tidak menambah pesan "berpikir..." — cukup spinner di UI
 
 	case ModelEndMsg:
-		m.AgentRunning = false
 		m.CurrentTask = ""
 		m.Sidebar.CurrentTask = ""
 		m.Chat.UpdateViewport()
@@ -299,6 +305,29 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg.ModelID != "" {
 			m.Sidebar.ModelName = msg.ModelID
+		}
+
+	case ActionFinishedMsg:
+		m.AgentRunning = false
+		m.CurrentTask = ""
+		m.Sidebar.CurrentTask = ""
+		m.Chat.UpdateViewport()
+
+		if msg.Err != nil {
+			m.Chat.AppendMessage("system", fmt.Sprintf("Error: %v", msg.Err))
+			return m, nil
+		}
+
+		switch msg.Action {
+		case "compact":
+			if reply, ok := msg.Reply.(map[string]interface{}); ok {
+				if msgStr, exists := reply["message"].(string); exists {
+					m.Chat.AppendMessage("system", msgStr)
+				}
+			}
+		case "reset":
+			m.Chat.Messages = []ChatMessage{}
+			m.Chat.AppendMessage("system", "Sesi berhasil direset.")
 		}
 
 	case ToolStartMsg:
@@ -623,33 +652,23 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.TextInput.SetValue("")
 					m.AgentRunning = true
 					m.Chat.AppendMessage("system", "Mengompak context...")
-					go func() {
+					cmd := func() tea.Msg {
 						var reply map[string]interface{}
 						err := m.IPCClient.Call("agent.compact", map[string]interface{}{}, &reply)
-						if err == nil {
-							msg2, _ := reply["message"].(string)
-							m.Chat.AppendMessage("system", msg2)
-						} else {
-							m.Chat.AppendMessage("system", fmt.Sprintf("Gagal compact: %v", err))
-						}
-					}()
-					return m, nil
+						return ActionFinishedMsg{Action: "compact", Reply: reply, Err: err}
+					}
+					return m, cmd
 				}
 				if selected.Name == "/reset" {
 					m.TextInput.SetValue("")
 					m.AgentRunning = true
 					m.Chat.AppendMessage("system", "Mereset sesi percakapan...")
-					go func() {
+					cmd := func() tea.Msg {
 						var reply string
 						err := m.IPCClient.Call("agent.reset", map[string]interface{}{}, &reply)
-						if err == nil {
-							m.Chat.Messages = []ChatMessage{}
-							m.Chat.AppendMessage("system", "Sesi berhasil direset.")
-						} else {
-							m.Chat.AppendMessage("system", fmt.Sprintf("Gagal reset: %v", err))
-						}
-					}()
-					return m, nil
+						return ActionFinishedMsg{Action: "reset", Reply: reply, Err: err}
+					}
+					return m, cmd
 				}
 				if selected.Name == "/q" {
 					m.IPCClient.Close()
@@ -839,33 +858,23 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if val == "/compact" {
 				m.AgentRunning = true
 				m.Chat.AppendMessage("system", "Mengompak context...")
-				go func() {
+				cmd := func() tea.Msg {
 					var reply map[string]interface{}
 					err := m.IPCClient.Call("agent.compact", map[string]interface{}{}, &reply)
-					if err == nil {
-						msg, _ := reply["message"].(string)
-						m.Chat.AppendMessage("system", msg)
-					} else {
-						m.Chat.AppendMessage("system", fmt.Sprintf("Gagal compact: %v", err))
-					}
-				}()
-				return m, nil
+					return ActionFinishedMsg{Action: "compact", Reply: reply, Err: err}
+				}
+				return m, cmd
 			}
 
 			if val == "/reset" {
 				m.AgentRunning = true
 				m.Chat.AppendMessage("system", "Mereset sesi percakapan...")
-				go func() {
+				cmd := func() tea.Msg {
 					var reply string
 					err := m.IPCClient.Call("agent.reset", map[string]interface{}{}, &reply)
-					if err == nil {
-						m.Chat.AppendMessage("system", "Sesi berhasil direset.")
-						m.Chat.Messages = []ChatMessage{}
-					} else {
-						m.Chat.AppendMessage("system", fmt.Sprintf("Gagal reset: %v", err))
-					}
-				}()
-				return m, nil
+					return ActionFinishedMsg{Action: "reset", Reply: reply, Err: err}
+				}
+				return m, cmd
 			}
 
 			if val == "/board" || val == "/kanban" {
@@ -909,18 +918,16 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.CurrentTask = taskLabel
 			m.Sidebar.CurrentTask = taskLabel
-			go func(userInput string) {
+			runCmd := func() tea.Msg {
 				runParams := map[string]interface{}{
-					"user_input": userInput,
+					"user_input": val,
 				}
 				var reply map[string]interface{}
 				err := m.IPCClient.Call("agent.run", runParams, &reply)
-				if err != nil {
-					m.IPCClient.Close()
-				}
-			}(val)
+				return ActionFinishedMsg{Action: "run", Reply: reply, Err: err}
+			}
 
-			return m, nil
+			return m, runCmd
 		}
 	}
 
