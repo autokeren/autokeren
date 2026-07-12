@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.35] - 2026-07-12
+
+### Changed
+- add --resume/-r command-line flag for resuming sessions directly on startup
+
 ## [0.11.34] - 2026-07-12
 
 ### Changed
