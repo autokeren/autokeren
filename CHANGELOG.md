@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.28] - 2026-07-12
+
+### Changed
+- fix camofox tool JSON serialization error by popping python functions from args
+
 ## [0.11.27] - 2026-07-12
 
 ### Changed
