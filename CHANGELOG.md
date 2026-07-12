@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.42] - 2026-07-12
+
+### Changed
+- feat: add sync slash commands /config, /local, /approval, /mcp to TUI, CLI, Daemon, and Go TUI
+
 ## [0.11.41] - 2026-07-12
 
 ### Changed
