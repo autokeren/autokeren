@@ -2,7 +2,7 @@
 
 **Cloudflare-first agentic coding CLI with an interactive TUI for developers worldwide.**
 
-**English** | [Bahasa Indonesia](README.id.md)
+**English** | [Bahasa Indonesia](README.id.md) | [简体中文](README.zh-CN.md) | [Português (Brasil)](README.pt-BR.md) | [Español](README.es.md) | [日本語](README.ja.md)
 
 `autokeren` is an agentic coding CLI specifically designed for the Cloudflare-first stack. Built with Python, `autokeren` provides an interactive **Text User Interface (TUI)** that splits the screen into a static status panel and a dynamic chat area. It supports 7 AI models with automatic fallback, and comes equipped with built-in tools for file management, shell execution, git control, Cloudflare deployments, and a built-in PaaS.
 
