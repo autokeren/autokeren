@@ -59,6 +59,9 @@ class CamofoxTool(Tool):
                 ok=False
             )
 
+        # Hapus callback internal agar tidak menyebabkan error serialisasi JSON
+        kwargs.pop("on_output", None)
+
         try:
             # Map action helpers
             if action == "net_start":
