@@ -6,11 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/spf13/cobra"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/autokeren/autokeren/ghost"
 	"github.com/autokeren/autokeren/ipc"
 	"github.com/autokeren/autokeren/ui"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -85,7 +85,7 @@ var rootCmd = &cobra.Command{
 			ConfirmPermission: func(name string, desc string, args map[string]interface{}) bool {
 				fmt.Printf("\n  [yellow]⚡ %s[/yellow] — %s", name, desc)
 				fmt.Print("\n  [yellow]Izinkan? [Y/n]: [/yellow]")
-				
+
 				var input string
 				_, err := fmt.Scanln(&input)
 				if err != nil || input == "" || input == "y" || input == "Y" {
@@ -122,7 +122,7 @@ var rootCmd = &cobra.Command{
 				fmt.Println("[red]Error: Task/Prompt kosong.[/red]")
 				os.Exit(1)
 			}
-			
+
 			err := client.Start(projectRoot, configPath, opts)
 			if err != nil {
 				fmt.Printf("Error: %v\n", err)
@@ -140,7 +140,7 @@ var rootCmd = &cobra.Command{
 				fmt.Printf("\nError saat eksekusi: %v\n", err)
 				os.Exit(1)
 			}
-			
+
 			fmt.Println()
 			return
 		}
@@ -186,7 +186,7 @@ var rootCmd = &cobra.Command{
 func runInteractiveLoop(client *ipc.Client) {
 	fmt.Println("Ketik perintah Anda (atau /q untuk keluar):")
 	scanner := bufio.NewScanner(os.Stdin)
-	
+
 	for {
 		fmt.Print("\nkamu> ")
 		if !scanner.Scan() {
@@ -200,7 +200,7 @@ func runInteractiveLoop(client *ipc.Client) {
 			fmt.Println("Sampai jumpa!")
 			break
 		}
-		
+
 		runParams := map[string]interface{}{
 			"user_input": text,
 		}

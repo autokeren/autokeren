@@ -95,7 +95,7 @@ func renderColumnContent(tasks []KanbanTask, colID int, selectedCol int, selecte
 
 	for i, t := range tasks {
 		isHovered := (colID == selectedCol && i == selectedTaskIndex)
-		
+
 		priorityStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#94A3B8"))
 		if t.Priority == "high" {
 			priorityStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#F87171")).Bold(true)

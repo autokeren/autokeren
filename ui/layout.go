@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/autokeren/autokeren/ghost"
+	"github.com/autokeren/autokeren/ipc"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/autokeren/autokeren/ghost"
-	"github.com/autokeren/autokeren/ipc"
 )
 
 // SpinnerTickMsg adalah tick untuk animasi spinner
@@ -78,8 +78,6 @@ type PermissionConfirmReq struct {
 // PermissionAbortMsg dikirim saat user memilih abort (q) pada dialog izin
 type PermissionAbortMsg struct{}
 
-
-
 type ModelSelectorItem struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
@@ -103,21 +101,21 @@ var slashCommands = []SlashCommandInfo{
 }
 
 type MainModel struct {
-	Chat              ChatModel
-	Sidebar           SidebarModel
-	TextInput         textinput.Model
-	IPCClient         *ipc.Client
-	GhostMgr          *ghost.GhostManager
-	ProjectRoot       string
-	ConfigPath        string
-	InitOpts          map[string]interface{}
+	Chat        ChatModel
+	Sidebar     SidebarModel
+	TextInput   textinput.Model
+	IPCClient   *ipc.Client
+	GhostMgr    *ghost.GhostManager
+	ProjectRoot string
+	ConfigPath  string
+	InitOpts    map[string]interface{}
 
 	Width  int
 	Height int
 
-	AgentRunning      bool
-	PermissionReq     *PermissionConfirmReq
-	ActiveModelID     string
+	AgentRunning  bool
+	PermissionReq *PermissionConfirmReq
+	ActiveModelID string
 
 	Initialized       bool
 	InitError         string
@@ -127,9 +125,9 @@ type MainModel struct {
 	SelectorModels     []ModelSelectorItem
 	SelectedModelIndex int
 
-	ShowAutocomplete  bool
-	FilteredCmds      []SlashCommandInfo
-	SelectedCommand   int
+	ShowAutocomplete bool
+	FilteredCmds     []SlashCommandInfo
+	SelectedCommand  int
 
 	// Spinner state
 	SpinnerFrame int
@@ -137,8 +135,8 @@ type MainModel struct {
 	SpinnerPos   int // posisi bola saat ini
 
 	// Always-allow set: tool name yang sudah diizinkan selama sesi
-	AlwaysAllow    map[string]bool
-	AllowAllTools  bool // autonomous mode: semua tool diizinkan tanpa konfirmasi
+	AlwaysAllow   map[string]bool
+	AllowAllTools bool // autonomous mode: semua tool diizinkan tanpa konfirmasi
 
 	// Task aktif saat ini (ditampilkan di sidebar)
 	CurrentTask string
@@ -181,33 +179,33 @@ func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot,
 	kit.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FBBF24")).Bold(true)
 
 	return MainModel{
-		Chat:               NewChatModel(),
-		Sidebar:            NewSidebarModel(),
-		TextInput:          ti,
-		IPCClient:          client,
-		GhostMgr:           ghostMgr,
-		ProjectRoot:        projectRoot,
-		ConfigPath:         configPath,
-		InitOpts:           opts,
-		ActiveEditingFile:  "",
-		ShowModelSelector:  false,
-		SelectorModels:     []ModelSelectorItem{},
-		SelectedModelIndex: 0,
-		ShowAutocomplete:   false,
-		FilteredCmds:       []SlashCommandInfo{},
-		SelectedCommand:    0,
-		SpinnerFrame:       0,
-		SpinnerDir:         1,
-		SpinnerPos:         0,
-		AlwaysAllow:        make(map[string]bool),
-		CurrentTask:        "",
-		ShowKanban:         false,
-		KanbanTasks:        []KanbanTask{},
-		SelectedColumn:     0,
-		SelectedTaskIndex:  0,
-		KanbanAddingTask:   false,
-		KanbanInputTitle:   kit,
-		ShowDebate:         false,
+		Chat:                  NewChatModel(),
+		Sidebar:               NewSidebarModel(),
+		TextInput:             ti,
+		IPCClient:             client,
+		GhostMgr:              ghostMgr,
+		ProjectRoot:           projectRoot,
+		ConfigPath:            configPath,
+		InitOpts:              opts,
+		ActiveEditingFile:     "",
+		ShowModelSelector:     false,
+		SelectorModels:        []ModelSelectorItem{},
+		SelectedModelIndex:    0,
+		ShowAutocomplete:      false,
+		FilteredCmds:          []SlashCommandInfo{},
+		SelectedCommand:       0,
+		SpinnerFrame:          0,
+		SpinnerDir:            1,
+		SpinnerPos:            0,
+		AlwaysAllow:           make(map[string]bool),
+		CurrentTask:           "",
+		ShowKanban:            false,
+		KanbanTasks:           []KanbanTask{},
+		SelectedColumn:        0,
+		SelectedTaskIndex:     0,
+		KanbanAddingTask:      false,
+		KanbanInputTitle:      kit,
+		ShowDebate:            false,
 		SelectedDebateAgentID: 0,
 	}
 }
@@ -231,12 +229,12 @@ func (m MainModel) pollPeriodicCmd() tea.Cmd {
 	return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
 		var statusReply map[string]interface{}
 		_ = m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply)
-		
+
 		var ghostAgents []*ghost.GhostAgentInfo
 		if m.GhostMgr != nil {
 			ghostAgents = m.GhostMgr.List()
 		}
-		
+
 		return PeriodicTickMsg{
 			Status:      statusReply,
 			GhostAgents: ghostAgents,
@@ -246,12 +244,12 @@ func (m MainModel) pollPeriodicCmd() tea.Cmd {
 
 func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
-		
+
 		sidebarWidth := 30
 		if m.Width > 90 {
 			sidebarWidth = m.Width / 4
@@ -259,15 +257,15 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				sidebarWidth = 40
 			}
 		}
-		
+
 		m.Sidebar.Width = sidebarWidth
 		m.Sidebar.Height = m.Height
-		
+
 		chatWidth := m.Width - sidebarWidth
 		m.Chat.Resize(chatWidth, m.Height-4) // kurangi ruang untuk input box
-		
+
 		m.TextInput.Width = chatWidth - 6
-		
+
 	case SpinnerTickMsg:
 		m.SpinnerFrame++
 		// Bounce logic untuk bola gliding
@@ -282,17 +280,17 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ChunkMsg:
 		m.Chat.AppendMessage("assistant", msg.Text)
-		
+
 	case ModelStartMsg:
 		m.AgentRunning = true
 		// Tidak menambah pesan "berpikir..." — cukup spinner di UI
-		
+
 	case ModelEndMsg:
 		m.AgentRunning = false
 		m.CurrentTask = ""
 		m.Sidebar.CurrentTask = ""
 		m.Chat.UpdateViewport()
-		
+
 		// Update info token di sidebar jika ada
 		if msg.Usage != nil {
 			if total, ok := msg.Usage["total"].(float64); ok {
@@ -302,7 +300,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.ModelID != "" {
 			m.Sidebar.ModelName = msg.ModelID
 		}
-		
+
 	case ToolStartMsg:
 		if msg.Name == "write_file" || msg.Name == "patch_file" || msg.Name == "read_file" {
 			filePath, _ := msg.Args["path"].(string)
@@ -320,7 +318,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.Chat.AppendMessage("tool", fmt.Sprintf("⏺ %s", msg.Name))
 		}
-		
+
 	case ToolEndMsg:
 		ok := true
 		if val, exists := msg.Result["ok"]; exists {
@@ -342,7 +340,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Chat.AppendMessage("tool", fmt.Sprintf("✗ %s: %v", msg.Name, msg.Result["error"]))
 			}
 		}
-		
+
 	case ToolOutputMsg:
 		m.Chat.AppendMessage("tool", fmt.Sprintf("│ %s", msg.Line))
 
@@ -352,7 +350,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ErrorMsg:
 		m.InitError = msg.Message
 		m.Chat.AppendMessage("system", fmt.Sprintf("error: %s", msg.Message))
-		
+
 	case ModelsLoadedMsg:
 		m.SelectorModels = msg.Models
 		m.ShowModelSelector = true
@@ -728,8 +726,6 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-
-
 		// Jika dialog izin sedang aktif, tangani 4 opsi
 		if m.PermissionReq != nil {
 			switch msg.String() {
@@ -805,18 +801,18 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyCtrlQ:
 			m.IPCClient.Close()
 			return m, tea.Quit
-			
+
 		case tea.KeyEnter:
 			val := strings.TrimSpace(m.TextInput.Value())
 			if val == "" {
 				return m, nil
 			}
-			
+
 			if val == "/q" || val == "/quit" {
 				m.IPCClient.Close()
 				return m, tea.Quit
 			}
-			
+
 			m.TextInput.SetValue("")
 			m.Chat.AppendMessage("user", val)
 
@@ -826,7 +822,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.handleGhostCommand(args)
 				return m, nil
 			}
-			
+
 			if strings.HasPrefix(val, "/model") {
 				args := strings.TrimSpace(strings.TrimPrefix(val, "/model"))
 				if args == "" {
@@ -839,7 +835,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.switchModelCmd(args)
 				}
 			}
-			
+
 			if val == "/compact" {
 				m.AgentRunning = true
 				m.Chat.AppendMessage("system", "Mengompak context...")
@@ -855,7 +851,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}()
 				return m, nil
 			}
-			
+
 			if val == "/reset" {
 				m.AgentRunning = true
 				m.Chat.AppendMessage("system", "Mereset sesi percakapan...")
@@ -903,7 +899,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
-			
+
 			// ── Kirim perintah biasa secara asinkron ke background thread ──
 			m.AgentRunning = true
 			// Simpan ringkasan task di sidebar (maks 40 char)
@@ -923,11 +919,11 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.IPCClient.Close()
 				}
 			}(val)
-			
+
 			return m, nil
 		}
 	}
-	
+
 	// Forward scroll keys ke Chat.Viewport (pgup/pgdn/up/down saat tidak typing)
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		switch keyMsg.String() {
@@ -988,7 +984,7 @@ func (m MainModel) View() string {
 		sidebarView := m.Sidebar.View()
 		chatWidth := m.Width - m.Sidebar.Width
 		chatHeight := m.Height - 4
-		
+
 		chatStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#2A2A35")).
@@ -1020,7 +1016,7 @@ func (m MainModel) View() string {
 		sidebarView := m.Sidebar.View()
 		chatWidth := m.Width - m.Sidebar.Width
 		chatHeight := m.Height - 4
-		
+
 		chatStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#FF5252")).
@@ -1134,18 +1130,18 @@ func (m MainModel) View() string {
 			Padding(1, 3).
 			Width(panelWidth)
 
-		titleStyle  := lipgloss.NewStyle().Foreground(lipgloss.Color("#FBBF24")).Bold(true)
-		toolStyle   := lipgloss.NewStyle().Foreground(lipgloss.Color("#F8FAFC")).Bold(true)
-		descStyle   := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Italic(true)
-		divStyle    := lipgloss.NewStyle().Foreground(lipgloss.Color("#2D3748"))
-		keyStyle    := lipgloss.NewStyle().Foreground(lipgloss.Color("#FBBF24")).Bold(true)
-		keyBgStyle  := lipgloss.NewStyle().
+		titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FBBF24")).Bold(true)
+		toolStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F8FAFC")).Bold(true)
+		descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Italic(true)
+		divStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#2D3748"))
+		keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FBBF24")).Bold(true)
+		keyBgStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FBBF24")).
 			Background(lipgloss.Color("#1A1A2E")).
 			Bold(true).
 			Padding(0, 1)
-		labelStyle  := lipgloss.NewStyle().Foreground(lipgloss.Color("#94A3B8"))
-		autoStyle   := lipgloss.NewStyle().Foreground(lipgloss.Color("#A78BFA")).Bold(true)
+		labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#94A3B8"))
+		autoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#A78BFA")).Bold(true)
 
 		var pb strings.Builder
 		pb.WriteString(titleStyle.Render("⚠  permission required") + "\n")
@@ -1157,10 +1153,10 @@ func (m MainModel) View() string {
 		pb.WriteString("\n")
 		pb.WriteString(
 			keyBgStyle.Render("y") + labelStyle.Render(" once") + "   " +
-			keyBgStyle.Render("a") + labelStyle.Render(" this tool") + "   " +
-			keyBgStyle.Render("t") + autoStyle.Render(" all tools") + "   " +
-			keyStyle.Render("n") + labelStyle.Render(" deny") + "   " +
-			keyStyle.Render("q") + labelStyle.Render(" abort"),
+				keyBgStyle.Render("a") + labelStyle.Render(" this tool") + "   " +
+				keyBgStyle.Render("t") + autoStyle.Render(" all tools") + "   " +
+				keyStyle.Render("n") + labelStyle.Render(" deny") + "   " +
+				keyStyle.Render("q") + labelStyle.Render(" abort"),
 		)
 		permissionView = permStyle.Render(pb.String())
 	}
@@ -1420,12 +1416,12 @@ func parseStatusReply(statusReply map[string]interface{}, projectRoot string) St
 			}
 		}
 	}
-	
+
 	contextInfo, _ := statusReply["context_info"].(map[string]interface{})
 	contextUsed := 0
 	contextWindow := 262144
 	contextPct := 0.0
-	
+
 	if contextInfo != nil {
 		if u, ok := contextInfo["tokens"].(float64); ok {
 			contextUsed = int(u)

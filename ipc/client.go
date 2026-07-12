@@ -47,11 +47,11 @@ type Client struct {
 	stdin     io.WriteCloser
 	stdout    io.ReadCloser
 	callbacks *IPCCallbacks
-	
+
 	pending     map[int64]chan *JSONRPCMessage
 	pendingLock sync.Mutex
 	nextID      int64
-	
+
 	isClosed int32
 }
 
@@ -148,6 +148,7 @@ func (c *Client) Close() {
 		if c.cmd != nil && c.cmd.Process != nil {
 			c.cmd.Process.Kill()
 		}
+		GetBrowserManager().Close()
 	}
 }
 
@@ -157,62 +158,62 @@ func (c *Client) send(msg *JSONRPCMessage) error {
 		return err
 	}
 	data = append(data, '\n')
-	
+
 	c.pendingLock.Lock()
 	defer c.pendingLock.Unlock()
-	
+
 	if atomic.LoadInt32(&c.isClosed) == 1 {
 		return errors.New("ipc client closed")
 	}
-	
+
 	_, err = c.stdin.Write(data)
 	return err
 }
 
 func (c *Client) Call(method string, params interface{}, reply interface{}) error {
 	id := atomic.AddInt64(&c.nextID, 1)
-	
+
 	rawParams, err := json.Marshal(params)
 	if err != nil {
 		return err
 	}
-	
+
 	ch := make(chan *JSONRPCMessage, 1)
 	c.pendingLock.Lock()
 	c.pending[id] = ch
 	c.pendingLock.Unlock()
-	
+
 	defer func() {
 		c.pendingLock.Lock()
 		delete(c.pending, id)
 		c.pendingLock.Unlock()
 	}()
-	
+
 	msg := &JSONRPCMessage{
 		JSONRPC: "2.0",
 		Method:  method,
 		Params:  rawParams,
 		ID:      id,
 	}
-	
+
 	if err := c.send(msg); err != nil {
 		return err
 	}
-	
+
 	// Tunggu response
 	resp := <-ch
 	if resp == nil {
 		return errors.New("daemon process exited or disconnected")
 	}
-	
+
 	if resp.Error != nil {
 		return fmt.Errorf("daemon error (%d): %s", resp.Error.Code, resp.Error.Message)
 	}
-	
+
 	if reply != nil && len(resp.Result) > 0 {
 		return json.Unmarshal(resp.Result, reply)
 	}
-	
+
 	return nil
 }
 
@@ -220,7 +221,7 @@ func (c *Client) handleNotification(msg *JSONRPCMessage) {
 	if c.callbacks == nil {
 		return
 	}
-	
+
 	switch msg.Method {
 	case "ui.on_model_start":
 		if c.callbacks.OnModelStart != nil {
@@ -307,14 +308,42 @@ func (c *Client) handleRequest(msg *JSONRPCMessage) {
 			Description string                 `json:"description"`
 			Arguments   map[string]interface{} `json:"arguments"`
 		}
-		
+
 		allowed := false
 		if err := json.Unmarshal(msg.Params, &p); err == nil && c.callbacks != nil && c.callbacks.ConfirmPermission != nil {
 			allowed = c.callbacks.ConfirmPermission(p.ToolName, p.Description, p.Arguments)
 		}
-		
+
 		// Kirim balik hasil konfirmasi sebagai response
 		resBytes, _ := json.Marshal(allowed)
+		resp := &JSONRPCMessage{
+			JSONRPC: "2.0",
+			Result:  resBytes,
+			ID:      msg.ID,
+		}
+		c.send(resp)
+	} else if msg.Method == "ui.control_browser" {
+		var p struct {
+			Action string                 `json:"action"`
+			Args   map[string]interface{} `json:"args"`
+		}
+
+		var result interface{}
+		var err error
+		if err = json.Unmarshal(msg.Params, &p); err == nil {
+			bm := GetBrowserManager()
+			result, err = bm.Execute(p.Action, p.Args)
+		}
+
+		respMap := map[string]interface{}{
+			"ok":     err == nil,
+			"output": result,
+		}
+		if err != nil {
+			respMap["error"] = err.Error()
+		}
+
+		resBytes, _ := json.Marshal(respMap)
 		resp := &JSONRPCMessage{
 			JSONRPC: "2.0",
 			Result:  resBytes,
@@ -330,13 +359,13 @@ func (c *Client) listen() {
 	const maxCapacity = 64 * 1024 * 1024
 	buf := make([]byte, 0, 64*1024)
 	scanner.Buffer(buf, maxCapacity)
-	
+
 	for scanner.Scan() {
 		data := scanner.Bytes()
 		if len(data) == 0 {
 			continue
 		}
-		
+
 		var msg JSONRPCMessage
 		if err := json.Unmarshal(data, &msg); err != nil {
 			if c.callbacks != nil && c.callbacks.OnError != nil {
@@ -344,19 +373,19 @@ func (c *Client) listen() {
 			}
 			continue
 		}
-		
+
 		// Kasus 1: Notifikasi (method terisi, id kosong)
 		if msg.Method != "" && msg.ID == nil {
 			c.handleNotification(&msg)
 			continue
 		}
-		
+
 		// Kasus 2: Request masuk (method terisi, id terisi)
 		if msg.Method != "" && msg.ID != nil {
 			c.handleRequest(&msg)
 			continue
 		}
-		
+
 		// Kasus 3: Response atas request (id terisi, method kosong)
 		if msg.ID != nil {
 			var numericID int64
@@ -366,17 +395,17 @@ func (c *Client) listen() {
 			} else if i, ok := msg.ID.(int64); ok {
 				numericID = i
 			}
-			
+
 			c.pendingLock.Lock()
 			ch, ok := c.pending[numericID]
 			c.pendingLock.Unlock()
-			
+
 			if ok {
 				ch <- &msg
 			}
 		}
 	}
-	
+
 	// Jika scanner selesai (daemon keluar)
 	c.pendingLock.Lock()
 	for _, ch := range c.pending {
@@ -384,6 +413,6 @@ func (c *Client) listen() {
 	}
 	c.pending = make(map[int64]chan *JSONRPCMessage)
 	c.pendingLock.Unlock()
-	
+
 	c.Close()
 }

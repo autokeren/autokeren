@@ -64,13 +64,13 @@ func renderToolLine(content string) string {
 	}
 
 	var sb strings.Builder
-	dimStyle   := lipgloss.NewStyle().Foreground(lipgloss.Color("#4B5563"))
+	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#4B5563"))
 	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280"))
-	pathStyle  := lipgloss.NewStyle().Foreground(lipgloss.Color("#9CA3AF")).Italic(true)
-	okStyle    := lipgloss.NewStyle().Foreground(lipgloss.Color("#34D399")).Bold(true)
-	errStyle   := lipgloss.NewStyle().Foreground(lipgloss.Color("#F87171")).Bold(true)
-	infoStyle  := lipgloss.NewStyle().Foreground(lipgloss.Color("#60A5FA"))
-	pipeStyle  := lipgloss.NewStyle().Foreground(lipgloss.Color("#374151"))
+	pathStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9CA3AF")).Italic(true)
+	okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#34D399")).Bold(true)
+	errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F87171")).Bold(true)
+	infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#60A5FA"))
+	pipeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#374151"))
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)

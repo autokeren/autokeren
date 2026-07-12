@@ -356,6 +356,19 @@ class JSONRPCDaemon:
                 }
             )
 
+            # Sambungkan callback browser Go-Rod ke tool camofox
+            camofox_tool = reg.get("camofox")
+            if camofox_tool and hasattr(camofox_tool, "set_rpc_callback"):
+                camofox_tool.set_rpc_callback(
+                    lambda action, args: self.send_request(
+                        "ui.control_browser",
+                        {
+                            "action": action,
+                            "args": args
+                        }
+                    )
+                )
+
             # Start background system observer daemon (Fase 3 AGI)
             def init_and_run_observer() -> None:
                 try:

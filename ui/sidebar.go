@@ -63,8 +63,6 @@ func (m SidebarModel) View() string {
 		barInnerW = 3
 	}
 
-
-
 	labelStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#374151"))
 
@@ -133,8 +131,8 @@ func (m SidebarModel) View() string {
 			pctStyle = warnStyle
 		}
 		sb.WriteString(
-			dimStyle.Render(fmt.Sprintf("%s/%s", humanTokens(m.ContextUsed), humanTokens(m.ContextWindow)))+
-				"  "+pctStyle.Render(fmt.Sprintf("%.0f%%", m.ContextPct))+"\n",
+			dimStyle.Render(fmt.Sprintf("%s/%s", humanTokens(m.ContextUsed), humanTokens(m.ContextWindow))) +
+				"  " + pctStyle.Render(fmt.Sprintf("%.0f%%", m.ContextPct)) + "\n",
 		)
 	} else {
 		sb.WriteString(dimStyle.Render("—") + "\n")
@@ -158,7 +156,7 @@ func (m SidebarModel) View() string {
 			barColor = "#FBBF24"
 		}
 		barFill := lipgloss.NewStyle().Foreground(lipgloss.Color(barColor))
-		barBg   := lipgloss.NewStyle().Foreground(lipgloss.Color("#1E2433"))
+		barBg := lipgloss.NewStyle().Foreground(lipgloss.Color("#1E2433"))
 		sb.WriteString(barFill.Render(strings.Repeat("▪", filled)) +
 			barBg.Render(strings.Repeat("▪", unfilled)) + "\n\n")
 	} else {
@@ -180,13 +178,17 @@ func (m SidebarModel) View() string {
 			nPctStyle = warnStyle
 		}
 		sb.WriteString(
-			dimStyle.Render(fmt.Sprintf("pakai: %s | sisa: %s (limit %s)", humanTokens(used), humanTokens(m.NeuronsRemaining), humanTokens(m.NeuronsQuota)))+"\n",
+			dimStyle.Render(fmt.Sprintf("pakai: %s | sisa: %s (limit %s)", humanTokens(used), humanTokens(m.NeuronsRemaining), humanTokens(m.NeuronsQuota))) + "\n",
 		)
 		// Neuron progress bar
 		if barInnerW > 3 {
 			nFilled := int(float64(barInnerW) * pct / 100.0)
-			if nFilled < 0 { nFilled = 0 }
-			if nFilled > barInnerW { nFilled = barInnerW }
+			if nFilled < 0 {
+				nFilled = 0
+			}
+			if nFilled > barInnerW {
+				nFilled = barInnerW
+			}
 			nUnfilled := barInnerW - nFilled
 			nBarColor := "#34D399"
 			if pct >= 90.0 {
@@ -195,7 +197,7 @@ func (m SidebarModel) View() string {
 				nBarColor = "#FBBF24"
 			}
 			nFillStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(nBarColor))
-			nBgStyle   := lipgloss.NewStyle().Foreground(lipgloss.Color("#1E2433"))
+			nBgStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#1E2433"))
 			sb.WriteString(nFillStyle.Render(strings.Repeat("▪", nFilled)) +
 				nBgStyle.Render(strings.Repeat("▪", nUnfilled)) + "  " +
 				nPctStyle.Render(fmt.Sprintf("%.0f%%", pct)) + "\n\n")

@@ -105,7 +105,7 @@ func (gm *GhostManager) CheckStatus(agentID int) string {
 	sessionName := fmt.Sprintf("%s-%d", gm.Prefix, agentID)
 	cmd := exec.Command("tmux", "has-session", "-t", sessionName)
 	err := cmd.Run()
-	
+
 	// Jika tmux has-session mengembalikan error (exit code != 0), session tmux sudah mati
 	if err != nil {
 		info.Status = "completed"
