@@ -116,6 +116,11 @@ var slashCommands = []SlashCommandInfo{
 	{Name: "/save", Description: "Simpan sesi percakapan aktif ke disk"},
 	{Name: "/resume", Description: "Lanjutkan sesi percakapan yang disimpan"},
 	{Name: "/sessions", Description: "Tampilkan semua sesi percakapan yang disimpan"},
+	{Name: "/help", Description: "Tampilkan bantuan perintah slash"},
+	{Name: "/mcp", Description: "Kelola MCP server aktif (list/show/add)"},
+	{Name: "/config", Description: "Lihat/ubah konfigurasi aktif"},
+	{Name: "/local", Description: "Set/lihat local LLM endpoint (Ollama)"},
+	{Name: "/approval", Description: "Set approval mode untuk tool"},
 	{Name: "/q", Description: "Keluar dari autokeren"},
 }
 

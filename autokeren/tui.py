@@ -1321,7 +1321,8 @@ class AutokerenTUI(App):
         commands = [
             "/help", "/reset", "/compact", "/permissions", "/memory",
             "/model", "/lang", "/export", "/mcp", "/save", "/resume", "/sessions", "/q", "/quit",
-            "/project", "/tdd", "/copy",
+            "/project", "/tdd", "/copy", "/debug", "/spec", "/ghost", "/research", "/deploy",
+            "/config", "/local", "/approval",
         ]
         suggester = SuggestFromList(commands, case_sensitive=False)
         yield Horizontal(
@@ -1707,19 +1708,44 @@ class AutokerenTUI(App):
             f"  - [bold]Ctrl+C[/bold]: {self.t('ctrlc_desc')}\n"
             f"  - [bold]Ctrl+Q[/bold]: {self.t('ctrlq_desc')}\n\n"
             f"{self.t('slash_commands_label')}\n"
-            "  - [bold]/model <name>[/bold]  : Switch model\n"
-            "  - [bold]/lang <code2>[/bold]  : Switch TUI language\n"
-            "  - [bold]/export [file][/bold]  : Export chat to Markdown file\n"
-            "  - [bold]/copy [last|N][/bold]  : Copy message to clipboard (last or by index)\n"
-            "  - [bold]/compact[/bold]       : Compact context history\n"
-            "  - [bold]/reset[/bold]         : Reset conversation session\n"
-            "  - [bold]/permissions[/bold]   : Check allowed tools\n"
-            "  - [bold]/memory[/bold]        : Display project memory\n"
-            "  - [bold]/sessions[/bold]      : List saved sessions\n"
-            "  - [bold]/save <name>[/bold]    : Save current session\n"
-            "  - [bold]/resume <id>[/bold]    : Resume saved session\n"
-            "  - [bold]/project <sub>[/bold]  : Multi-agent project management\n"
-            "  - [bold]/q[/bold]              : Quit autokeren"
+            "[bold cyan]── Model & Bahasa ──[/bold cyan]\n"
+            "  [bold]/model [name][/bold]         : Pilih/switch model AI\n"
+            "  [bold]/lang [code][/bold]           : Switch bahasa TUI (id/en/zh/ja/de/ar/pt/es)\n\n"
+            "[bold cyan]── MCP & Tools ──[/bold cyan]\n"
+            "  [bold]/mcp[/bold]                   : Kelola MCP servers (tambah, lihat tools)\n\n"
+            "[bold cyan]── Config & Settings ──[/bold cyan]\n"
+            "  [bold]/config[/bold]                : Lihat semua setting aktif\n"
+            "  [bold]/config git-commit on|off[/bold] : Toggle auto git commit\n"
+            "  [bold]/config cf-verify on|off[/bold]   : Toggle auto verify setelah deploy\n"
+            "  [bold]/local [url][/bold]            : Set/lihat local LLM endpoint (Ollama dll)\n"
+            "  [bold]/approval on|off|ask[/bold]   : Set approval mode untuk tool eksekusi\n\n"
+            "[bold cyan]── Session & Memory ──[/bold cyan]\n"
+            "  [bold]/memory[/bold]                : Tampilkan project memory\n"
+            "  [bold]/sessions[/bold]              : List semua saved sessions\n"
+            "  [bold]/save [name][/bold]            : Simpan session saat ini\n"
+            "  [bold]/resume <id|name>[/bold]       : Resume session yang disimpan\n"
+            "  [bold]/reset[/bold]                 : Reset percakapan\n"
+            "  [bold]/compact[/bold]               : Kompres context history\n\n"
+            "[bold cyan]── Dev Workflow ──[/bold cyan]\n"
+            "  [bold]/tdd <file> | <desc>[/bold]   : Jalankan TDD workflow\n"
+            "  [bold]/spec <request>[/bold]         : Mulai spec interview → plan.md\n"
+            "  [bold]/spec answer <text>[/bold]     : Jawab pertanyaan spec interview\n"
+            "  [bold]/spec generate[/bold]          : Generate plan dari interview\n"
+            "  [bold]/spec show|progress[/bold]     : Lihat plan / progress\n"
+            "  [bold]/deploy <deskripsi>[/bold]     : Deploy app ke Cloudflare\n"
+            "  [bold]/debug[/bold]                 : Toggle debug mode\n\n"
+            "[bold cyan]── Ghost Agent & Research ──[/bold cyan]\n"
+            "  [bold]/ghost <task>[/bold]           : Spawn ghost agent di background\n"
+            "  [bold]/ghost list[/bold]             : Lihat semua ghost agents\n"
+            "  [bold]/ghost show <id>[/bold]        : Lihat output ghost agent\n"
+            "  [bold]/ghost kill <id>|all[/bold]    : Kill ghost agent\n"
+            "  [bold]/research <query>[/bold]       : Research via web/reddit/HN\n\n"
+            "[bold cyan]── Output ──[/bold cyan]\n"
+            "  [bold]/export [file][/bold]          : Export chat ke Markdown\n"
+            "  [bold]/copy [last|N][/bold]          : Copy pesan ke clipboard\n"
+            "  [bold]/permissions[/bold]            : Cek tool permissions aktif\n"
+            "  [bold]/project <sub>[/bold]          : Multi-agent project manager\n"
+            "  [bold]/q[/bold]                      : Quit autokeren"
         )
         self.append_chat_message("system", help_text)
 
@@ -1954,7 +1980,13 @@ class AutokerenTUI(App):
                     self.append_chat_message("system", f"[red]Language code '{arg}' not supported. Available: {', '.join(LANGUAGES.keys())}[/red]")
         elif cmd == "/mcp":
             from autokeren.cli import _mcp_clients
-            await self.push_screen(MCPManageScreen(_mcp_clients))
+            if arg:
+                from autokeren.commands import handle_slash_command_sync
+                res = handle_slash_command_sync(f"/mcp {arg}", self.agent, self.cfg, _mcp_clients, lambda val: setattr(self, "allow_all", val))
+                if res:
+                    self.append_chat_message("system", res)
+            else:
+                await self.push_screen(MCPManageScreen(_mcp_clients))
         elif cmd == "/save":
             name = arg or f"session-{len(self.agent.sessions.list()) + 1}"
             try:
@@ -2174,8 +2206,35 @@ class AutokerenTUI(App):
                 input_pane = self.query_one("#input-pane", Input)
                 input_pane.disabled = True
                 self.run_worker(lambda: self._run_deploy(deploy_prompt), thread=True)
+        elif cmd == "/config":
+            await self._handle_config_cmd(arg)
+        elif cmd == "/local":
+            await self._handle_local_cmd(arg)
+        elif cmd == "/approval":
+            await self._handle_approval_cmd(arg)
         else:
             self.append_chat_message("system", self.t("unknown_cmd", cmd=cmd))
+
+    async def _handle_config_cmd(self, arg: str) -> None:
+        from autokeren.commands import handle_slash_command_sync
+        from autokeren.cli import _mcp_clients
+        res = handle_slash_command_sync(f"/config {arg}", self.agent, self.cfg, _mcp_clients, lambda val: setattr(self, "allow_all", val))
+        if res:
+            self.append_chat_message("system", res)
+
+    async def _handle_local_cmd(self, arg: str) -> None:
+        from autokeren.commands import handle_slash_command_sync
+        from autokeren.cli import _mcp_clients
+        res = handle_slash_command_sync(f"/local {arg}", self.agent, self.cfg, _mcp_clients, lambda val: setattr(self, "allow_all", val))
+        if res:
+            self.append_chat_message("system", res)
+
+    async def _handle_approval_cmd(self, arg: str) -> None:
+        from autokeren.commands import handle_slash_command_sync
+        from autokeren.cli import _mcp_clients
+        res = handle_slash_command_sync(f"/approval {arg}", self.agent, self.cfg, _mcp_clients, lambda val: setattr(self, "allow_all", val))
+        if res:
+            self.append_chat_message("system", res)
 
     async def _handle_project_cmd(self, arg: str) -> None:
         """Handler untuk semua sub-command /project."""

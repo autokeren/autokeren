@@ -131,6 +131,7 @@ class JSONRPCDaemon:
         self.next_client_req_id = 1000
         self.observer: SystemObserver | None = None
         self._diagnosing = False
+        self.allow_all = False
         
         self.port = port
         self.reader: Any = None
@@ -369,7 +370,7 @@ class JSONRPCDaemon:
             )
 
             # Sambungkan callback izin interaktif ke client Go
-            self.agent.permission_callback = lambda name, desc, args: self.send_request(
+            self.agent.permission_callback = lambda name, desc, args: True if self.allow_all else self.send_request(
                 "ui.confirm_permission",
                 {
                     "tool_name": name,
@@ -410,6 +411,28 @@ class JSONRPCDaemon:
             return
         try:
             user_input = params.get("user_input", "")
+            # Intercept slash commands
+            parts = user_input.strip().split(" ", 1)
+            cmd = parts[0].lower()
+            if cmd in ("/config", "/local", "/approval", "/mcp", "/help"):
+                from autokeren.commands import handle_slash_command_sync
+                from autokeren.cli import _mcp_clients
+
+                def _set_allow_all(val: bool) -> None:
+                    self.allow_all = val
+
+                res = handle_slash_command_sync(user_input, self.agent, self.agent.cfg, _mcp_clients, _set_allow_all)
+                if res is not None:
+                    self.send_response(
+                        req_id,
+                        result={
+                            "content": res,
+                            "model_id": "system",
+                            "usage": None
+                        }
+                    )
+                    return
+
             resp = self.agent.run(user_input)
             self.send_response(
                 req_id,

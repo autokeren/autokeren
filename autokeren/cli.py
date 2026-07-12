@@ -178,7 +178,18 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
         if user_input in ("/quit", "/q"):
             break
         if user_input == "/help":
-            console.print("Perintah: /q /status /model /compact /deploy /rewind /genome /loop /review /security /spec /ghost /research /reset /debug /memory /permissions /save /resume /sessions /diagram")
+            from autokeren.commands import handle_slash_command_sync
+            sync_res = handle_slash_command_sync("/help", agent, cfg, _mcp_clients, lambda val: setattr(ui, "_allow_all", val))
+            if sync_res:
+                console.print(sync_res)
+            continue
+        parts = user_input.strip().split(" ", 1)
+        cmd = parts[0].lower()
+        if cmd in ("/config", "/local", "/approval", "/mcp"):
+            from autokeren.commands import handle_slash_command_sync
+            sync_res = handle_slash_command_sync(user_input, agent, cfg, _mcp_clients, lambda val: setattr(ui, "_allow_all", val))
+            if sync_res:
+                console.print(sync_res)
             continue
         if user_input == "/model" or user_input.startswith("/model "):
             arg = user_input[6:].strip()
