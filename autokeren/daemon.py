@@ -137,8 +137,9 @@ class JSONRPCDaemon:
             "method": method,
             "params": params
         }
-        sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
-        sys.stdout.flush()
+        with self.lock:
+            sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
+            sys.stdout.flush()
 
     def send_request(self, method: str, params: dict[str, Any]) -> Any:
         """Kirim request ke client Go (misal konfirmasi izin) dan tunggu respon."""
@@ -148,14 +149,14 @@ class JSONRPCDaemon:
             evt = threading.Event()
             self.pending_requests[req_id] = evt
 
-        payload = {
-            "jsonrpc": "2.0",
-            "method": method,
-            "params": params,
-            "id": req_id
-        }
-        sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
-        sys.stdout.flush()
+            payload = {
+                "jsonrpc": "2.0",
+                "method": method,
+                "params": params,
+                "id": req_id
+            }
+            sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
+            sys.stdout.flush()
 
         # Tunggu sampai client mengirimkan response balik ke stdin
         evt.wait()
@@ -181,8 +182,9 @@ class JSONRPCDaemon:
         else:
             payload["result"] = result
 
-        sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
-        sys.stdout.flush()
+        with self.lock:
+            sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
+            sys.stdout.flush()
 
     def trigger_auto_diagnose(self, issue: str, context: str) -> None:
         """Picu diagnosa mandiri background jika terjadi anomali sistem (RAG/Self-Healing)."""
@@ -238,23 +240,23 @@ class JSONRPCDaemon:
         elif method == "agent.interrupt":
             self.handle_agent_interrupt(req_id)
         elif method == "agent.compact":
-            self.handle_agent_compact(req_id)
+            threading.Thread(target=self.handle_agent_compact, args=(req_id,), daemon=True).start()
         elif method == "agent.status":
-            self.handle_agent_status(req_id)
+            threading.Thread(target=self.handle_agent_status, args=(req_id,), daemon=True).start()
         elif method == "agent.reset":
-            self.handle_agent_reset(req_id)
+            threading.Thread(target=self.handle_agent_reset, args=(req_id,), daemon=True).start()
         elif method == "agent.switch_model":
-            self.handle_agent_switch_model(req_id, params)
+            threading.Thread(target=self.handle_agent_switch_model, args=(req_id, params), daemon=True).start()
         elif method == "agent.list_models":
-            self.handle_agent_list_models(req_id)
+            threading.Thread(target=self.handle_agent_list_models, args=(req_id,), daemon=True).start()
         elif method == "kanban.list":
-            self.handle_kanban_list(req_id)
+            threading.Thread(target=self.handle_kanban_list, args=(req_id,), daemon=True).start()
         elif method == "kanban.add":
-            self.handle_kanban_add(req_id, params)
+            threading.Thread(target=self.handle_kanban_add, args=(req_id, params), daemon=True).start()
         elif method == "kanban.move":
-            self.handle_kanban_move(req_id, params)
+            threading.Thread(target=self.handle_kanban_move, args=(req_id, params), daemon=True).start()
         elif method == "kanban.delete":
-            self.handle_kanban_delete(req_id, params)
+            threading.Thread(target=self.handle_kanban_delete, args=(req_id, params), daemon=True).start()
         else:
             self.send_response(
                 req_id,
