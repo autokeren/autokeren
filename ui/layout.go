@@ -172,6 +172,11 @@ type MainModel struct {
 	KanbanAddingTask  bool
 	KanbanInputTitle  textinput.Model
 
+	McpAddingServer      bool
+	McpInputName         textinput.Model
+	McpInputCmd          textinput.Model
+	McpInputActiveField  int // 0 = Name, 1 = Command
+
 	ShowDebate            bool
 	SelectedDebateAgentID int
 }
@@ -231,6 +236,24 @@ func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot,
 		KanbanInputTitle:      kit,
 		ShowDebate:            false,
 		SelectedDebateAgentID: 0,
+		McpAddingServer:       false,
+		McpInputName: func() textinput.Model {
+			ti := textinput.New()
+			ti.Placeholder = "misal: filesystem"
+			ti.CharLimit = 100
+			ti.Width = 30
+			ti.Prompt = " "
+			return ti
+		}(),
+		McpInputCmd: func() textinput.Model {
+			ti := textinput.New()
+			ti.Placeholder = "npx -y @modelcontextprotocol/server-filesystem /tmp"
+			ti.CharLimit = 1000
+			ti.Width = 60
+			ti.Prompt = " "
+			return ti
+		}(),
+		McpInputActiveField: 0,
 	}
 }
 
@@ -552,6 +575,69 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.PermissionReq = &msg
 
 	case tea.KeyMsg:
+		if m.McpAddingServer {
+			switch msg.String() {
+			case "esc":
+				m.McpAddingServer = false
+				m.McpInputName.SetValue("")
+				m.McpInputCmd.SetValue("")
+				m.McpInputActiveField = 0
+				m.TextInput.Focus()
+				return m, nil
+			case "tab", "up", "down":
+				if m.McpInputActiveField == 0 {
+					m.McpInputActiveField = 1
+					m.McpInputCmd.Focus()
+					m.McpInputName.Blur()
+				} else {
+					m.McpInputActiveField = 0
+					m.McpInputName.Focus()
+					m.McpInputCmd.Blur()
+				}
+				return m, nil
+			case "enter":
+				if m.McpInputActiveField == 0 {
+					m.McpInputActiveField = 1
+					m.McpInputCmd.Focus()
+					m.McpInputName.Blur()
+					return m, nil
+				} else {
+					name := strings.TrimSpace(m.McpInputName.Value())
+					cmdRaw := strings.TrimSpace(m.McpInputCmd.Value())
+					if name != "" && cmdRaw != "" {
+						m.McpAddingServer = false
+						m.McpInputName.SetValue("")
+						m.McpInputCmd.SetValue("")
+						m.McpInputActiveField = 0
+						m.TextInput.Focus()
+
+						// Kirim ke daemon untuk dijalankan
+						m.AgentRunning = true
+						m.CurrentTask = "Menambahkan MCP server..."
+						m.Sidebar.CurrentTask = "Menambahkan MCP server..."
+						runCmd := func() tea.Msg {
+							runParams := map[string]interface{}{
+								"user_input": fmt.Sprintf("/mcp add %s %s", name, cmdRaw),
+							}
+							var reply map[string]interface{}
+							err := m.IPCClient.Call("agent.run", runParams, &reply)
+							return ActionFinishedMsg{Action: "run", Reply: reply, Err: err}
+						}
+						return m, runCmd
+					}
+				}
+				return m, nil
+			default:
+				var cmd tea.Cmd
+				if m.McpInputActiveField == 0 {
+					m.McpInputName, cmd = m.McpInputName.Update(msg)
+				} else {
+					m.McpInputCmd, cmd = m.McpInputCmd.Update(msg)
+				}
+				return m, cmd
+			}
+		}
+
 		if m.ShowDebate {
 			switch msg.String() {
 			case "tab", "esc", "ctrl+d":
@@ -958,6 +1044,16 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Chat.AppendMessage("user", val)
 
 			// ── Penanganan Slash Commands Secara Native ────────────────────
+			if val == "/mcp add" {
+				m.McpAddingServer = true
+				m.McpInputName.SetValue("")
+				m.McpInputCmd.SetValue("")
+				m.McpInputActiveField = 0
+				m.McpInputName.Focus()
+				m.McpInputCmd.Blur()
+				return m, nil
+			}
+
 			if strings.HasPrefix(val, "/ghost") {
 				args := strings.TrimSpace(strings.TrimPrefix(val, "/ghost"))
 				m.handleGhostCommand(args)
@@ -1422,6 +1518,14 @@ func (m MainModel) View() string {
 			autocompleteView,
 			inputView,
 		)
+	case m.McpAddingServer:
+		mcpDialogView := renderMcpAddDialog(m.McpInputName, m.McpInputCmd, m.McpInputActiveField, panelWidth)
+		rightPanel = lipgloss.JoinVertical(
+			lipgloss.Left,
+			chatView,
+			mcpDialogView,
+			inputView,
+		)
 	default:
 		rightPanel = lipgloss.JoinVertical(
 			lipgloss.Left,
@@ -1724,4 +1828,31 @@ func (m MainModel) getSelectedTask() (KanbanTask, bool) {
 		return KanbanTask{}, false
 	}
 	return colTasks[m.SelectedTaskIndex], true
+}
+
+func renderMcpAddDialog(nameInput, cmdInput textinput.Model, activeField int, width int) string {
+	dialogStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#10B981")).
+		Padding(1, 2).
+		Width(width)
+
+	titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981")).Bold(true)
+	activeLabelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981")).Bold(true)
+
+	nameLabel := "  Nama Server:      "
+	cmdLabel := "  Perintah/Command: "
+	if activeField == 0 {
+		nameLabel = activeLabelStyle.Render("▸ Nama Server:      ")
+	} else {
+		cmdLabel = activeLabelStyle.Render("▸ Perintah/Command: ")
+	}
+
+	var sb strings.Builder
+	sb.WriteString(titleStyle.Render("⚡ TAMBAH MCP SERVER BARU") + "\n\n")
+	sb.WriteString(nameLabel + nameInput.View() + "\n")
+	sb.WriteString(cmdLabel + cmdInput.View() + "\n\n")
+	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render("Tab/Up/Down: Pindah field · Enter: Lanjut/Simpan · Esc: Batal"))
+
+	return dialogStyle.Render(sb.String())
 }
