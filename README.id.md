@@ -300,6 +300,14 @@ Dapat diketik langsung di kotak input chat (mendukung *autocomplete* otomatis me
 | `/export [nama]` | Ekspor percakapan ke file Markdown (default: auto-timestamp) |
 | `/copy [last\|N]` | Salin pesan ke clipboard (`last` = pesan terakhir, `N` = indeks pesan) |
 | `/mcp` | Membuka manager interaktif MCP Server |
+| `/mcp list` | Daftar MCP server aktif |
+| `/mcp show <nama>` | Tampilkan tools dari suatu MCP server |
+| `/mcp add <nama> <cmd>` | Tambah dan aktifkan MCP server baru |
+| `/config` | Tampilkan konfigurasi aktif |
+| `/config git-commit on\|off` | Aktifkan/nonaktifkan auto git commit |
+| `/config cf-verify on\|off` | Aktifkan/nonaktifkan auto verify setelah deploy |
+| `/local [url]` | Set/tampilkan local LLM endpoint (Ollama) |
+| `/approval on\|off\|ask` | Set mode persetujuan eksekusi tool |
 | `/project <subcommand>`| Manajemen project Multi-Agent |
 | `/compact` | Ringkas history percakapan |
 | `/reset` | Reset sesi percakapan saat ini |

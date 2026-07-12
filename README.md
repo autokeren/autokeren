@@ -288,6 +288,14 @@ Enter slash commands directly into the chat input box (Tab autocomplete is suppo
 | `/export [name]` | Export conversation to a Markdown file |
 | `/copy [last\|N]` | Copy a specific message to the clipboard |
 | `/mcp` | Open the interactive Model Context Protocol (MCP) server manager |
+| `/mcp list` | List active MCP servers |
+| `/mcp show <name>` | Show tools from a specific MCP server |
+| `/mcp add <name> <cmd>` | Add and start a new MCP server |
+| `/config` | View active settings configurations |
+| `/config git-commit on\|off` | Toggle automatic git commits |
+| `/config cf-verify on\|off` | Toggle auto visual verify after deployment |
+| `/local [url]` | Set/view local LLM endpoint (Ollama) |
+| `/approval on\|off\|ask` | Set tool execution approval mode |
 | `/project <subcommand>`| Multi-agent project management command |
 | `/compact` | Compact conversation history |
 | `/reset` | Reset the active session |
