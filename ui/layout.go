@@ -1582,7 +1582,7 @@ func parseStatusReply(statusReply map[string]interface{}, projectRoot string) St
 	if version == "" {
 		version = os.Getenv("AUTOKEREN_VERSION")
 		if version == "" {
-			version = "v0.11.39" // fallback
+			version = "v0.11.40" // fallback
 		} else if !strings.HasPrefix(version, "v") {
 			version = "v" + version
 		}
