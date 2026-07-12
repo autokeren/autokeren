@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.43] - 2026-07-13
+
+### Changed
+- fix(go-tui): fix slash commands (/mcp, /config, /local, /approval, /help) in Go TUI
+
 ## [0.11.42] - 2026-07-12
 
 ### Changed
