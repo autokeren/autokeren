@@ -12,6 +12,7 @@ from autokeren.tools.research import ResearchTool
 from autokeren.tools.review import ReviewTool
 from autokeren.tools.rewind import RewindTool
 from autokeren.tools.search import SearchCodeTool
+from autokeren.tools.repo_map import RepoMapTool
 from autokeren.tools.shell import ShellTool
 from autokeren.tools.spawn_agent import SpawnAgentTool
 from autokeren.tools.check_agent import CheckAgentTool
@@ -25,6 +26,7 @@ __all__ = [
     "Tool",
     "ToolRegistry",
     "ToolResult",
+    "RepoMapTool",
     "CollaborateTool",
     "ReadFileTool",
     "WriteFileTool",

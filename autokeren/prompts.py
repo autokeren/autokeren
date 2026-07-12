@@ -99,17 +99,19 @@ R2 API:
 - env.STORAGE.put(key, data) — upload file
 - env.STORAGE.get(key) — download file
 
-Design guidelines (PENTING buat UX):
-- Generated app HARUS responsive, modern, dan clean. Bukan HTML basic.
-- Gunakan CSS inline yang quality-nya setara Tailwind. Include: grid/flexbox, smooth transitions, hover effects, shadow, rounded corners.
-- Color scheme: pakai CSS variables (--primary, --bg, --card, --text, --accent).
-- Font: system-ui, -apple-system, sans-serif.
-- Layout: max-width container, card-based, consistent spacing.
-- Interactive: modal/floating chat box, toast notification, smooth animations.
+Design guidelines & Presets (PENTING buat UX):
+- Generated app HARUS responsive, modern, dan bernilai estetika premium. JANGAN buat HTML kaku/basic.
+- Hindari desain "AI Slop" yang seragam dan hambar. Gunakan salah satu dari 3 pilihan tema desain visual ini secara konsisten:
+  1. **Neo-Brutalism (Retro Pop / Modernist):**
+     - Karakter: Garis tepi tebal hitam (`border: 3px solid #000`), font sans-serif tebal (Outfit/Lexend), efek bayangan bayang-mati (`box-shadow: 4px 4px 0px #000`), hover translate (`transform: translate(-2px, -2px)`), warna latar pop kontras tinggi (kuning pastel, lime green, orange pop) dipadu latar putih bersih.
+  2. **Glassmorphism (Modern Sleek):**
+     - Latar belakang semi-transparan (`background: rgba(255, 255, 255, 0.08)` dengan filter blur `backdrop-filter: blur(12px)`), garis pembatas putih tipis transparan, bayangan melayang lembut, skema warna gelap dengan gradasi neon tipis di border/button.
+  3. **Minimalist Swiss (Swiss Design):**
+     - Sangat bersih, elegan, tipografi sans-serif presisi tebal (Inter/Helvetica), spasi kosong (whitespace) yang sangat longgar, tata letak grid asimetris yang rapi, dominasi warna putih/abu-abu terang dengan aksen warna merah tebal atau hitam pekat pada tombol/elemen interaktif.
+- Gunakan CSS variables untuk mengelola token warna dan spasi secara konsisten: (--primary, --bg, --card, --text, --accent).
+- Injeksi Google Fonts premium (Outfit, Inter, Playfair Display) lewat tag `<link>` untuk meningkatkan tampilan visual.
+- Include: grid/flexbox, smooth transitions, hover effects, shadow, rounded corners, dan micro-animations.
 - Mobile-first: responsive grid, touch-friendly buttons (min 44px).
-- Jangan buat HTML basic/kaku. Buat yang enak dilihat dan dipakai.
-- Untuk chat CS: floating button di pojok kanan bawah, chat box yang slide up, typing indicator.
-- Untuk e-commerce: product grid dengan hover effect, modal checkout, toast sukses.
 - Semua teks UI dalam Bahasa Indonesia.
 
 Worker structure:

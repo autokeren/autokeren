@@ -44,6 +44,7 @@ from autokeren.tools import (
     PatchFileTool,
     ReadFileTool,
     RememberTool,
+    RepoMapTool,
     ResearchTool,
     ReviewTool,
     RewindTool,
@@ -71,6 +72,7 @@ def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegist
     reg.register(ListFilesTool(project_root))
     reg.register(ShellTool(project_root, allowlist=cfg.autokeren.shell_allowlist, default_timeout=cfg.autokeren.shell_timeout))
     reg.register(SearchCodeTool(project_root))
+    reg.register(RepoMapTool(project_root))
     reg.register(FetchURLTool())
     reg.register(GitStatusTool(project_root))
     reg.register(GitDiffTool(project_root))
