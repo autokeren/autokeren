@@ -35,7 +35,7 @@ type SidebarModel struct {
 func NewSidebarModel() SidebarModel {
 	version := os.Getenv("AUTOKEREN_VERSION")
 	if version == "" {
-		version = "v0.11.50"
+		version = "v0.11.51"
 	} else if !strings.HasPrefix(version, "v") {
 		version = "v" + version
 	}
