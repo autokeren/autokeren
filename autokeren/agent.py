@@ -511,6 +511,8 @@ class Agent:
         self.context.reset()
         self.current_session_id = "default"
         self.current_session_name = "default"
+        self._session_auto_saved = False
+        self._session_first_user_input = ""
         self._build_system_prompt()
         self.context.messages.append({"role": "system", "content": self._system_prompt})
         self.plan_approved = not self.cfg.autokeren.plan_mode
