@@ -32,6 +32,7 @@ from autokeren.tools import (
     CollaborateTool,
     CreateProjectTool,
     DeployProjectTool,
+    FDDMTool,
     FetchURLTool,
     GenomeTool,
     GitBranchTool,
@@ -91,6 +92,7 @@ def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegist
     reg.register(SpawnAgentTool(cfg, str(project_root), memory))
     reg.register(CheckAgentTool(cfg, str(project_root), memory))
     reg.register(CollaborateTool(cfg, str(project_root), memory))
+    reg.register(FDDMTool())
     if cfg.auth.mode == "platform":
         reg.register(CreateProjectTool(cfg))
         reg.register(DeployProjectTool(cfg))

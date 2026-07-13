@@ -43,7 +43,13 @@ def handle_slash_command_sync(
             "  /save [name]               : Simpan session saat ini\n"
             "  /resume <id|name>          : Resume session\n"
             "  /reset                    : Reset percakapan\n"
-            "  /compact                  : Kompres context history"
+            "  /compact                  : Kompres context history\n"
+            "\n"
+            "[bold cyan]── FDDM Memory ──[/bold cyan]\n"
+            "  /fddm emit <type> <text>  : Simpan memori ke FDDM\n"
+            "  /fddm sniff <query>       : Cari memori relevan\n"
+            "  /fddm stats               : Statistik FDDM\n"
+            "  /fddm decay               : Jalankan pemudaran memori"
         )
 
     elif cmd == "/config":
@@ -168,5 +174,89 @@ def handle_slash_command_sync(
                 return f"[red]Gagal memulai MCP Server: {exc}[/red]"
         else:
             return f"[red]Sub-command MCP tidak dikenal: {subcmd}[/red]"
+
+    elif cmd == "/fddm":
+        from autokeren.tools.fddm import FDDMTool
+
+        tool = FDDMTool()
+        if not arg:
+            return (
+                "[bold yellow]🐜 FDDM — Feromon Digital Distributed Memory[/bold yellow]\n\n"
+                "  /fddm emit <type> <text>  : Simpan memori (type: error/decision/document/observation)\n"
+                "  /fddm sniff <query>       : Cari memori relevan\n"
+                "  /fddm stats               : Statistik memori\n"
+                "  /fddm decay               : Jalankan pemudaran\n"
+                "  /fddm trust <emitter> <success|fail> : Lapor kepercayaan emitter"
+            )
+
+        subparts = arg.split(" ", 1)
+        subcmd = subparts[0].lower()
+        subarg = subparts[1].strip() if len(subparts) > 1 else ""
+
+        if subcmd == "emit":
+            if not subarg:
+                return "[red]Gunakan: /fddm emit <type> <text>[/red]"
+            emit_parts = subarg.split(" ", 1)
+            emit_type = emit_parts[0].lower()
+            emit_text = emit_parts[1].strip() if len(emit_parts) > 1 else ""
+            if emit_type not in ("error", "decision", "document", "conversation", "artifact", "observation"):
+                return f"[red]Tipe tidak valid: {emit_type}. Pilih: error/decision/document/conversation/artifact/observation[/red]"
+            if not emit_text:
+                return "[red]Text tidak boleh kosong. Gunakan: /fddm emit <type> <text>[/red]"
+            result = tool.run(action="emit", type=emit_type, text=emit_text, emitter_id="autokeren_user")
+            if result.ok and isinstance(result.output, dict):
+                return f"[green]✅ Scent di-emmit ke FDDM[/green]\n[dim]ID: {result.output.get('scent_id', '?')} | Dim: {result.output.get('dimensions', '?')}[/dim]"
+            return f"[red]{result.error}[/red]"
+
+        elif subcmd == "sniff":
+            if not subarg:
+                return "[red]Gunakan: /fddm sniff <query>[/red]"
+            result = tool.run(action="sniff", text=subarg, top_k=5, radius=0.2)
+            if result.ok and isinstance(result.output, list):
+                if not result.output:
+                    return "[yellow]Tidak ada scent yang cocok.[/yellow]"
+                lines = ["[bold green]👃 Hasil Sniff FDDM:[/bold green]"]
+                for i, hit in enumerate(result.output, 1):
+                    hit_dict: dict[str, Any] = hit if isinstance(hit, dict) else {}
+                    lines.append(
+                        f"  {i}. [cyan]{hit_dict.get('type', '?')}[/cyan] score={hit_dict.get('score', 0):.3f} sim={hit_dict.get('similarity', 0):.3f}\n"
+                        f"     [dim]{str(hit_dict.get('artifact', ''))[:120]}[/dim]"
+                    )
+                return "\n".join(lines)
+            return f"[red]{result.error if not result.ok else 'No results'}[/red]"
+
+        elif subcmd == "stats":
+            result = tool.run(action="stats")
+            if result.ok and isinstance(result.output, dict):
+                s = result.output
+                return (
+                    f"[bold yellow]📊 FDDM Statistics[/bold yellow]\n"
+                    f"  • Active Scents : [bold]{s.get('total_scents', 0)}[/bold]\n"
+                    f"  • Archived      : [bold]{s.get('archived', 0)}[/bold]\n"
+                    f"  • Emitters      : [bold]{s.get('emitters', 0)}[/bold]"
+                )
+            return f"[red]{result.error}[/red]"
+
+        elif subcmd == "decay":
+            result = tool.run(action="decay")
+            if result.ok and isinstance(result.output, dict):
+                return f"[green]⏳ Decay selesai: {result.output.get('decayed', 0)} decayed, {result.output.get('archived', 0)} archived[/green]"
+            return f"[red]{result.error}[/red]"
+
+        elif subcmd == "trust":
+            if not subarg:
+                return "[red]Gunakan: /fddm trust <emitter_id> <success|fail>[/red]"
+            trust_parts = subarg.split()
+            if len(trust_parts) < 2:
+                return "[red]Gunakan: /fddm trust <emitter_id> <success|fail>[/red]"
+            emitter = trust_parts[0]
+            success = trust_parts[1].lower() in ("success", "true", "1", "yes")
+            result = tool.run(action="trust", emitter_id=emitter, success=success)
+            if result.ok and isinstance(result.output, dict):
+                return f"[green]✅ Trust updated: {result.output.get('emitter_id')} = {result.output.get('trust', 0)}[/green]"
+            return f"[red]{result.error}[/red]"
+
+        else:
+            return f"[red]Sub-command FDDM tidak dikenal: {subcmd}[/red]"
 
     return None

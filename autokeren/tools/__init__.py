@@ -22,6 +22,7 @@ from autokeren.tools.kanban import KanbanTool
 from autokeren.tools.collaborate import CollaborateTool
 from autokeren.tools.web import FetchURLTool
 from autokeren.tools.cf_verify import CfVerifyTool
+from autokeren.tools.fddm import FDDMTool
 
 __all__ = [
     "Tool",
@@ -61,4 +62,5 @@ __all__ = [
     "ReviewTool",
     "ResearchTool",
     "CfVerifyTool",
+    "FDDMTool",
 ]
