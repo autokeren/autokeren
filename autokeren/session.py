@@ -101,9 +101,9 @@ class SessionManager:
             )
             row = cursor.fetchone()
             if not row:
-                # Cari partial match
+                # Cari partial match, ambil yang terbaru
                 cursor.execute(
-                    "SELECT id, name, project, timestamp, messages, usage FROM sessions WHERE lower(id) LIKE ? OR lower(name) LIKE ?",
+                    "SELECT id, name, project, timestamp, messages, usage FROM sessions WHERE lower(id) LIKE ? OR lower(name) LIKE ? ORDER BY timestamp DESC LIMIT 1",
                     (f"%{identifier_lower}%", f"%{identifier_lower}%")
                 )
                 row = cursor.fetchone()

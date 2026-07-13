@@ -127,9 +127,9 @@ func (m SidebarModel) View() string {
 
 	// Session
 	sb.WriteString(labelStyle.Render("session") + "\n")
-	sessionDisplay := m.SessionName
-	if m.SessionID != "" && m.SessionID != "default" {
-		sessionDisplay = fmt.Sprintf("%s (%s)", m.SessionName, m.SessionID)
+	sessionDisplay := m.SessionID
+	if sessionDisplay == "" {
+		sessionDisplay = "default"
 	}
 	sb.WriteString(okStyle.Render(truncate(sessionDisplay, w-4)) + "\n\n")
 
