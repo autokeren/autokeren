@@ -18,6 +18,7 @@ from autokeren.prompts import build_system_prompt
 from autokeren.session import SessionManager
 from autokeren.tools import ToolRegistry, ToolResult
 from autokeren.tools.git import GitAutoCommitTool
+from autokeren.fddm_hook import build_sniff_context, auto_emit_completion
 
 
 class Agent:
@@ -192,6 +193,9 @@ class Agent:
             if relevant:
                 ctx_msg = "ℹ️ MEMORI HISTORIS RELEVAN DARI SESI SEBELUMNYA:\n" + "\n".join(f"- {r}" for r in relevant)
                 self.context.messages.insert(-1, {"role": "system", "content": ctx_msg})
+        fddm_ctx = build_sniff_context(user_input)
+        if fddm_ctx:
+            self.context.messages.insert(-1, {"role": "system", "content": fddm_ctx})
         try:
             for iteration in range(self.cfg.autokeren.max_iterations):
                 self.check_interrupt()
@@ -270,6 +274,7 @@ class Agent:
                     self._consecutive_no_tool_prompts = 0
                     self._add_assistant_and_log(resp)
                     self._run_git_auto_commit(resp.content or "")
+                    auto_emit_completion(user_input, resp.content or "")
                     self._auto_save_session()
                     return resp
 
