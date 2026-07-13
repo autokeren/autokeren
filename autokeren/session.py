@@ -62,11 +62,28 @@ class SessionManager:
                     continue
             conn.commit()
 
-    def save(self, name: str, messages: list[dict[str, Any]], usage: dict[str, Any]) -> str:
-        """Save session. Return session_id."""
+    def save(self, name: str, messages: list[dict[str, Any]], usage: dict[str, Any], session_id: str | None = None) -> str:
+        """Save session. Return session_id.
+
+        Kalau session_id diberikan, update session yang sudah ada.
+        Kalau None, buat session baru.
+        """
+        timestamp = now_iso()
+        if session_id:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE sessions SET name = ?, timestamp = ?, messages = ?, usage = ? WHERE id = ?",
+                    (name, timestamp, json.dumps(messages), json.dumps(usage), session_id),
+                )
+                if cursor.rowcount > 0:
+                    conn.commit()
+                    return session_id
+            # Fall through: session_id tidak ditemukan, buat baru
+
         session_id = now_iso().replace(":", "").replace("-", "")[:14]
         timestamp = now_iso()
-        
+
         # Hindari tabrakan ID untuk pemanggilan sangat cepat
         base_id = session_id
         counter = 1

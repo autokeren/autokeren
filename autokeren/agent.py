@@ -458,7 +458,10 @@ class Agent:
         slug_words = "-".join(w.lower() for w in words[:3] if w) or "session"
         ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         name = f"{ts}-{slug_words}"[:80]
-        self.save_session(name)
+        if self.current_session_id != "default":
+            self._update_existing_session()
+        else:
+            self.save_session(name)
         self._session_auto_saved = True
 
     def _run_cf_verify_after_deploy(self, deploy_result: ToolResult) -> None:
@@ -524,6 +527,20 @@ class Agent:
         self.current_session_name = name
         if self.on_session_saved:
             self.on_session_saved(sid, name)
+        return sid
+
+    def _update_existing_session(self) -> str:
+        """Update session yang sedang aktif. Dipakai oleh auto-save setelah resume."""
+        if self.current_session_id == "default":
+            return self.save_session(self.current_session_name)
+        usage = {
+            "prompt": self.router.usage_total.prompt,
+            "completion": self.router.usage_total.completion,
+            "total": self.router.usage_total.total,
+        }
+        sid = self.sessions.save(self.current_session_name, self.context.messages, usage, session_id=self.current_session_id)
+        if self.on_session_saved:
+            self.on_session_saved(sid, self.current_session_name)
         return sid
 
     def resume_session(self, identifier: str) -> str:
