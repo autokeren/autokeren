@@ -58,7 +58,7 @@ var rootCmd = &cobra.Command{
 			OnModelStart: func() {
 				fmt.Print("\n[dim]mikir...[/dim]")
 			},
-			OnModelEnd: func(content string, modelID string, usage map[string]interface{}) {
+			OnModelEnd: func(content string, modelID string, sessionID string, sessionName string, usage map[string]interface{}) {
 				fmt.Println()
 			},
 			OnChunk: func(text string) {
@@ -156,8 +156,8 @@ var rootCmd = &cobra.Command{
 
 		// Arahkan callbacks agar menyalurkan pesan ke Bubble Tea program
 		callbacks.OnModelStart = func() { p.Send(ui.ModelStartMsg{}) }
-		callbacks.OnModelEnd = func(content string, modelID string, usage map[string]interface{}) {
-			p.Send(ui.ModelEndMsg{Content: content, ModelID: modelID, Usage: usage})
+		callbacks.OnModelEnd = func(content string, modelID string, sessionID string, sessionName string, usage map[string]interface{}) {
+			p.Send(ui.ModelEndMsg{Content: content, ModelID: modelID, SessionID: sessionID, SessionName: sessionName, Usage: usage})
 		}
 		callbacks.OnChunk = func(text string) { p.Send(ui.ChunkMsg{Text: text}) }
 		callbacks.OnToolStart = func(name string, arguments map[string]interface{}) {

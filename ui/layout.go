@@ -43,9 +43,11 @@ type PeriodicTickMsg struct {
 type ChunkMsg struct{ Text string }
 type ModelStartMsg struct{}
 type ModelEndMsg struct {
-	Content string
-	ModelID string
-	Usage   map[string]interface{}
+	Content     string
+	ModelID     string
+	SessionID   string
+	SessionName string
+	Usage       map[string]interface{}
 }
 type ToolStartMsg struct {
 	Name string
@@ -345,6 +347,13 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg.ModelID != "" {
 			m.Sidebar.ModelName = msg.ModelID
+		}
+		// Update session name di sidebar jika auto-save mengubahnya
+		if msg.SessionID != "" && msg.SessionID != "default" {
+			m.Sidebar.SessionID = msg.SessionID
+		}
+		if msg.SessionName != "" && msg.SessionName != "default" {
+			m.Sidebar.SessionName = msg.SessionName
 		}
 
 	case ActionFinishedMsg:

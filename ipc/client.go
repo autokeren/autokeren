@@ -34,7 +34,7 @@ type JSONRPCError struct {
 // IPCCallbacks mewakili callback dari daemon untuk merespon turn atau event
 type IPCCallbacks struct {
 	OnModelStart      func()
-	OnModelEnd        func(content string, modelID string, usage map[string]interface{})
+	OnModelEnd        func(content string, modelID string, sessionID string, sessionName string, usage map[string]interface{})
 	OnChunk           func(text string)
 	OnToolStart       func(name string, arguments map[string]interface{})
 	OnToolEnd         func(name string, result map[string]interface{})
@@ -245,12 +245,14 @@ func (c *Client) handleNotification(msg *JSONRPCMessage) {
 	case "ui.on_model_end":
 		if c.callbacks.OnModelEnd != nil {
 			var p struct {
-				Content string                 `json:"content"`
-				ModelID string                 `json:"model_id"`
-				Usage   map[string]interface{} `json:"usage"`
+				Content     string                 `json:"content"`
+				ModelID     string                 `json:"model_id"`
+				SessionID   string                 `json:"session_id"`
+				SessionName string                 `json:"session_name"`
+				Usage       map[string]interface{} `json:"usage"`
 			}
 			if err := json.Unmarshal(msg.Params, &p); err == nil {
-				c.callbacks.OnModelEnd(p.Content, p.ModelID, p.Usage)
+				c.callbacks.OnModelEnd(p.Content, p.ModelID, p.SessionID, p.SessionName, p.Usage)
 			}
 		}
 	case "ui.on_chunk":

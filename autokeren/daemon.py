@@ -343,11 +343,14 @@ class JSONRPCDaemon:
 
             # Pasang callbacks agen untuk dikirim sebagai notifikasi JSON-RPC ke Go TUI
             self.agent.on_model_start = lambda: self.send_notification("ui.on_model_start", {})
-            self.agent.on_model_end = lambda resp: self.send_notification(
+            _ag = self.agent
+            self.agent.on_model_end = lambda resp, _a=_ag: self.send_notification(
                 "ui.on_model_end",
                 {
                     "content": resp.content,
                     "model_id": resp.model_id,
+                    "session_id": _a.current_session_id,
+                    "session_name": _a.current_session_name,
                     "usage": {
                         "prompt": resp.usage.prompt,
                         "completion": resp.usage.completion,
@@ -634,7 +637,7 @@ class JSONRPCDaemon:
             if not name:
                 name = f"session-{len(self.agent.sessions.list()) + 1}"
             sid = self.agent.save_session(name)
-            self.send_response(req_id, result={"message": f"Session '{name}' disimpan.", "session_id": sid})
+            self.send_response(req_id, result={"message": f"Session '{name}' disimpan.", "session_id": sid, "name": name})
         except Exception as e:
             self.send_response(req_id, error={"code": -32603, "message": str(e)})
 
