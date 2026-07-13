@@ -922,6 +922,7 @@ class StatusWidget(Static):
 
         model = info.get("model", "?")
         cwd = info.get("cwd", "?")
+        session_name = info.get("session_name", "") or info.get("session_id", "default")
         neurons_remaining = info.get("neurons_remaining")
         neurons_quota = info.get("neurons_quota")
 
@@ -942,7 +943,7 @@ class StatusWidget(Static):
 [bold]{self.tui.t('neurons')}[/bold] : {neurons_str}
 
 [bold]{self.tui.t('active')}[/bold]  : {cwd}
-[bold]{self.tui.t('session')}[/bold] : {self.agent.context.summary().get('messages', 0)} msg
+[bold]{self.tui.t('session')}[/bold] : {session_name}
 [bold]{self.tui.t('lang')}[/bold]    : {lang_label}
 
 [bold]{self.tui.t('temp')}[/bold]    : {self.cfg.cloudflare.temperature}

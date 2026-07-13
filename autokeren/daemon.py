@@ -371,6 +371,9 @@ class JSONRPCDaemon:
             self.agent.on_retry = lambda attempt, delay, msg: self.send_notification(
                 "ui.on_retry", {"attempt": attempt, "delay": delay, "message": msg}
             )
+            self.agent.on_session_saved = lambda sid, name: self.send_notification(
+                "ui.session_saved", {"session_id": sid, "session_name": name}
+            )
 
             # Sambungkan callback izin interaktif ke client Go
             self.agent.permission_callback = lambda name, desc, args: True if self.allow_all else self.send_request(
@@ -437,6 +440,15 @@ class JSONRPCDaemon:
                     return
 
             resp = self.agent.run(user_input)
+            # Notifikasi session ke Go TUI setelah auto-save (jika ada)
+            if self.agent.current_session_id and self.agent.current_session_name:
+                self.send_notification(
+                    "ui.session_saved",
+                    {
+                        "session_id": self.agent.current_session_id,
+                        "session_name": self.agent.current_session_name,
+                    },
+                )
             self.send_response(
                 req_id,
                 result={

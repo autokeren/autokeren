@@ -172,6 +172,9 @@ var rootCmd = &cobra.Command{
 		callbacks.OnRetry = func(attempt int, delay float64, message string) {
 			p.Send(ui.RetryMsg{Attempt: attempt, Delay: delay, Message: message})
 		}
+		callbacks.OnSessionSaved = func(sessionID string, sessionName string) {
+			p.Send(ui.SessionSavedMsg{SessionID: sessionID, SessionName: sessionName})
+		}
 		callbacks.ConfirmPermission = func(name string, desc string, args map[string]interface{}) bool {
 			ch := make(chan bool)
 			p.Send(ui.PermissionConfirmReq{Name: name, Description: desc, Arguments: args, RespChan: ch})

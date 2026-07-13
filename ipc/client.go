@@ -40,6 +40,7 @@ type IPCCallbacks struct {
 	OnToolEnd         func(name string, result map[string]interface{})
 	OnToolOutput      func(name string, line string)
 	OnRetry           func(attempt int, delay float64, message string)
+	OnSessionSaved    func(sessionID string, sessionName string)
 	ConfirmPermission func(name string, desc string, args map[string]interface{}) bool
 	OnError           func(message string)
 }
@@ -303,6 +304,16 @@ func (c *Client) handleNotification(msg *JSONRPCMessage) {
 			}
 			if err := json.Unmarshal(msg.Params, &p); err == nil {
 				c.callbacks.OnRetry(p.Attempt, p.Delay, p.Message)
+			}
+		}
+	case "ui.session_saved":
+		if c.callbacks.OnSessionSaved != nil {
+			var p struct {
+				SessionID   string `json:"session_id"`
+				SessionName string `json:"session_name"`
+			}
+			if err := json.Unmarshal(msg.Params, &p); err == nil {
+				c.callbacks.OnSessionSaved(p.SessionID, p.SessionName)
 			}
 		}
 	case "ui.error":

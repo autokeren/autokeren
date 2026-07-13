@@ -107,6 +107,7 @@ class Agent:
         self.on_tool_output: Callable[[str, str], None] | None = None
         self.on_chunk: Callable[[str], None] | None = None
         self.on_retry: Callable[[int, float, str], None] | None = None
+        self.on_session_saved: Callable[[str, str], None] | None = None
         self.permission_callback: Callable[[str, str, dict[str, Any]], bool] | None = None
         self._consecutive_no_tool_prompts = 0
 
@@ -521,6 +522,8 @@ class Agent:
         sid = self.sessions.save(name, self.context.messages, usage)
         self.current_session_id = sid
         self.current_session_name = name
+        if self.on_session_saved:
+            self.on_session_saved(sid, name)
         return sid
 
     def resume_session(self, identifier: str) -> str:

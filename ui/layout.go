@@ -70,6 +70,10 @@ type ErrorMsg struct{ Message string }
 type ModelsLoadedMsg struct {
 	Models []ModelSelectorItem
 }
+type SessionSavedMsg struct {
+	SessionID   string
+	SessionName string
+}
 type StatusUpdateMsg struct {
 	ModelName        string
 	ProjectName      string
@@ -348,11 +352,12 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.ModelID != "" {
 			m.Sidebar.ModelName = msg.ModelID
 		}
-		// Update session name di sidebar jika auto-save mengubahnya
-		if msg.SessionID != "" && msg.SessionID != "default" {
+
+	case SessionSavedMsg:
+		if msg.SessionID != "" {
 			m.Sidebar.SessionID = msg.SessionID
 		}
-		if msg.SessionName != "" && msg.SessionName != "default" {
+		if msg.SessionName != "" {
 			m.Sidebar.SessionName = msg.SessionName
 		}
 

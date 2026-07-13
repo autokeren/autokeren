@@ -331,6 +331,7 @@ class AgentUI:
         cwd = info.get("cwd", "?")
         neurons_remaining = info.get("neurons_remaining")
         neurons_quota = info.get("neurons_quota")
+        session_name = info.get("session_name", "") or info.get("session_id", "")
 
         if pct < 50:
             color = "green"
@@ -358,10 +359,12 @@ class AgentUI:
                 n_color = "green"
             neuron_str = f" [dim]|[/dim] [{n_color}]neurons {neurons_used:,}/{neurons_quota:,} ({n_pct:.0f}%)[/{n_color}]"
 
+        session_str = f" [dim]| {session_name}[/dim]" if session_name else ""
+
         self.console.print(
             f"  [dim][{color}]{model}[/{color}] "
             f"ctx [{color}]{bar}[/{color}] {pct:.0f}% "
-            f"[dim]| {cwd} | {now}[/dim]{neuron_str}"
+            f"[dim]| {cwd} | {now}[/dim]{session_str}{neuron_str}"
         )
 
     # ------------------------------------------------------------------ #
