@@ -446,10 +446,8 @@ class Agent:
 
 
     def _auto_save_session(self) -> None:
-        """Auto-save session setelah respons pertama AI jika auto_save_session aktif."""
+        """Auto-save session setelah setiap respons AI jika auto_save_session aktif."""
         if not self.cfg.autokeren.auto_save_session:
-            return
-        if self._session_auto_saved:
             return
         import datetime
         import re
@@ -461,7 +459,9 @@ class Agent:
         if self.current_session_id != "default":
             self._update_existing_session()
         else:
-            self.save_session(name)
+            sid = self.save_session(name)
+            self.current_session_id = sid
+            self.current_session_name = name
         self._session_auto_saved = True
 
     def _run_cf_verify_after_deploy(self, deploy_result: ToolResult) -> None:
