@@ -171,9 +171,12 @@ class CloudflareModel:
     def _call_once(self, messages: list[Message], tools: list[dict] | None = None, **params) -> ModelResponse:
         if self.auth_mode == "platform":
             return self._call_once_openai(messages, tools=tools, **params)
+        max_tok = params.get("max_tokens", 4096)
+        if max_tok > 4096:
+            max_tok = 4096
         payload = {
             "messages": messages,
-            "max_tokens": params.get("max_tokens", 4096),
+            "max_tokens": max_tok,
             "temperature": params.get("temperature", 0.3),
         }
         if tools:
@@ -208,10 +211,13 @@ class CloudflareModel:
         return self._parse_response(result)
 
     def _call_once_openai(self, messages: list[Message], tools: list[dict] | None = None, **params) -> ModelResponse:
+        max_tok = params.get("max_tokens", 8192)
+        if max_tok > 4096:
+            max_tok = 4096
         payload: dict[str, Any] = {
             "model": self.model_id,
             "messages": messages,
-            "max_tokens": params.get("max_tokens", 8192),
+            "max_tokens": max_tok,
             "temperature": params.get("temperature", 0.3),
             "stream": False,
         }
@@ -359,10 +365,13 @@ class CloudflareModel:
         **params,
     ) -> ModelResponse:
         """Streaming via OpenAI-compatible endpoint. Supports text + tool_calls SSE."""
+        max_tok = params.get("max_tokens", 8192)
+        if max_tok > 4096:
+            max_tok = 4096
         payload: dict[str, Any] = {
             "model": self.model_id,
             "messages": messages,
-            "max_tokens": params.get("max_tokens", 8192),
+            "max_tokens": max_tok,
             "temperature": params.get("temperature", 0.3),
             "stream": True,
         }
