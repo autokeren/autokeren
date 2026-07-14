@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.58] - 2026-07-15
+
+### Changed
+- fix: bypass inner retries and model fallbacks for 8007 context window errors to trigger compaction immediately
+
 ## [0.11.57] - 2026-07-15
 
 ### Changed
