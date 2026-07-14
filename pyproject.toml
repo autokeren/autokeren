@@ -48,6 +48,7 @@ dependencies = [
     "pyfiglet>=1.0",
     "textual>=0.50.0",
     "pyperclip>=1.8.0",
+    "python-telegram-bot>=20.0",
 ]
 
 

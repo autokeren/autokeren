@@ -110,6 +110,14 @@ class FDDMConfig(BaseModel):
     api_key: str = ""
 
 
+class TelegramConfig(BaseModel):
+    enabled: bool = False
+    token: str = ""
+    allowed_usernames: list[str] = Field(default_factory=list)
+    require_mention_in_groups: bool = True
+    typing_interval_seconds: float = 4.0
+
+
 class GhostAgentConfig(BaseModel):
     enabled: bool = True
     max_background: int = 3
@@ -157,6 +165,7 @@ class AutokerenConfig(BaseModel):
     git_auto_commit: GitAutoCommitConfig = Field(default_factory=GitAutoCommitConfig)
     cf_verify: CfVerifyConfig = Field(default_factory=CfVerifyConfig)
     fddm: FDDMConfig = Field(default_factory=FDDMConfig)
+    telegram: TelegramConfig = Field(default_factory=TelegramConfig)
 
 
 class CamofoxConfig(BaseModel):

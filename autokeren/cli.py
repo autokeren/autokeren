@@ -784,6 +784,9 @@ def main() -> int:
     parser.add_argument("--non-interactive", action="store_true", help="Run single task, no REPL (for ghost agent)")
     parser.add_argument("--task", help="Task untuk non-interactive mode")
     parser.add_argument("--resume", "-r", help="Resume sesi percakapan dari disk")
+    parser.add_argument("--telegram", action="store_true", help="Jalankan Telegram gateway")
+    parser.add_argument("--telegram-token", help="Telegram bot token (override config)")
+    parser.add_argument("--telegram-allow-user", action="append", help="Username Telegram yang diizinkan (bisa berkali-kali)")
     parser.add_argument("prompt", nargs="?", help="Single prompt to run non-interactively")
     args = parser.parse_args()
 
@@ -910,6 +913,21 @@ def main() -> int:
     agent.on_chunk = ui.on_chunk
     agent.on_retry = ui.on_retry
     agent.permission_callback = ui.confirm_permission
+
+    if args.telegram:
+        from autokeren.telegram_gateway import run_telegram_gateway
+        token = args.telegram_token or cfg.autokeren.telegram.token
+        if not token:
+            console.print("[red]Token Telegram tidak ditemukan. Set via --telegram-token atau config telegram.token[/red]")
+            return 1
+        allowed = args.telegram_allow_user or cfg.autokeren.telegram.allowed_usernames
+        console.print("[green]Memulai Telegram gateway...[/green]")
+        try:
+            run_telegram_gateway(token, str(project_root), args.config, allowed)
+        except Exception as e:
+            console.print(f"[red]Telegram gateway gagal: {e}[/red]")
+            return 1
+        return 0
 
     if args.prompt or args.task or args.non_interactive:
         ui.mermaid_render = cfg.autokeren.mermaid_render
