@@ -107,7 +107,7 @@ class TelegramGateway:
 
         session.agent.permission_callback = _ask_permission  # type: ignore[assignment]
 
-    async def start(self) -> None:
+    def start(self) -> None:
         application = Application.builder().token(self.token).build()
         application.add_handler(CommandHandler("start", self._cmd_start))
         application.add_handler(CommandHandler("reset", self._cmd_reset))
@@ -115,7 +115,7 @@ class TelegramGateway:
         application.add_handler(CallbackQueryHandler(self._handle_callback))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_text))
         print("Telegram gateway berjalan. Tekan Ctrl+C untuk berhenti.")
-        await application.run_polling(allowed_updates=Update.ALL_TYPES)
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
 
     async def _cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not update.effective_chat:
@@ -260,5 +260,5 @@ def run_telegram_gateway(
     allowed_usernames: list[str] | None = None,
 ) -> None:
     gateway = TelegramGateway(token, project_root, config_path, allowed_usernames)
-    asyncio.run(gateway.start())
+    gateway.start()
 # ak:c84127756f77d800

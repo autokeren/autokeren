@@ -645,7 +645,7 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
 
 def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
     """Mencoba meluncurkan TUI Go (ak). Mengembalikan False jika harus fallback ke Python TUI."""
-    if args.about or args.init or args.login or args.prompt or args.task or args.non_interactive:
+    if args.about or args.init or args.login or args.prompt or args.task or args.non_interactive or args.telegram:
         return False
 
     import os
