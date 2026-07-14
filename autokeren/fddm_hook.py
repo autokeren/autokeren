@@ -6,16 +6,18 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-FDDM_DEFAULT_URL = "https://autokeren-b6481c9f.pyscalp.workers.dev"
 
-
-def fddm_sniff(query: str, top_k: int = 3, radius: float = 0.2) -> list[dict[str, Any]]:
+def fddm_sniff(url: str, query: str, top_k: int = 3, radius: float = 0.2, api_key: str = "") -> list[dict[str, Any]]:
     try:
         import httpx
 
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         r = httpx.post(
-            f"{FDDM_DEFAULT_URL}/api/sniff_text",
+            f"{url.rstrip('/')}/api/sniff_text",
             json={"text": query, "top_k": top_k, "radius": radius},
+            headers=headers,
             timeout=10.0,
         )
         r.raise_for_status()
@@ -26,13 +28,17 @@ def fddm_sniff(query: str, top_k: int = 3, radius: float = 0.2) -> list[dict[str
         return []
 
 
-def fddm_emit(type_: str, text: str, emitter_id: str = "autokeren_auto") -> bool:
+def fddm_emit(url: str, type_: str, text: str, emitter_id: str = "autokeren_auto", api_key: str = "") -> bool:
     try:
         import httpx
 
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         r = httpx.post(
-            f"{FDDM_DEFAULT_URL}/api/emit_text",
+            f"{url.rstrip('/')}/api/emit_text",
             json={"type": type_, "text": text, "emitter_id": emitter_id, "base_score": 0.6},
+            headers=headers,
             timeout=10.0,
         )
         r.raise_for_status()
@@ -42,9 +48,11 @@ def fddm_emit(type_: str, text: str, emitter_id: str = "autokeren_auto") -> bool
         return False
 
 
-def build_sniff_context(query: str) -> str:
+def build_sniff_context(fddm_url: str, query: str, api_key: str = "") -> str:
     """Sniff FDDM dan format hasil sebagai context message untuk agent."""
-    results = fddm_sniff(query)
+    if not fddm_url:
+        return ""
+    results = fddm_sniff(fddm_url, query, api_key=api_key)
     if not results:
         return ""
     lines = ["🐜 FDDM AUTO-SNIFF: Memori relevan dari sesi/project sebelumnya:"]
@@ -56,11 +64,10 @@ def build_sniff_context(query: str) -> str:
     return "\n".join(lines)
 
 
-def auto_emit_completion(user_task: str, agent_response: str) -> None:
-    """Auto-emit ke FDDM setelah agent selesai task. Extract insight dari response."""
-    if not agent_response or len(agent_response.strip()) < 20:
+def auto_emit_completion(fddm_url: str, user_task: str, agent_response: str, api_key: str = "") -> None:
+    """Auto-emit ke FDDM setelah agent selesai task."""
+    if not fddm_url or not agent_response or len(agent_response.strip()) < 20:
         return
-
     summary = f"Task: {user_task[:200]}\nResult: {agent_response[:500]}"
-    fddm_emit("decision", summary, emitter_id="autokeren_auto")
-# ak:db3f8a21384cba79
+    fddm_emit(fddm_url, "decision", summary, emitter_id="autokeren_auto", api_key=api_key)
+# ak:96ca274ded73d234

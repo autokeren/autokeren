@@ -92,7 +92,8 @@ def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegist
     reg.register(SpawnAgentTool(cfg, str(project_root), memory))
     reg.register(CheckAgentTool(cfg, str(project_root), memory))
     reg.register(CollaborateTool(cfg, str(project_root), memory))
-    reg.register(FDDMTool())
+    if cfg.autokeren.fddm.enabled and cfg.autokeren.fddm.url:
+        reg.register(FDDMTool(cfg.autokeren.fddm.url, cfg.autokeren.fddm.api_key))
     if cfg.auth.mode == "platform":
         reg.register(CreateProjectTool(cfg))
         reg.register(DeployProjectTool(cfg))

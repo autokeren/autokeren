@@ -104,6 +104,12 @@ class CfVerifyConfig(BaseModel):
     save_dir: str = ".ak-verification"
 
 
+class FDDMConfig(BaseModel):
+    enabled: bool = False
+    url: str = ""
+    api_key: str = ""
+
+
 class GhostAgentConfig(BaseModel):
     enabled: bool = True
     max_background: int = 3
@@ -132,8 +138,8 @@ class AutokerenConfig(BaseModel):
     project_root: str = "."
     context_window: int = 262144
     compact_tail_turns: int = 6
-    auto_compact: bool = False
-    auto_compact_threshold: float = 0.8
+    auto_compact: bool = True
+    auto_compact_threshold: float = 0.6
     memory_enabled: bool = True
     auto_save_session: bool = True
     max_tool_calls: int = 0
@@ -150,6 +156,7 @@ class AutokerenConfig(BaseModel):
     research: ResearchConfig = Field(default_factory=ResearchConfig)
     git_auto_commit: GitAutoCommitConfig = Field(default_factory=GitAutoCommitConfig)
     cf_verify: CfVerifyConfig = Field(default_factory=CfVerifyConfig)
+    fddm: FDDMConfig = Field(default_factory=FDDMConfig)
 
 
 class CamofoxConfig(BaseModel):

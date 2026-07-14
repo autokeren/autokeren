@@ -193,7 +193,8 @@ class Agent:
             if relevant:
                 ctx_msg = "ℹ️ MEMORI HISTORIS RELEVAN DARI SESI SEBELUMNYA:\n" + "\n".join(f"- {r}" for r in relevant)
                 self.context.messages.insert(-1, {"role": "system", "content": ctx_msg})
-        fddm_ctx = build_sniff_context(user_input)
+        fddm_cfg = self.cfg.autokeren.fddm
+        fddm_ctx = build_sniff_context(fddm_cfg.url, user_input, fddm_cfg.api_key) if fddm_cfg.enabled else ""
         if fddm_ctx:
             self.context.messages.insert(-1, {"role": "system", "content": fddm_ctx})
         try:
@@ -202,6 +203,10 @@ class Agent:
 
                 if self.on_model_start:
                     self.on_model_start()
+
+                # Auto-compact context sebelum model call kalau sudah melebihi threshold
+                if self.should_compact():
+                    self.compact()
 
                 def _on_chunk(text: str) -> None:
                     self.check_interrupt()
@@ -274,7 +279,8 @@ class Agent:
                     self._consecutive_no_tool_prompts = 0
                     self._add_assistant_and_log(resp)
                     self._run_git_auto_commit(resp.content or "")
-                    auto_emit_completion(user_input, resp.content or "")
+                    if self.cfg.autokeren.fddm.enabled:
+                        auto_emit_completion(self.cfg.autokeren.fddm.url, user_input, resp.content or "", self.cfg.autokeren.fddm.api_key)
                     self._auto_save_session()
                     return resp
 

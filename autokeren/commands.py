@@ -46,6 +46,7 @@ def handle_slash_command_sync(
             "  /compact                  : Kompres context history\n"
             "\n"
             "[bold cyan]── FDDM Memory ──[/bold cyan]\n"
+            "  /config fddm on|off       : Aktifkan/matikan FDDM\n"
             "  /fddm emit <type> <text>  : Simpan memori ke FDDM\n"
             "  /fddm sniff <query>       : Cari memori relevan\n"
             "  /fddm stats               : Statistik FDDM\n"
@@ -56,11 +57,13 @@ def handle_slash_command_sync(
         if not arg:
             git_status = "ON" if cfg.autokeren.git_auto_commit.enabled else "OFF"
             cf_status = "ON" if cfg.autokeren.cf_verify.enabled else "OFF"
+            fddm_status = "ON" if cfg.autokeren.fddm.enabled else "OFF"
             local_url = cfg.auth.local_endpoint
             return (
                 f"[bold yellow]⚙️ CONFIG AKTIF autokeren:[/bold yellow]\n"
                 f"  • Git Auto-Commit : [bold]{git_status}[/bold]\n"
                 f"  • CF Auto-Verify  : [bold]{cf_status}[/bold]\n"
+                f"  • FDDM Memory     : [bold]{fddm_status}[/bold]\n"
                 f"  • Local Endpoint  : [cyan]{local_url}[/cyan]"
             )
 
@@ -92,6 +95,20 @@ def handle_slash_command_sync(
                 return "[yellow]⚠️ CF Auto-Verify dinonaktifkan (OFF).[/yellow]"
             else:
                 return "[red]Gunakan: /config cf-verify on|off[/red]"
+        elif subopt == "fddm":
+            if subval in ("on", "true", "1"):
+                cfg.autokeren.fddm.enabled = True
+                save_config(cfg)
+                return (
+                    "[green]✅ FDDM diaktifkan (ON).[/green]\n"
+                    "[dim]Pastikan fddm.url sudah diisi di config.yaml.[/dim]"
+                )
+            elif subval in ("off", "false", "0"):
+                cfg.autokeren.fddm.enabled = False
+                save_config(cfg)
+                return "[yellow]⚠️ FDDM dinonaktifkan (OFF).[/yellow]"
+            else:
+                return "[red]Gunakan: /config fddm on|off[/red]"
         else:
             return f"[red]Setting tidak dikenal: {subopt}[/red]"
 
@@ -178,7 +195,14 @@ def handle_slash_command_sync(
     elif cmd == "/fddm":
         from autokeren.tools.fddm import FDDMTool
 
-        tool = FDDMTool()
+        if not cfg.autokeren.fddm.enabled or not cfg.autokeren.fddm.url:
+            return (
+                "[yellow]⚠️ FDDM belum dikonfigurasi.[/yellow]\n"
+                "1. Isi fddm.url di config.yaml (akses memori server).\n"
+                "2. Aktifkan: /config fddm on"
+            )
+
+        tool = FDDMTool(str(cfg.autokeren.fddm.url), cfg.autokeren.fddm.api_key)
         if not arg:
             return (
                 "[bold yellow]🐜 FDDM — Feromon Digital Distributed Memory[/bold yellow]\n\n"
