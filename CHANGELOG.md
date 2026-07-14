@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.57] - 2026-07-15
+
+### Changed
+- feat: implement self-healing context window auto-pruning/compaction to prevent error 8007
+
 ## [0.11.56] - 2026-07-15
 
 ### Changed
