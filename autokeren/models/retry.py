@@ -58,6 +58,10 @@ class RetryPolicy:
     def should_retry(self, exc: Exception, status: int | None, attempt: int) -> bool:
         if attempt >= self.max_retries:
             return False
+        # Jangan retry jika error 8007 atau context length exceeded (deterministic validation error)
+        exc_msg = str(exc)
+        if "8007" in exc_msg or "context length" in exc_msg.lower():
+            return False
         if status is None:
             return True  # network-level failure (timeout, connection error)
         if status in self.retry_on:

@@ -214,6 +214,10 @@ class ModelRouter:
             except Exception as e:
                 last_error = e
                 self.breakers[model.model_id].record_failure()
+                # Jika error 8007 (context limit), jangan fallback, melainkan langsung raise ke agent agar auto-compact
+                err_msg = str(e)
+                if "8007" in err_msg or "context length" in err_msg.lower():
+                    raise
                 if on_retry and i < len(candidates) - 1:
                     next_model = candidates[i + 1].model_id
                     on_retry(0, 0.0, f"Error: {e} | fallback ke model: {next_model}")
