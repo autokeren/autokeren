@@ -228,6 +228,12 @@ class Agent:
                     if os.environ.get("AUTOKEREN_DEBUG") == "1":
                         raise
                     err_msg = str(e) or type(e).__name__
+                    # Jika error disebabkan batas limit context window / token (8007)
+                    if "exceeds" in err_msg.lower() or "context length" in err_msg.lower() or "8007" in err_msg:
+                        if self.on_retry:
+                            self.on_retry(iteration + 1, 1.0, f"Konteks memori penuh ({err_msg}). Menjalankan pruning otomatis...")
+                        self.prune_context()
+                        continue
                     if iteration < self.cfg.autokeren.max_iterations - 1:
                         if not self.router.has_healthy():
                             if self.on_retry:
@@ -616,57 +622,96 @@ class Agent:
         return info
 
     def should_compact(self) -> bool:
-        """Cek apakah perlu auto-compact berdasarkan threshold."""
+        """Cek apakah perlu auto-compact berdasarkan threshold atau batas limit model."""
+        est_tokens = self.context.estimate_tokens()
+        # Batasi jika mendekati limit context window model (misal 90% dari limit)
+        max_limit = self.cfg.autokeren.context_window - self.cfg.cloudflare.max_tokens - 8000
+        if est_tokens >= max_limit:
+            return True
+
         if not self.cfg.autokeren.auto_compact:
             return False
         info = self.context_info()
         return info["pct"] >= self.cfg.autokeren.auto_compact_threshold * 100
 
+    def prune_context(self, keep_turns: int = 12) -> str:
+        """Prune context secara manual tanpa panggil LLM (metode fallback aman)."""
+        system_msg = self.context.messages[0]
+        tail = max(keep_turns, self.cfg.autokeren.compact_tail_turns)
+        if len(self.context.messages) <= tail + 1:
+            return "Context tidak bisa di-prune lebih lanjut."
+
+        before_tokens = self.context.estimate_tokens()
+        recent = self.context.messages[-tail:]
+
+        self.context.messages = [
+            system_msg,
+            {"role": "user", "content": "ℹ️ Beberapa riwayat percakapan lama telah dihapus untuk menghemat ruang memori/context window."},
+            {"role": "assistant", "content": "Dimengerti. Saya akan melanjutkan diskusi berdasarkan konteks terbaru yang tersisa."},
+            *recent,
+        ]
+        after_tokens = self.context.estimate_tokens()
+        saved = before_tokens - after_tokens
+        return (
+            f"Context di-prune: pesan lama dihapus. "
+            f"Token {before_tokens:,} → {after_tokens:,} (hemat {saved:,})."
+        )
+
     def compact(self) -> str:
-        """Compact context: summarize pesan lama, keep system prompt + N pesan terakhir."""
+        """Compact context: summarize pesan lama, keep system prompt + N pesan terakhir.
+        Jika kompresi via LLM gagal, lakukan pruning secara otomatis.
+        """
         tail = self.cfg.autokeren.compact_tail_turns
         if len(self.context.messages) <= tail + 1:
             return "Context sudah cukup singkat, tidak perlu compact."
 
-        system_msg = self.context.messages[0]
-        recent = self.context.messages[-tail:]
-        to_summarize = self.context.messages[1:-tail]
+        try:
+            system_msg = self.context.messages[0]
+            recent = self.context.messages[-tail:]
+            to_summarize = self.context.messages[1:-tail]
 
-        before_tokens = self.context.estimate_tokens()
+            before_tokens = self.context.estimate_tokens()
 
-        summary_parts: list[str] = []
-        for msg in to_summarize:
-            role = msg.get("role", "?")
-            content = str(msg.get("content", ""))[:800]
-            summary_parts.append(f"[{role}] {content}")
-        summary_text = "\n".join(summary_parts)
+            summary_parts: list[str] = []
+            for msg in to_summarize:
+                role = msg.get("role", "?")
+                content = str(msg.get("content", ""))[:800]
+                summary_parts.append(f"[{role}] {content}")
+            summary_text = "\n".join(summary_parts)
 
-        summary_prompt = (
-            "Ringkas percakapan berikut secara singkat dan padat. "
-            "Pertahankan: keputusan penting, perubahan file, error yang ditemukan, "
-            "dan konteks yang perlu diingat untuk percakapan selanjutnya.\n\n"
-            f"{summary_text}"
-        )
+            summary_prompt = (
+                "Ringkas percakapan berikut secara singkat dan padat. "
+                "Pertahankan: keputusan penting, perubahan file, error yang ditemukan, "
+                "dan konteks yang perlu diingat untuk percakapan selanjutnya.\n\n"
+                f"{summary_text}"
+            )
 
-        resp = self.router.complete(
-            [{"role": "user", "content": summary_prompt}],
-            max_tokens=1024,
-            temperature=0.0,
-        )
+            # Jika summary prompt terlalu panjang, langsung gunakan pruning
+            if len(summary_prompt) // 4 > (self.cfg.autokeren.context_window - 20000):
+                return self.prune_context()
 
-        self.context.messages = [
-            system_msg,
-            {"role": "user", "content": f"Ringkasan percakapan sebelumnya:\n{resp.content}"},
-            {"role": "assistant", "content": "Baik, saya ingat ringkasan ini. Lanjutkan."},
-            *recent,
-        ]
+            resp = self.router.complete(
+                [{"role": "user", "content": summary_prompt}],
+                max_tokens=1024,
+                temperature=0.0,
+            )
 
-        after_tokens = self.context.estimate_tokens()
-        saved = before_tokens - after_tokens
-        return (
-            f"Context di-compact: {len(to_summarize)} pesan diringkas. "
-            f"Token {before_tokens:,} → {after_tokens:,} (hemat {saved:,})."
-        )
+            self.context.messages = [
+                system_msg,
+                {"role": "user", "content": f"Ringkasan percakapan sebelumnya:\n{resp.content}"},
+                {"role": "assistant", "content": "Baik, saya ingat ringkasan ini. Lanjutkan."},
+                *recent,
+            ]
+
+            after_tokens = self.context.estimate_tokens()
+            saved = before_tokens - after_tokens
+            return (
+                f"Context di-compact: {len(to_summarize)} pesan diringkas. "
+                f"Token {before_tokens:,} → {after_tokens:,} (hemat {saved:,})."
+            )
+        except Exception:
+            # Fallback ke pruning jika LLM call gagal (misal rate limit atau context error)
+            return self.prune_context()
 
     def status(self) -> dict[str, Any]:
         from autokeren import __version__
