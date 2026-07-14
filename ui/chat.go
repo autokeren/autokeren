@@ -118,6 +118,16 @@ func renderToolLine(content string) string {
 func (m *ChatModel) UpdateViewport() {
 	var sb strings.Builder
 
+	// Guard: Bubble Tea viewport crashes on SetContent/GotoBottom with
+	// non-positive dimensions (e.g. before the terminal size is known).
+	if m.Viewport.Width <= 0 || m.Viewport.Height <= 0 {
+		if m.Width > 0 && m.Height > 0 {
+			m.Resize(m.Width, m.Height)
+		} else {
+			return
+		}
+	}
+
 	// Styles
 	userPrefixStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#38BDF8")).
