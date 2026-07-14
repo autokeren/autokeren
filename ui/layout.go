@@ -1336,9 +1336,7 @@ func (m MainModel) View() string {
 		)
 	}
 
-	chatView := m.Chat.View()
 	sidebarView := m.Sidebar.View()
-
 	panelWidth := m.Width - m.Sidebar.Width - 4
 
 	if m.ShowKanban {
@@ -1509,6 +1507,52 @@ func (m MainModel) View() string {
 		modelSelectorView = msStyle.Render(msSb.String())
 	}
 
+	// Hitung tinggi komponen lain untuk menghitung sisa tinggi viewport chat secara dinamis
+	otherHeights := 0
+
+	// TextInput ditampilkan di semua keadaan kecuali saat agen berjalan dan tidak ada permission request
+	showInput := true
+	if m.AgentRunning && m.PermissionReq == nil {
+		showInput = false
+	}
+
+	if showInput {
+		otherHeights += 3 // Tinggi inputView (1 line input + 2 lines border)
+	}
+
+	if m.AgentRunning && m.PermissionReq == nil && spinnerView != "" {
+		otherHeights += 3 // Tinggi spinnerView (1 line progress + 2 lines border)
+	}
+
+	if m.PermissionReq != nil {
+		otherHeights += lipgloss.Height(permissionView)
+	}
+
+	if m.ShowModelSelector {
+		otherHeights += lipgloss.Height(modelSelectorView)
+	}
+
+	if m.ShowAutocomplete && autocompleteView != "" {
+		otherHeights += lipgloss.Height(autocompleteView)
+	}
+
+	var mcpDialogView string
+	if m.McpAddingServer {
+		mcpDialogView = renderMcpAddDialog(m.McpInputName, m.McpInputCmd, m.McpInputActiveField, panelWidth)
+		otherHeights += lipgloss.Height(mcpDialogView)
+	}
+
+	// Tinggi viewport = Total tinggi terminal - tinggi komponen lain - border chat (2)
+	vpHeight := m.Height - otherHeights - 2
+	if vpHeight < 4 {
+		vpHeight = 4
+	}
+
+	// Update tinggi viewport chat secara real-time
+	m.Chat.Viewport.Height = vpHeight
+	m.Chat.UpdateViewport()
+	chatView := m.Chat.View()
+
 	var rightPanel string
 	switch {
 	case m.ShowModelSelector:
@@ -1539,7 +1583,6 @@ func (m MainModel) View() string {
 			inputView,
 		)
 	case m.McpAddingServer:
-		mcpDialogView := renderMcpAddDialog(m.McpInputName, m.McpInputCmd, m.McpInputActiveField, panelWidth)
 		rightPanel = lipgloss.JoinVertical(
 			lipgloss.Left,
 			chatView,

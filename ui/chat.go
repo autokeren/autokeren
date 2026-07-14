@@ -56,8 +56,8 @@ func (m *ChatModel) AppendMessage(role, content string) {
 	m.UpdateViewport()
 }
 
-// renderToolLine renders satu baris tool activity secara compact & profesional
-func renderToolLine(content string) string {
+// renderToolLine renders satu baris tool activity secara compact & profesional dengan line wrapping
+func renderToolLine(content string, textWidth int) string {
 	lines := strings.Split(strings.TrimSpace(content), "\n")
 	if len(lines) == 0 {
 		return ""
@@ -65,8 +65,15 @@ func renderToolLine(content string) string {
 
 	var sb strings.Builder
 	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#4B5563"))
-	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280"))
-	pathStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9CA3AF")).Italic(true)
+	
+	// Tool width offset: kurangi 6 kolom untuk prefix indent
+	toolWidth := textWidth - 6
+	if toolWidth < 10 {
+		toolWidth = 10
+	}
+	
+	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Width(toolWidth)
+	pathStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9CA3AF")).Italic(true).Width(toolWidth)
 	okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#34D399")).Bold(true)
 	errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F87171")).Bold(true)
 	infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#60A5FA"))
@@ -128,27 +135,35 @@ func (m *ChatModel) UpdateViewport() {
 		}
 	}
 
+	// Hitung sisa lebar untuk text setelah dikurangi padding dan border (8 kolom)
+	textWidth := m.Viewport.Width - 8
+	if textWidth < 10 {
+		textWidth = 10
+	}
+
 	// Styles
 	userPrefixStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#38BDF8")).
 		Bold(true)
 	userTextStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#E2E8F0")).
-		PaddingLeft(4)
+		PaddingLeft(4).
+		Width(textWidth)
 
 	asstPrefixStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#34D399")).
 		Bold(true)
 	asstTextStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#F8FAFC")).
-		PaddingLeft(4)
+		PaddingLeft(4).
+		Width(textWidth)
 
 	sysPrefixStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#6B7280"))
 	sysTextStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#6B7280")).
-		PaddingLeft(4).
-		Italic(true)
+		Italic(true).
+		Width(textWidth + 4) // system prefix tidak pakai padding, jadi lebar penuh
 
 	dividerStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#1E1E2A"))
@@ -170,10 +185,10 @@ func (m *ChatModel) UpdateViewport() {
 
 		case "system":
 			text := strings.TrimSpace(msg.Content)
-			sb.WriteString(sysPrefixStyle.Render("  · ") + sysTextStyle.PaddingLeft(0).Render(text) + "\n")
+			sb.WriteString(sysPrefixStyle.Render("  · ") + sysTextStyle.Render(text) + "\n")
 
 		case "tool":
-			sb.WriteString(renderToolLine(msg.Content))
+			sb.WriteString(renderToolLine(msg.Content, textWidth))
 		}
 	}
 
