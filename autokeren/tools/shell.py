@@ -62,6 +62,16 @@ class ShellTool(Tool):
                     ok=False,
                 )
         cwd = Path(workdir) if workdir else self.project_root
+        try:
+            cwd_resolved = cwd.resolve()
+            root_resolved = Path(self.project_root).resolve()
+            if not cwd_resolved.is_relative_to(root_resolved):
+                return ToolResult(
+                    error=f"blocked: workdir '{workdir}' is outside project root",
+                    ok=False,
+                )
+        except (OSError, ValueError):
+            return ToolResult(error=f"blocked: invalid workdir '{workdir}'", ok=False)
         effective_timeout = timeout or self.default_timeout
 
         env = os.environ.copy()
