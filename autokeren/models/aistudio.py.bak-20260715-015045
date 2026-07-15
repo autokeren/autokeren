@@ -38,8 +38,8 @@ def fetch_aistudio_models(cfg) -> list[dict[str, Any]]:
         ]
 
     try:
-        url = "https://generativelanguage.googleapis.com/v1beta/models"
-        resp = httpx.get(url, headers={"x-goog-api-key": api_key}, timeout=10.0)
+        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+        resp = httpx.get(url, timeout=10.0)
         if resp.status_code == 200:
             data = resp.json()
             models = []

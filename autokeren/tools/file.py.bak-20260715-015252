@@ -112,8 +112,8 @@ class ReadFileTool(Tool):
     def _resolve(self, path: str) -> Path:
         p = Path(path)
         if p.is_absolute():
-            return p.resolve()
-        return (self.project_root / p).resolve()
+            return p
+        return self.project_root / p
 
 
 class WriteFileTool(Tool):

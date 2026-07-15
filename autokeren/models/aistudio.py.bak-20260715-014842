@@ -38,8 +38,8 @@ def fetch_aistudio_models(cfg) -> list[dict[str, Any]]:
         ]
 
     try:
-        url = "https://generativelanguage.googleapis.com/v1beta/models"
-        resp = httpx.get(url, headers={"x-goog-api-key": api_key}, timeout=10.0)
+        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+        resp = httpx.get(url, timeout=10.0)
         if resp.status_code == 200:
             data = resp.json()
             models = []
@@ -329,7 +329,7 @@ class AIStudioModel:
             last_text_part = ""
 
             if is_stream:
-                with httpx.stream("POST", url, json=payload, headers=headers, timeout=self.timeout) as r:
+                with httpx.stream("POST", url, json=payload, timeout=self.timeout) as r:
                     if r.status_code != 200:
                         err_body = r.read().decode("utf-8")
                         raise RuntimeError(f"Google API HTTP Error {r.status_code}: {err_body}")
@@ -374,7 +374,7 @@ class AIStudioModel:
                             except Exception:
                                 pass
             else:
-                resp = httpx.post(url, json=payload, headers=headers, timeout=self.timeout)
+                resp = httpx.post(url, json=payload, timeout=self.timeout)
                 if resp.status_code != 200:
                     raise RuntimeError(f"Google API HTTP Error {resp.status_code}: {resp.text}")
 

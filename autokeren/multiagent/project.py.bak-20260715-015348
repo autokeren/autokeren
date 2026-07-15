@@ -103,7 +103,7 @@ class AgentProject:
                 ready.append(w)
                 continue
             deps_done = all(
-                (dep := self.get_worker(d)) is not None and dep.status == WorkerStatus.DONE
+                self.get_worker(d) is not None and self.get_worker(d).status == WorkerStatus.DONE
                 for d in w.depends_on
             )
             if deps_done:

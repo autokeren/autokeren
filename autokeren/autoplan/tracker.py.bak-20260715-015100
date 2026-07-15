@@ -20,7 +20,6 @@ class TaskStatus(str, Enum):
 @dataclass
 class PlanTracker:
     """Track progress semua sub-tasks."""
-
     tasks: list[SubTask] = field(default_factory=list)
     _status: dict[str, TaskStatus] = field(default_factory=dict)
 
@@ -28,14 +27,6 @@ class PlanTracker:
         for t in self.tasks:
             if t.id not in self._status:
                 self._status[t.id] = TaskStatus.PENDING
-        self._validate_dependencies()
-
-    def add_task(self, task: SubTask) -> None:
-        """Tambah task baru ke tracker (misal dari replanning)."""
-        self.tasks.append(task)
-        if task.id not in self._status:
-            self._status[task.id] = TaskStatus.PENDING
-        self._validate_dependencies()
 
     def set_status(self, task_id: str, status: TaskStatus) -> None:
         self._status[task_id] = status
@@ -60,42 +51,10 @@ class PlanTracker:
     def _deps_satisfied(self, task: SubTask) -> bool:
         if not task.depends_on:
             return True
-        valid_ids = {t.id for t in self.tasks}
         for dep_id in task.depends_on:
-            if dep_id not in valid_ids:
-                return False
             if self._status.get(dep_id, TaskStatus.PENDING) != TaskStatus.DONE:
                 return False
         return True
-
-    def _validate_dependencies(self) -> None:
-        """Deteksi circular dependency dan unknown dep ids."""
-        ids = {t.id for t in self.tasks}
-        for t in self.tasks:
-            for dep_id in t.depends_on:
-                if dep_id not in ids:
-                    raise ValueError(f"Task '{t.id}' bergantung pada task unknown '{dep_id}'")
-        visited: set[str] = set()
-        rec_stack: set[str] = set()
-
-        def _visit(tid: str) -> bool:
-            visited.add(tid)
-            rec_stack.add(tid)
-            task = next((t for t in self.tasks if t.id == tid), None)
-            if task:
-                for dep_id in task.depends_on:
-                    if dep_id not in visited:
-                        if _visit(dep_id):
-                            return True
-                    elif dep_id in rec_stack:
-                        return True
-            rec_stack.discard(tid)
-            return False
-
-        for t in self.tasks:
-            if t.id not in visited:
-                if _visit(t.id):
-                    raise ValueError(f"Circular dependency terdeteksi di task '{t.id}'")
 
     def all_done(self) -> bool:
         return all(

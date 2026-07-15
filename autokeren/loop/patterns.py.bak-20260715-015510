@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 _APOLOGY_PATTERNS = [
     r"let me try (a different|another)",
@@ -31,51 +31,34 @@ class PatternResult:
     pattern: str = ""
     detected: bool = False
     detail: str = ""
-    suggestion: str = ""
-
-
-_PATTERN_SUGGESTIONS: dict[str, str] = {
-    "same_tool_same_args": "Hentikan pengulangan tool yang sama. Ubah args atau pivot ke pendekatan berbeda.",
-    "write_test_fail_cycle": "Hentikan write-test-fail cycle. Baca error log, analisis root cause sebelum write ulang.",
-    "file_thrashing": "Hentikan bolak-balik edit file yang sama. Step back dan rencanakan perubahan sekaligus.",
-    "apology_loop": "Hentikan apology loop. Eksekusi langsung tanpa penjelasan berulang.",
-}
 
 
 class PatternDetector:
     """Detect repetitive behavioral patterns di agent tool calls."""
 
-    def __init__(self, on_pattern: Callable[[PatternResult], None] | None = None) -> None:
+    def __init__(self) -> None:
         self._entries: list[ToolCallEntry] = []
-        self._on_pattern = on_pattern
-        self._suppressed_patterns: set[str] = set()
 
-    def track(self, entry: ToolCallEntry) -> PatternResult | None:
+    def track(self, entry: ToolCallEntry) -> None:
         self._entries.append(entry)
         if len(self._entries) > 100:
             self._entries = self._entries[-50:]
 
-        result = self.detect()
-        if result.detected and result.pattern not in self._suppressed_patterns:
-            self._suppressed_patterns.add(result.pattern)
-            if self._on_pattern:
-                self._on_pattern(result)
-            return result
-        return None
-
     def detect(self) -> PatternResult:
         if len(self._entries) < 3:
             return PatternResult()
-        for checker in (
-            self._check_apology_loop,
-            self._check_write_test_fail_cycle,
-            self._check_same_tool_same_args,
-            self._check_file_thrashing,
-        ):
-            result = checker()
-            if result.detected:
-                result.suggestion = _PATTERN_SUGGESTIONS.get(result.pattern, "")
-                return result
+        result = self._check_apology_loop()
+        if result.detected:
+            return result
+        result = self._check_write_test_fail_cycle()
+        if result.detected:
+            return result
+        result = self._check_same_tool_same_args()
+        if result.detected:
+            return result
+        result = self._check_file_thrashing()
+        if result.detected:
+            return result
         return PatternResult()
 
     def _check_same_tool_same_args(self, n: int = 3) -> PatternResult:
@@ -154,9 +137,7 @@ class PatternDetector:
 
     def reset(self) -> None:
         self._entries.clear()
-        self._suppressed_patterns.clear()
 
     @property
     def entries(self) -> list[ToolCallEntry]:
         return list(self._entries)
-# ak:c4dcaea39bca8247
