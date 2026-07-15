@@ -265,11 +265,13 @@ class Agent:
 
                 if not resp.tool_calls:
                     has_run_tools = any(isinstance(m, dict) and m.get("role") == "tool" for m in self.context.messages)
-                    if has_run_tools and self._consecutive_no_tool_prompts < 2 and iteration < self.cfg.autokeren.max_iterations - 1:
-                        continuation_keywords = ["akan", "mari", "selanjutnya", "berikutnya", "mencoba", "perlu", "harus", "apology", "maaf"]
+                    if has_run_tools and self._consecutive_no_tool_prompts < 1 and iteration < self.cfg.autokeren.max_iterations - 1:
+                        strong_continue = ["selanjutnya", "berikutnya", "mari kita", "akan saya", "sekarang saya"]
+                        stop_signals = ["selesai", "done", "berhasil", "complete", "selesai.", "sukses", "✅", "dibuat", "dibuat.", "terdeploy"]
                         content_lower = (resp.content or "").lower()
-                        needs_continue = any(kw in content_lower for kw in continuation_keywords)
-                        if needs_continue:
+                        has_stop = any(kw in content_lower for kw in stop_signals)
+                        has_continue = any(kw in content_lower for kw in strong_continue)
+                        if has_continue and not has_stop:
                             self._consecutive_no_tool_prompts += 1
                             self._add_assistant_and_log(resp)
                             self.context.messages.append({
