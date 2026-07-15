@@ -94,8 +94,6 @@ class TelegramGateway:
             }
             session._approval_event.clear()
 
-            # Akses application dari luar async handler rumit; kirim via bot polling thread
-            # Simpan callable sender yang di-set saat handle message.
             if hasattr(session, "_send_approval_request") and session._send_approval_request:
                 await session._send_approval_request(name, desc, req_id)
 
@@ -120,8 +118,9 @@ class TelegramGateway:
     async def _cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not update.effective_chat:
             return
+        chat_id = update.effective_chat.id
         await context.bot.send_message(
-            chat_id=update.effective_chat.id,
+            chat_id=chat_id,
             text="Halo! Saya autokeren via Telegram. Ketik apa saja untuk mulai.",
         )
 
@@ -155,11 +154,11 @@ class TelegramGateway:
         text = update.message.text
 
         session = await self._get_or_create_session(chat_id)
-        if not session.is_allowed(username, self.allowed_usernames):
+        allowed = session.is_allowed(username, self.allowed_usernames)
+        if not allowed:
             await context.bot.send_message(chat_id=chat_id, text="Akses ditolak.")
             return
 
-        # Inject sender approval ke session
         session._send_approval_request = lambda name, desc, req_id: self._send_approval(
             context, chat_id, name, desc, req_id
         )
@@ -261,4 +260,4 @@ def run_telegram_gateway(
 ) -> None:
     gateway = TelegramGateway(token, project_root, config_path, allowed_usernames)
     gateway.start()
-# ak:c84127756f77d800
+# ak:ecfb59effeb2a6b0
