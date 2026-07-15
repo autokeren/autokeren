@@ -68,6 +68,7 @@ autokeren/signing.py
 *-worker.js
 worker.js
 worker.js.bak-*
+*.bak-*
 toko-*/
 scratch/
 
@@ -80,5 +81,9 @@ scratch/
 # SQLite databases
 *.db
 .ak-kanban.db
+
+# Ghost agent runtime metadata
+.ak-ghost-*.json
+.ak-ghost-*.log
 
 .ak-verification/
