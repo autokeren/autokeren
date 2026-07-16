@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.61] - 2026-07-16
+
+### Changed
+- fix(ui): fix scroll lock in chat viewport by only auto-scrolling on new messages or user input
+
 ## [0.11.60] - 2026-07-15
 
 ### Changed
