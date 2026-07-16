@@ -1,6 +1,7 @@
 """Tmux supervisor tool."""
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -16,7 +17,7 @@ class TmuxTool(Tool):
         "properties": {
             "action": {
                 "type": "string",
-                "enum": ["run", "capture", "list", "kill", "exists"],
+                "enum": ["run", "capture", "list", "kill", "exists", "sniff"],
             },
             "session": {"type": "string", "default": "autokeren"},
             "command": {"type": "string"},
@@ -56,6 +57,45 @@ class TmuxTool(Tool):
                 target = f"{session}:{window or '0'}.{pane}"
                 result = subprocess.run([self.tmux, "capture-pane", "-p", "-t", target, "-S", f"-{lines}"], capture_output=True, text=True, timeout=30)
                 return ToolResult(output=result.stdout, error=result.stderr or None, ok=result.returncode == 0)
+            if action == "sniff":
+                target = f"{session}:{window or '0'}.{pane}"
+                result = subprocess.run([self.tmux, "capture-pane", "-p", "-t", target, "-S", f"-{lines}"], capture_output=True, text=True, timeout=30)
+                if result.returncode != 0:
+                    return ToolResult(error=result.stderr or "failed to capture pane", ok=False)
+                
+                output_text = result.stdout
+                error_patterns = [
+                    r"TypeError:.*",
+                    r"ReferenceError:.*",
+                    r"SyntaxError:.*",
+                    r"RuntimeError:.*",
+                    r"Error:.*",
+                    r"Traceback \(most recent call last\):",
+                    r"panic:.*",
+                    r"fatal error:.*",
+                    r"500 Internal Server Error",
+                ]
+                
+                found_errors = []
+                lines_list = output_text.splitlines()
+                for i, line in enumerate(lines_list):
+                    for pat in error_patterns:
+                        if re.search(pat, line):
+                            if "Traceback" in line:
+                                traceback_block = lines_list[i:i+15]
+                                found_errors.append("\n".join(traceback_block))
+                            else:
+                                found_errors.append(line)
+                            break
+                
+                if found_errors:
+                    unique_errors = list(dict.fromkeys(found_errors))
+                    return ToolResult(
+                        ok=False,
+                        error="Detected error patterns in tmux logs.",
+                        output="\n".join(unique_errors)
+                    )
+                return ToolResult(output="Logs are clean. No error patterns detected.", ok=True)
             if action == "list":
                 result = subprocess.run([self.tmux, "list-sessions", "-F", "#{session_name}: #{session_windows} windows"], capture_output=True, text=True, timeout=30)
                 return ToolResult(output=result.stdout, error=result.stderr or None, ok=result.returncode == 0)

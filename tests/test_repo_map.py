@@ -2,7 +2,6 @@ from autokeren.tools.repo_map import RepoMapTool
 
 
 def test_repo_map_python_parsing(tmp_path):
-    # Buat file python simulasi
     py_content = """
 class MyClass(Base):
     def __init__(self, x: int):
@@ -18,15 +17,17 @@ def global_func(a, b=1):
     py_file.write_text(py_content, encoding="utf-8")
 
     tool = RepoMapTool(tmp_path)
-    res = tool._parse_file(py_file)
-    assert "class MyClass(Base):" in res
-    assert "def __init__(self, x)" in res
-    assert "def async process(self)" in res
-    assert "def global_func(a, b)" in res
+    res_summary, res_symbols = tool._parse_file(py_file)
+    assert "class MyClass(Base):" in res_summary
+    assert "def __init__(self, x)" in res_summary
+    assert "def async process(self)" in res_summary
+    assert "def global_func(a, b)" in res_summary
+    assert "MyClass" in res_symbols
+    assert "process" in res_symbols
+    assert "global_func" in res_symbols
 
 
 def test_repo_map_go_parsing(tmp_path):
-    # Buat file go simulasi
     go_content = """
 package mypkg
 
@@ -44,14 +45,16 @@ func HelloWorld() {
     go_file.write_text(go_content, encoding="utf-8")
 
     tool = RepoMapTool(tmp_path)
-    res = tool._parse_file(go_file)
-    assert "package mypkg" in res
-    assert "func (s *Server) Start(port int) error" in res
-    assert "func HelloWorld()" in res
+    res_summary, res_symbols = tool._parse_file(go_file)
+    assert "package mypkg" in res_summary
+    assert "func (s *Server) Start(port int) error" in res_summary
+    assert "func HelloWorld()" in res_summary
+    assert "mypkg" in res_symbols
+    assert "Start" in res_symbols
+    assert "HelloWorld" in res_symbols
 
 
 def test_repo_map_js_ts_parsing(tmp_path):
-    # Buat file js/ts simulasi
     js_content = """
 export default class Router {
     constructor() {}
@@ -69,14 +72,16 @@ const formatData = (item) => {
     js_file.write_text(js_content, encoding="utf-8")
 
     tool = RepoMapTool(tmp_path)
-    res = tool._parse_file(js_file)
-    assert "class Router" in res
-    assert "function handleRequest()" in res
-    assert "const formatData = () =>" in res
+    res_summary, res_symbols = tool._parse_file(js_file)
+    assert "class Router" in res_summary
+    assert "function handleRequest()" in res_summary
+    assert "const formatData = () =>" in res_summary
+    assert "Router" in res_symbols
+    assert "handleRequest" in res_symbols
+    assert "formatData" in res_symbols
 
 
 def test_repo_map_full_run(tmp_path):
-    # Setup tree folder
     (tmp_path / "src").mkdir()
     (tmp_path / "node_modules").mkdir()
     (tmp_path / "src" / "index.js").write_text("function init() {}", encoding="utf-8")
@@ -88,5 +93,26 @@ def test_repo_map_full_run(tmp_path):
     assert res.ok
     assert "src/index.js" in res.output
     assert "README.md" in res.output
-    # Node modules harus diabaikan
     assert "node_modules" not in res.output
+
+    # Cek bahwa berkas cache dibuat
+    assert (tmp_path / ".ak-repomap.cache").exists()
+
+
+def test_repo_map_relevance_filtering(tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "auth.py").write_text("def login_user(username, password):\n    pass", encoding="utf-8")
+    (tmp_path / "src" / "utils.py").write_text("def helper_fn():\n    pass", encoding="utf-8")
+
+    tool = RepoMapTool(tmp_path)
+    # Jalankan dengan query 'auth login'
+    res = tool.run(query="auth login", max_files=1)
+    assert res.ok
+    
+    # File 'auth.py' harus memiliki signature lengkap (karena paling relevan)
+    assert "src/auth.py" in res.output
+    assert "def login_user(username, password)" in res.output
+    
+    # File 'utils.py' tidak relevan dengan query, jadi hanya dicantumkan nama berkasnya saja tanpa signature
+    assert "src/utils.py" in res.output
+    assert "def helper_fn()" not in res.output

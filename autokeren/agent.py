@@ -184,9 +184,26 @@ class Agent:
             self.memory.log_message(session_id="default", role="assistant", content=resp.content)
 
     def run(self, user_input: str) -> ModelResponse:
-        if not self._session_first_user_input:
+        is_first = not self._session_first_user_input
+        if is_first:
             self._session_first_user_input = user_input
         self.context.add_user(user_input)
+        
+        if is_first:
+            try:
+                from autokeren.tools.repo_map import RepoMapTool
+                repo_tool = RepoMapTool(project_root=Path(self.project_root))
+                repo_map_res = repo_tool.run(query=user_input, max_files=15)
+                if repo_map_res.ok and repo_map_res.output:
+                    repo_msg = (
+                        "🗺️ MINI-REPO MAP RELEVAN DENGAN TUGAS ANDA:\n"
+                        "Gunakan struktur relasi kelas dan fungsi di bawah ini sebagai navigasi proyek:\n\n"
+                        f"{repo_map_res.output}"
+                    )
+                    self.context.messages.insert(1, {"role": "system", "content": repo_msg})
+            except Exception:
+                pass
+
         if self.cfg.autokeren.memory_enabled:
             self.memory.log_message(session_id="default", role="user", content=user_input)
             relevant = self.memory.search_relevant(user_input, limit=3)
@@ -385,6 +402,22 @@ class Agent:
                                     "role": "system",
                                     "content": lb_action.suggestion,
                                 })
+                            if self._git_auto_commit_enabled:
+                                try:
+                                    import subprocess
+                                    rollback_res = subprocess.run(
+                                        ["git", "-C", self.project_root, "reset", "--hard", "HEAD~1"],
+                                        capture_output=True,
+                                        text=True,
+                                        timeout=30,
+                                    )
+                                    if rollback_res.returncode == 0:
+                                        self.context.messages.append({
+                                            "role": "system",
+                                            "content": "⏪ Auto-rollback berhasil: codebase di-revert ke HEAD~1 (state hijau terakhir) karena kesalahan beruntun."
+                                        })
+                                except Exception:
+                                    pass
                             self.run_self_improvement(
                                 failed_tool_name=tc.name,
                                 error_message=raw_result.error or str(raw_result.to_dict()),
@@ -445,11 +478,13 @@ class Agent:
                             self._genome = self._genome_scanner.scan()
                             self._guardian_checker = GuardianChecker(self._genome, block_duplicates=ag_cfg.block_duplicates)
                             self._tool_calls_since_scan = 0
-                    # Pillar B: track modified files for auto-commit
+                    # Pillar B: micro-commit on write/patch success
                     if self._git_auto_commit_enabled and tc.name in ("write_file", "patch_file") and raw_result.ok:
                         _written = str(tc.arguments.get("path", ""))
-                        if _written and _written not in self._modified_files:
-                            self._modified_files.append(_written)
+                        if _written:
+                            self._run_git_micro_commit(_written)
+                            if _written not in self._modified_files:
+                                self._modified_files.append(_written)
                     # Pillar C: auto-verify after deploy
                     if tc.name == "cf_deploy" and raw_result.ok:
                         self._run_cf_verify_after_deploy(raw_result)
@@ -504,6 +539,63 @@ class Agent:
                 f"{result.output or result.error or 'Tidak ada output'}"
             ),
         })
+
+    def _generate_commit_message_from_diff(self, diff: str) -> str:
+        if not diff.strip():
+            return "auto-commit"
+        try:
+            prompt = (
+                "Generate a single-line Conventional Commit message (max 72 chars) for the following git diff. "
+                "Do not include markdown formatting or quotes. Example: feat(auth): add email login validation\n\n"
+                f"Diff:\n{diff}"
+            )
+            resp = self.router.complete(
+                [{"role": "user", "content": prompt}],
+                tools=None,
+                max_tokens=50,
+                temperature=0.2,
+            )
+            if resp.content:
+                msg = resp.content.strip().splitlines()[0]
+                msg = msg.strip('`"\'').strip()
+                return msg[:72]
+        except Exception:
+            pass
+        return "auto-commit"
+
+    def _run_git_micro_commit(self, file_path: str) -> None:
+        if not self._git_auto_commit_enabled:
+            return
+        try:
+            import subprocess
+            diff_res = subprocess.run(
+                ["git", "-C", self.project_root, "diff", file_path],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            diff_text = diff_res.stdout
+            if not diff_text.strip():
+                status_res = subprocess.run(
+                    ["git", "-C", self.project_root, "status", "--porcelain", file_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if "??" in status_res.stdout:
+                    diff_text = f"New file created: {file_path}"
+                    
+            commit_msg = self._generate_commit_message_from_diff(diff_text)
+            
+            tool = GitAutoCommitTool(project_root=Path(self.project_root))
+            result = tool.run(files=[file_path], summary=commit_msg)
+            if result.ok:
+                self.context.messages.append({
+                    "role": "system",
+                    "content": f"📝 Auto-committed changes in `{file_path}`: `{commit_msg}`"
+                })
+        except Exception:
+            pass
 
     def _run_git_auto_commit(self, summary: str) -> None:
         if not self._git_auto_commit_enabled or not self._modified_files:
