@@ -50,7 +50,7 @@ class ShellTool(Tool):
         cmd_preview = command if len(command) <= 80 else command[:77] + "…"
         return f"jalankan shell: {cmd_preview}"
 
-    def run(self, command: str, timeout: int | None = None, workdir: str | None = None, stdin: str | None = None, on_output: Callable[[str], None] | None = None, **_) -> ToolResult:
+    def run(self, command: str, timeout: int | None = None, workdir: str | None = None, stdin: str | None = None, on_output: Callable[[str], None] | None = None, check_interrupt: Callable[[], None] | None = None, **_) -> ToolResult:
         bad, reason = is_dangerous_command(command)
         if bad:
             return ToolResult(error=f"blocked: {reason}", ok=False)
@@ -82,8 +82,8 @@ class ShellTool(Tool):
 
         try:
             if _IS_WINDOWS:
-                return self._run_subprocess(command, cwd, env, effective_timeout, stdin, on_output)
-            return self._run_pty(command, cwd, env, effective_timeout, stdin, on_output)
+                return self._run_subprocess(command, cwd, env, effective_timeout, stdin, on_output, check_interrupt)
+            return self._run_pty(command, cwd, env, effective_timeout, stdin, on_output, check_interrupt)
         except Exception as e:
             return ToolResult(error=f"{type(e).__name__}: {e}", ok=False)
 
@@ -95,6 +95,7 @@ class ShellTool(Tool):
         timeout: int,
         stdin: str | None,
         on_output: Callable[[str], None] | None,
+        check_interrupt: Callable[[], None] | None,
     ) -> ToolResult:
         master_fd, slave_fd = pty.openpty()
 
@@ -125,35 +126,46 @@ class ShellTool(Tool):
         output_lines: list[str] = []
         deadline = time.time() + timeout
 
-        while True:
-            remaining = deadline - time.time()
-            if remaining <= 0:
-                proc.kill()
-                self._close_fd(master_fd)
-                return ToolResult(error=f"timeout after {timeout}s", ok=False)
+        try:
+            while True:
+                if check_interrupt:
+                    check_interrupt()
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    proc.kill()
+                    self._close_fd(master_fd)
+                    return ToolResult(error=f"timeout after {timeout}s", ok=False)
 
-            try:
-                rlist, _, _ = select.select([master_fd], [], [], min(remaining, 0.5))
-            except (OSError, ValueError):
-                break
-
-            if rlist:
                 try:
-                    data = os.read(master_fd, 4096)
-                except OSError:
+                    rlist, _, _ = select.select([master_fd], [], [], min(remaining, 0.5))
+                except (OSError, ValueError):
                     break
-                if not data:
+
+                if rlist:
+                    try:
+                        data = os.read(master_fd, 4096)
+                    except OSError:
+                        break
+                    if not data:
+                        break
+                    text = data.decode("utf-8", errors="replace")
+                    clean = _strip_ansi(text)
+                    for line in clean.splitlines():
+                        line = line.rstrip("\r")
+                        if line.strip():
+                            output_lines.append(line)
+                            if on_output:
+                                on_output(line)
+                elif proc.poll() is not None:
                     break
-                text = data.decode("utf-8", errors="replace")
-                clean = _strip_ansi(text)
-                for line in clean.splitlines():
-                    line = line.rstrip("\r")
-                    if line.strip():
-                        output_lines.append(line)
-                        if on_output:
-                            on_output(line)
-            elif proc.poll() is not None:
-                break
+        except KeyboardInterrupt:
+            proc.terminate()
+            try:
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            self._close_fd(master_fd)
+            raise
 
         self._close_fd(master_fd)
         proc.wait()
@@ -173,6 +185,7 @@ class ShellTool(Tool):
         timeout: int,
         stdin: str | None,
         on_output: Callable[[str], None] | None,
+        check_interrupt: Callable[[], None] | None,
     ) -> ToolResult:
         """Windows fallback: pakai subprocess.Popen tanpa PTY."""
         proc = subprocess.Popen(
@@ -202,23 +215,33 @@ class ShellTool(Tool):
         deadline = time.time() + timeout
 
         assert proc.stdout is not None
-        while True:
-            if time.time() > deadline:
+        try:
+            while True:
+                if check_interrupt:
+                    check_interrupt()
+                if time.time() > deadline:
+                    proc.kill()
+                    return ToolResult(error=f"timeout after {timeout}s", ok=False)
+
+                line = proc.stdout.readline()
+                if not line:
+                    if proc.poll() is not None:
+                        break
+                    time.sleep(0.05)
+                    continue
+
+                clean = _strip_ansi(line).rstrip("\r\n")
+                if clean.strip():
+                    output_lines.append(clean)
+                    if on_output:
+                        on_output(clean)
+        except KeyboardInterrupt:
+            proc.terminate()
+            try:
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
                 proc.kill()
-                return ToolResult(error=f"timeout after {timeout}s", ok=False)
-
-            line = proc.stdout.readline()
-            if not line:
-                if proc.poll() is not None:
-                    break
-                time.sleep(0.05)
-                continue
-
-            clean = _strip_ansi(line).rstrip("\r\n")
-            if clean.strip():
-                output_lines.append(clean)
-                if on_output:
-                    on_output(clean)
+            raise
 
         proc.wait()
 

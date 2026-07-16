@@ -369,7 +369,7 @@ class Agent:
                         if self.on_tool_output:
                             self.on_tool_output(_name, line)
                     
-                    raw_result = self.tools.run(tc.name, tc.arguments, on_output=_on_output)
+                    raw_result = self.tools.run(tc.name, tc.arguments, on_output=_on_output, check_interrupt=self.check_interrupt)
                     
                     if self.on_tool_end:
                         self.on_tool_end(tc.name, raw_result)
