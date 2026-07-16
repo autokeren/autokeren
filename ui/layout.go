@@ -565,7 +565,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.Chat.Messages = newMsgs
 		}
-		m.Chat.UpdateViewport()
+		m.Chat.UpdateViewportScroll(true)
 
 	case PeriodicTickMsg:
 		m.Sidebar.GhostAgents = msg.GhostAgents

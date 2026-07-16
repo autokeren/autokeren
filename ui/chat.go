@@ -53,7 +53,7 @@ func (m *ChatModel) AppendMessage(role, content string) {
 	} else {
 		m.Messages = append(m.Messages, ChatMessage{Role: role, Content: content})
 	}
-	m.UpdateViewport()
+	m.UpdateViewportScroll(role == "user")
 }
 
 // renderToolLine renders satu baris tool activity secara compact & profesional dengan line wrapping
@@ -123,6 +123,10 @@ func renderToolLine(content string, textWidth int) string {
 }
 
 func (m *ChatModel) UpdateViewport() {
+	m.UpdateViewportScroll(false)
+}
+
+func (m *ChatModel) UpdateViewportScroll(force bool) {
 	var sb strings.Builder
 
 	// Guard: Bubble Tea viewport crashes on SetContent/GotoBottom with
@@ -192,8 +196,11 @@ func (m *ChatModel) UpdateViewport() {
 		}
 	}
 
+	wasAtBottom := m.Viewport.AtBottom()
 	m.Viewport.SetContent(sb.String())
-	m.Viewport.GotoBottom()
+	if force || wasAtBottom {
+		m.Viewport.GotoBottom()
+	}
 }
 
 func (m ChatModel) View() string {
