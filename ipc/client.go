@@ -393,6 +393,30 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 				output += fmt.Sprintf("- %s: %s\n", server.Name, strings.Join(server.Command, " "))
 			}
 		}
+	case "/rewind":
+		steps := 1
+		if len(parts) > 1 {
+			if n, err := strconv.Atoi(parts[1]); err == nil && n > 0 {
+				steps = n
+			}
+		}
+		result := (tool.Rewind{Root: c.localRoot}).Run(context.Background(), map[string]any{"steps": float64(steps)}, nil)
+		output = fmt.Sprint(result.Output)
+		if !result.OK {
+			output = result.Error
+		}
+	case "/review":
+		result := (tool.Review{Root: c.localRoot}).Run(context.Background(), map[string]any{}, nil)
+		output = fmt.Sprint(result.Output)
+		if !result.OK {
+			output = result.Error
+		}
+	case "/security":
+		result := (tool.SecurityScan{Root: c.localRoot}).Run(context.Background(), map[string]any{}, nil)
+		output = fmt.Sprint(result.Output)
+		if !result.OK {
+			output = result.Error
+		}
 	case "/proof":
 		action := "list"
 		if len(parts) > 1 {
