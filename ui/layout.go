@@ -178,10 +178,10 @@ type MainModel struct {
 	KanbanAddingTask  bool
 	KanbanInputTitle  textinput.Model
 
-	McpAddingServer      bool
-	McpInputName         textinput.Model
-	McpInputCmd          textinput.Model
-	McpInputActiveField  int // 0 = Name, 1 = Command
+	McpAddingServer     bool
+	McpInputName        textinput.Model
+	McpInputCmd         textinput.Model
+	McpInputActiveField int // 0 = Name, 1 = Command
 
 	ShowDebate            bool
 	SelectedDebateAgentID int
@@ -1491,7 +1491,23 @@ func (m MainModel) View() string {
 			Width(panelWidth)
 
 		msSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#00E5FF")).Bold(true).Render("🤖 PILIH MODEL KECERDASAN BUATAN:") + "\n\n")
-		for i, item := range m.SelectorModels {
+		start, end := 0, len(m.SelectorModels)
+		maxVisible := 5
+		if end-start > maxVisible {
+			start = m.SelectedModelIndex - maxVisible/2
+			if start < 0 {
+				start = 0
+			}
+			if start+maxVisible > end {
+				start = end - maxVisible
+			}
+			end = start + maxVisible
+		}
+		if start > 0 {
+			msSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888899")).Render("   ↑ model sebelumnya") + "\n")
+		}
+		for i := start; i < end; i++ {
+			item := m.SelectorModels[i]
 			numStr := fmt.Sprintf("%d. ", i+1)
 			activeMarker := ""
 			if item.Active {
@@ -1502,6 +1518,9 @@ func (m MainModel) View() string {
 			} else {
 				msSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#E0E0E0")).Render(fmt.Sprintf("   %s%-35s%s", numStr, item.Name, activeMarker)) + "\n")
 			}
+		}
+		if end < len(m.SelectorModels) {
+			msSb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888899")).Render("   ↓ model berikutnya") + "\n")
 		}
 		msSb.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888899")).Render("  ↑↓/Tab navigasi · Enter pilih · Esc batal · 1-9 pilih cepat"))
 		modelSelectorView = msStyle.Render(msSb.String())
@@ -1558,7 +1577,6 @@ func (m MainModel) View() string {
 	case m.ShowModelSelector:
 		rightPanel = lipgloss.JoinVertical(
 			lipgloss.Left,
-			chatView,
 			modelSelectorView,
 			inputView,
 		)

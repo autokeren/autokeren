@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -331,7 +333,7 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		}
 		return nil
 	case "agent.list_models":
-		models := []map[string]interface{}{{"id": c.localConfig.Cloudflare.PrimaryModel, "name": c.localConfig.Cloudflare.PrimaryModel}}
+		models := c.localModels()
 		if reply != nil {
 			raw, _ := json.Marshal(models)
 			return json.Unmarshal(raw, reply)
@@ -341,6 +343,9 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		args, _ := params.(map[string]interface{})
 		if modelID, ok := args["model_id"].(string); ok && modelID != "" {
 			c.localConfig.Cloudflare.PrimaryModel = modelID
+			if c.localConfigPath != "" {
+				_ = config.Save(c.localConfigPath, c.localConfig)
+			}
 		}
 		return nil
 	case "kanban.add", "kanban.move", "kanban.delete":
@@ -363,6 +368,46 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 	default:
 		return fmt.Errorf("method %s belum tersedia di Go TUI adapter", method)
 	}
+}
+
+func (c *Client) localModels() []map[string]interface{} {
+	current := c.localConfig.Cloudflare.PrimaryModel
+	endpoint := strings.TrimRight(c.localConfig.Auth.BaseURL, "/") + "/v1/models"
+	request, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err == nil {
+		if c.localConfig.Auth.APIKey != "" {
+			request.Header.Set("Authorization", "Bearer "+c.localConfig.Auth.APIKey)
+		}
+		if response, requestErr := (&http.Client{Timeout: 10 * time.Second}).Do(request); requestErr == nil {
+			defer response.Body.Close()
+			if response.StatusCode >= 200 && response.StatusCode < 300 {
+				data, _ := io.ReadAll(io.LimitReader(response.Body, 2<<20))
+				var envelope struct {
+					Data []map[string]interface{} `json:"data"`
+				}
+				if json.Unmarshal(data, &envelope) == nil && len(envelope.Data) > 0 {
+					for _, model := range envelope.Data {
+						if _, ok := model["name"]; !ok {
+							model["name"] = model["id"]
+						}
+						model["active"] = fmt.Sprint(model["id"]) == current
+					}
+					return envelope.Data
+				}
+			}
+		}
+	}
+	ids := []string{"@cf/moonshotai/kimi-k2.7-code", "@cf/moonshotai/kimi-k2.6", "@cf/zai-org/glm-5.2", "@cf/zai-org/glm-4.7-flash", "@cf/meta/llama-4-scout-17b-16b-instruct", "@cf/google/gemma-4-26b-a4b-it", "kimi-code", "kimi-2.6", "glm-5.2", "gpt-5.6", "gpt-4o", "gemini-2.5-pro", "gemini-2.5-flash"}
+	models := make([]map[string]interface{}, 0, len(ids)+1)
+	seen := map[string]bool{}
+	for _, id := range append([]string{current}, ids...) {
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		models = append(models, map[string]interface{}{"id": id, "name": id, "active": id == current})
+	}
+	return models
 }
 
 func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
