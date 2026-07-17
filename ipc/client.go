@@ -20,6 +20,7 @@ import (
 
 	"github.com/autokeren/autokeren/internal/config"
 	"github.com/autokeren/autokeren/internal/engine"
+	"github.com/autokeren/autokeren/internal/model"
 	sessionstore "github.com/autokeren/autokeren/internal/session"
 	"github.com/autokeren/autokeren/internal/tool"
 )
@@ -63,13 +64,16 @@ type Client struct {
 	pendingLock sync.Mutex
 	nextID      int64
 
-	isClosed         int32
-	local            bool
-	localRoot        string
-	localConfig      config.Config
-	localConfigPath  string
-	localSession     string
-	localSessionName string
+	isClosed              int32
+	local                 bool
+	localRoot             string
+	localConfig           config.Config
+	localConfigPath       string
+	localSession          string
+	localSessionName      string
+	localNeuronsUsed      int
+	localNeuronsRemaining int
+	localNeuronsQuota     int
 }
 
 func NewClient(callbacks *IPCCallbacks) *Client {
@@ -246,6 +250,11 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 				}
 				return name != "run_shell"
 			},
+			OnResponse: func(response model.Response) {
+				c.localNeuronsUsed = response.Usage.NeuronsUsed
+				c.localNeuronsRemaining = response.Usage.NeuronsRemaining
+				c.localNeuronsQuota = response.Usage.NeuronsQuota
+			},
 		}
 		content, err := engine.RunStandaloneEvents(context.Background(), c.localConfig, c.localRoot, input, events, c.localSession)
 		if err != nil {
@@ -254,15 +263,24 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 			}
 			return err
 		}
+		if err := c.autoSaveLocalSession(input); err != nil {
+			if c.callbacks != nil && c.callbacks.OnError != nil {
+				c.callbacks.OnError("auto-save session gagal: " + err.Error())
+			}
+		}
 		if c.callbacks != nil && c.callbacks.OnModelEnd != nil {
 			c.callbacks.OnModelEnd(content, c.localConfig.Cloudflare.PrimaryModel, c.localSession, c.localSessionName, nil)
 		}
 		if reply != nil {
-			return json.Unmarshal([]byte(fmt.Sprintf(`{"content":%q}`, content)), reply)
+			raw, _ := json.Marshal(map[string]any{"content": content, "session_id": c.localSession, "session_name": c.localSessionName})
+			return json.Unmarshal(raw, reply)
 		}
 		return nil
 	case "agent.status":
-		status := map[string]any{"running": false, "engine": "go", "model_id": c.localConfig.Cloudflare.PrimaryModel, "model_name": c.localConfig.Cloudflare.PrimaryModel, "session_id": c.localSession, "session_name": c.localSessionName}
+		status := map[string]any{"running": false, "engine": "go", "model_id": c.localConfig.Cloudflare.PrimaryModel, "model_name": c.localConfig.Cloudflare.PrimaryModel, "session_id": c.localSession, "session_name": c.localSessionName, "context_info": c.localContextInfo()}
+		if c.localNeuronsQuota > 0 {
+			status["status_bar_info"] = map[string]any{"neurons_used": c.localNeuronsUsed, "neurons_remaining": c.localNeuronsRemaining, "neurons_quota": c.localNeuronsQuota}
+		}
 		if data, err := os.ReadFile(filepath.Join(c.localRoot, ".autokeren", "kanban.json")); err == nil {
 			var tasks any
 			if json.Unmarshal(data, &tasks) == nil {
@@ -295,8 +313,8 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		if err := os.MkdirAll(filepath.Join(c.localRoot, ".ak-sessions"), 0o700); err != nil {
 			return err
 		}
-		src := filepath.Join(c.localRoot, ".ak-sessions", c.localSession+".json")
-		dst := filepath.Join(c.localRoot, ".ak-sessions", name+".json")
+		src := c.sessionPath(c.localSession)
+		dst := c.sessionPath(name)
 		data, err := os.ReadFile(src)
 		if os.IsNotExist(err) {
 			if saveErr := sessionstore.Save(src, sessionstore.New(c.localSession, nil)); saveErr != nil {
@@ -307,11 +325,18 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(dst, data, 0o600); err != nil {
+		var sessionData sessionstore.Data
+		if err := json.Unmarshal(data, &sessionData); err != nil {
 			return err
 		}
+		sessionData.ID = name
+		sessionData.Name = name
+		if err := sessionstore.Save(dst, sessionData); err != nil {
+			return err
+		}
+		c.localSession = name
+		c.localSessionName = name
 		if reply != nil {
-			c.localSessionName = name
 			return json.Unmarshal([]byte(fmt.Sprintf(`{"message":"Session '%s' disimpan.","session_id":%q,"session_name":%q,"name":%q}`, name, name, name, name)), reply)
 		}
 		return nil
@@ -321,18 +346,19 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		if identifier == "" {
 			return errors.New("session identifier kosong")
 		}
-		if _, err := os.Stat(filepath.Join(c.localRoot, ".ak-sessions", identifier+".json")); err != nil {
+		id, path, err := c.resolveSession(identifier)
+		if err != nil {
 			return err
 		}
-		c.localSession = identifier
+		c.localSession = id
 		c.localSessionName = identifier
 		if reply != nil {
-			data, loadErr := sessionstore.Load(filepath.Join(c.localRoot, ".ak-sessions", identifier+".json"))
+			data, loadErr := sessionstore.Load(path)
 			if loadErr == nil {
 				if data.Name != "" {
 					c.localSessionName = data.Name
 				}
-				raw, _ := json.Marshal(map[string]any{"message": "Session " + identifier + " berhasil di-resume.", "session_id": identifier, "session_name": data.Name, "messages": data.Messages})
+				raw, _ := json.Marshal(map[string]any{"message": "Session " + c.localSessionName + " berhasil di-resume.", "session_id": c.localSession, "session_name": c.localSessionName, "messages": data.Messages})
 				return json.Unmarshal(raw, reply)
 			}
 		}
@@ -346,7 +372,15 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		for _, entry := range entries {
 			if filepath.Ext(entry.Name()) == ".json" {
 				id := entry.Name()[:len(entry.Name())-5]
-				items = append(items, map[string]interface{}{"id": id, "name": id})
+				data, loadErr := sessionstore.Load(c.sessionPath(id))
+				if loadErr != nil {
+					continue
+				}
+				name := data.Name
+				if name == "" {
+					name = id
+				}
+				items = append(items, map[string]interface{}{"id": id, "name": name, "created_at": data.CreatedAt.Format(time.RFC3339), "message_count": len(data.Messages)})
 			}
 		}
 		if reply != nil {
@@ -432,6 +466,78 @@ func (c *Client) localModels() []map[string]interface{} {
 	return models
 }
 
+func (c *Client) sessionPath(id string) string {
+	return filepath.Join(c.localRoot, ".ak-sessions", id+".json")
+}
+
+func (c *Client) autoSaveLocalSession(input string) error {
+	if !c.localConfig.Autokeren.AutoSaveSession {
+		return nil
+	}
+	path := c.sessionPath(c.localSession)
+	data, err := sessionstore.Load(path)
+	if err != nil {
+		return err
+	}
+	if c.localSessionName == "" || c.localSessionName == "default" {
+		words := strings.FieldsFunc(strings.ToLower(input), func(r rune) bool { return !(r >= 'a' && r <= 'z') && !(r >= '0' && r <= '9') })
+		if len(words) > 3 {
+			words = words[:3]
+		}
+		slug := strings.Join(words, "-")
+		if slug == "" {
+			slug = "session"
+		}
+		c.localSessionName = time.Now().Format("20060102-150405") + "-" + slug
+	}
+	data.ID = c.localSession
+	data.Name = c.localSessionName
+	if err := sessionstore.Save(path, data); err != nil {
+		return err
+	}
+	if c.callbacks != nil && c.callbacks.OnSessionSaved != nil {
+		c.callbacks.OnSessionSaved(c.localSession, c.localSessionName)
+	}
+	return nil
+}
+
+func (c *Client) resolveSession(identifier string) (string, string, error) {
+	direct := c.sessionPath(identifier)
+	if _, err := os.Stat(direct); err == nil {
+		return identifier, direct, nil
+	}
+	entries, err := os.ReadDir(filepath.Join(c.localRoot, ".ak-sessions"))
+	if err != nil {
+		return "", "", err
+	}
+	for _, entry := range entries {
+		if filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+		id := strings.TrimSuffix(entry.Name(), ".json")
+		path := c.sessionPath(id)
+		data, loadErr := sessionstore.Load(path)
+		if loadErr == nil && data.Name == identifier {
+			return id, path, nil
+		}
+	}
+	return "", "", fmt.Errorf("session %q tidak ditemukan", identifier)
+}
+
+func (c *Client) localContextInfo() map[string]any {
+	tokens := 0
+	if data, err := sessionstore.Load(c.sessionPath(c.localSession)); err == nil {
+		for _, message := range data.Messages {
+			tokens += len([]rune(message.Role+" "+message.Content+" "+message.Name))/4 + len(message.ToolCalls)*8
+		}
+	}
+	window := c.localConfig.Autokeren.ContextWindow
+	if window <= 0 {
+		window = 262144
+	}
+	return map[string]any{"tokens": tokens, "window": window, "pct": float64(tokens) / float64(window) * 100}
+}
+
 func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 	parts := strings.Fields(input)
 	if len(parts) == 0 || !strings.HasPrefix(parts[0], "/") {
@@ -439,8 +545,26 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 	}
 	var output string
 	switch parts[0] {
+	case "/help":
+		output = "Perintah: /help, /model, /lang, /permissions, /memory, /export, /mcp, /save, /resume, /sessions, /ghost, /research, /proof, /review, /security, /rewind, /config, /local, /approval, /reset, /q"
+	case "/permissions":
+		output = "Tool berisiko akan meminta izin di TUI. Gunakan /approval all untuk mengizinkan semua tool selama sesi ini, atau /approval ask untuk kembali bertanya."
 	case "/status":
 		output = fmt.Sprintf("engine: go\nmodel: %s\nproject: %s", c.localConfig.Cloudflare.PrimaryModel, c.localRoot)
+	case "/lang":
+		if len(parts) == 1 {
+			output = fmt.Sprintf("Bahasa aktif: %s. Gunakan /lang <kode>.", c.localConfig.Autokeren.Language)
+			break
+		}
+		language := strings.ToLower(parts[1])
+		if len(language) < 2 || len(language) > 8 {
+			return true, errors.New("kode bahasa tidak valid")
+		}
+		c.localConfig.Autokeren.Language = language
+		if err := config.Save(c.localConfigPath, c.localConfig); err != nil {
+			return true, err
+		}
+		output = "Bahasa aktif diubah ke: " + language
 	case "/config":
 		raw, _ := json.MarshalIndent(c.localConfig, "", "  ")
 		output = string(raw)
@@ -453,6 +577,44 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 		if output == "" {
 			output = "Memory project kosong."
 		}
+	case "/export":
+		name := "autokeren_export_" + time.Now().Format("20060102_150405") + ".md"
+		if len(parts) > 1 {
+			name = parts[1]
+			if !strings.HasSuffix(name, ".md") {
+				name += ".md"
+			}
+		}
+		data, err := sessionstore.Load(c.sessionPath(c.localSession))
+		if err != nil {
+			return true, err
+		}
+		var builder strings.Builder
+		builder.WriteString("# autokeren Chat Export\n\n")
+		for _, message := range data.Messages {
+			if message.Role != "user" && message.Role != "assistant" {
+				continue
+			}
+			role := "Assistant"
+			if message.Role == "user" {
+				role = "User"
+			}
+			builder.WriteString("## " + role + "\n\n" + message.Content + "\n\n---\n\n")
+		}
+		if err := os.WriteFile(filepath.Join(c.localRoot, name), []byte(builder.String()), 0o600); err != nil {
+			return true, err
+		}
+		output = "Export tersimpan: " + filepath.Join(c.localRoot, name)
+	case "/local":
+		if len(parts) == 1 {
+			output = "Local endpoint: " + c.localConfig.Auth.LocalEndpoint
+			break
+		}
+		c.localConfig.Auth.LocalEndpoint = parts[1]
+		if err := config.Save(c.localConfigPath, c.localConfig); err != nil {
+			return true, err
+		}
+		output = "Local endpoint diubah: " + c.localConfig.Auth.LocalEndpoint
 	case "/mcp":
 		if len(parts) > 1 && parts[1] == "add" {
 			if len(parts) < 4 {
@@ -541,7 +703,7 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 		c.callbacks.OnChunk(output)
 	}
 	if c.callbacks != nil && c.callbacks.OnModelEnd != nil {
-		c.callbacks.OnModelEnd(output, c.localConfig.Cloudflare.PrimaryModel, c.localSession, c.localSession, nil)
+		c.callbacks.OnModelEnd(output, c.localConfig.Cloudflare.PrimaryModel, c.localSession, c.localSessionName, nil)
 	}
 	if reply != nil {
 		raw, _ := json.Marshal(map[string]any{"content": output, "ok": true})

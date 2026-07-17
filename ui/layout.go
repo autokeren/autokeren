@@ -112,7 +112,12 @@ type SlashCommandInfo struct {
 }
 
 var slashCommands = []SlashCommandInfo{
+	{Name: "/help", Description: "Tampilkan bantuan perintah slash"},
 	{Name: "/model", Description: "Ganti model AI yang digunakan"},
+	{Name: "/lang", Description: "Lihat atau ubah bahasa antarmuka"},
+	{Name: "/permissions", Description: "Lihat status izin tool"},
+	{Name: "/memory", Description: "Tampilkan memory proyek"},
+	{Name: "/export", Description: "Ekspor percakapan ke Markdown"},
 	{Name: "/ghost", Description: "Kelola background agent"},
 	{Name: "/board", Description: "Buka/tutup papan Kanban proyek (Shortcut: Ctrl+K)"},
 	{Name: "/kanban", Description: "Buka/tutup papan Kanban proyek (Shortcut: Ctrl+K)"},
@@ -1092,6 +1097,22 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.Chat.AppendMessage("system", fmt.Sprintf("Mengganti model ke: %s...", args))
 					return m, m.switchModelCmd(args)
 				}
+			}
+
+			if strings.HasPrefix(val, "/approval") {
+				args := strings.TrimSpace(strings.TrimPrefix(val, "/approval"))
+				m.TextInput.SetValue("")
+				switch args {
+				case "all":
+					m.AllowAllTools = true
+					m.Chat.AppendMessage("system", "Approval mode: semua tool diizinkan untuk sesi ini.")
+				case "ask", "default", "":
+					m.AllowAllTools = false
+					m.Chat.AppendMessage("system", "Approval mode: tool berisiko akan meminta izin.")
+				default:
+					m.Chat.AppendMessage("system", "Gunakan: /approval ask atau /approval all")
+				}
+				return m, nil
 			}
 
 			if val == "/compact" {

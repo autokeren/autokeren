@@ -36,6 +36,9 @@ type Usage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
 	TotalTokens      int `json:"total_tokens"`
+	NeuronsUsed      int `json:"neurons_used,omitempty"`
+	NeuronsRemaining int `json:"neurons_remaining,omitempty"`
+	NeuronsQuota     int `json:"neurons_quota,omitempty"`
 }
 
 type Request struct {

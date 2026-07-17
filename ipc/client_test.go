@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/autokeren/autokeren/internal/config"
+	sessionstore "github.com/autokeren/autokeren/internal/session"
 )
 
 func TestLocalModelsFetchesAndMarksActive(t *testing.T) {
@@ -43,5 +44,20 @@ func TestLocalSessionSaveAndResume(t *testing.T) {
 	if resumed["session_id"] != "demo" {
 		raw, _ := json.Marshal(resumed)
 		t.Fatalf("unexpected resume response: %s", raw)
+	}
+}
+
+func TestAutoSaveUsesPythonCompatibleNameAndUpdatesSession(t *testing.T) {
+	root := t.TempDir()
+	c := &Client{localRoot: root, localSession: "session-1", localSessionName: "default", localConfig: config.Config{Autokeren: config.Autokeren{AutoSaveSession: true}}}
+	if err := sessionstore.Save(c.sessionPath(c.localSession), sessionstore.New(c.localSession, nil)); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.autoSaveLocalSession("Buat aplikasi kalender pintar"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := sessionstore.Load(c.sessionPath(c.localSession))
+	if err != nil || data.Name == "" || data.Name == "default" {
+		t.Fatalf("auto-save did not name session: %#v err=%v", data, err)
 	}
 }

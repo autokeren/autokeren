@@ -127,7 +127,10 @@ func (m SidebarModel) View() string {
 
 	// Session
 	sb.WriteString(labelStyle.Render("session") + "\n")
-	sessionDisplay := m.SessionID
+	sessionDisplay := m.SessionName
+	if sessionDisplay == "" || sessionDisplay == "default" {
+		sessionDisplay = m.SessionID
+	}
 	if sessionDisplay == "" {
 		sessionDisplay = "default"
 	}

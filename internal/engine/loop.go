@@ -17,6 +17,7 @@ type Events struct {
 	OnToolOutput      func(string, string)
 	OnToolEnd         func(string, tool.Result)
 	ConfirmPermission func(string, string, map[string]any) bool
+	OnResponse        func(model.Response)
 }
 
 type Loop struct {

@@ -9,6 +9,7 @@ import (
 	"github.com/autokeren/autokeren/internal/model"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -47,7 +48,22 @@ func (p OpenAICompatible) Complete(ctx context.Context, request model.Request, o
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return model.Response{}, fmt.Errorf("provider status %d: %s", resp.StatusCode, strings.TrimSpace(string(data)))
 	}
-	return parseSSE(resp.Body, onChunk)
+	result, err := parseSSE(resp.Body, onChunk)
+	if err != nil {
+		return model.Response{}, err
+	}
+	result.Usage.NeuronsUsed = headerInt(resp.Header.Get("X-Neurons-Used"))
+	result.Usage.NeuronsRemaining = headerInt(resp.Header.Get("X-Neurons-Remaining"))
+	result.Usage.NeuronsQuota = headerInt(resp.Header.Get("X-Neurons-Quota"))
+	return result, nil
+}
+
+func headerInt(value string) int {
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 0 {
+		return 0
+	}
+	return parsed
 }
 
 type streamEvent struct {

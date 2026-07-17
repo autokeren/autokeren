@@ -85,6 +85,9 @@ func RunStandaloneEvents(ctx context.Context, cfg config.Config, root, prompt st
 	if err != nil {
 		return "", err
 	}
+	if events.OnResponse != nil {
+		events.OnResponse(response)
+	}
 	_ = session.Save(filepath.Join(root, ".ak-sessions", sessionID+".json"), session.New(sessionID, store.Messages()))
 	return response.Content, nil
 }

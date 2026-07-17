@@ -12,7 +12,7 @@ func TestLoadDefaultsAndEnv(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Auth.APIKey != "env-key" || cfg.Autokeren.ContextWindow != 262144 {
+	if cfg.Auth.APIKey != "env-key" || cfg.Autokeren.ContextWindow != 262144 || !cfg.Autokeren.AutoSaveSession {
 		t.Fatalf("unexpected config: %#v", cfg)
 	}
 }

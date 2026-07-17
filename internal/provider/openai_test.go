@@ -15,6 +15,9 @@ func TestOpenAICompatibleStreaming(t *testing.T) {
 			t.Errorf("missing auth header")
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("X-Neurons-Used", "123")
+		w.Header().Set("X-Neurons-Remaining", "9877")
+		w.Header().Set("X-Neurons-Quota", "10000")
 		_, _ = w.Write([]byte("data: {\"model\":\"test\",\"choices\":[{\"delta\":{\"content\":\"hello \"}}]}\n\n"))
 		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"world\"},\"finish_reason\":\"stop\"}]}\n\n"))
 		_, _ = w.Write([]byte("data: [DONE]\n\n"))
@@ -30,5 +33,8 @@ func TestOpenAICompatibleStreaming(t *testing.T) {
 	}
 	if strings.Join(chunks, "") != "hello world" {
 		t.Fatalf("chunks = %q", strings.Join(chunks, ""))
+	}
+	if response.Usage.NeuronsUsed != 123 || response.Usage.NeuronsRemaining != 9877 || response.Usage.NeuronsQuota != 10000 {
+		t.Fatalf("unexpected neuron usage: %#v", response.Usage)
 	}
 }
