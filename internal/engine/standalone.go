@@ -41,7 +41,7 @@ func RunStandalone(ctx context.Context, cfg config.Config, root, prompt string, 
 			registry.Register(remote)
 		}
 	}
-	loop := &Loop{Runner: Runner{Provider: provider.OpenAICompatible{Endpoint: endpoint, APIKey: cfg.Auth.APIKey}}, Tools: registry, Context: contextstore.New(cfg.Autokeren.ContextWindow, cfg.Autokeren.AutoCompact, cfg.Autokeren.AutoCompactThreshold), MaxIterations: cfg.Autokeren.MaxIterations}
+	loop := &Loop{Runner: Runner{Provider: provider.OpenAICompatible{Endpoint: endpoint, APIKey: cfg.Auth.APIKey}}, Model: cfg.Cloudflare.PrimaryModel, Temperature: cfg.Cloudflare.Temperature, MaxTokens: cfg.Cloudflare.MaxTokens, Tools: registry, Context: contextstore.New(cfg.Autokeren.ContextWindow, cfg.Autokeren.AutoCompact, cfg.Autokeren.AutoCompactThreshold), MaxIterations: cfg.Autokeren.MaxIterations}
 	response, err := loop.Run(ctx, prompt, Events{OnChunk: onChunk, ConfirmPermission: func(name string, _ string, _ map[string]any) bool { return name != "run_shell" }})
 	if err != nil {
 		return "", err

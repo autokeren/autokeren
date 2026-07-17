@@ -23,6 +23,9 @@ type Loop struct {
 	Tools         *tool.Registry
 	Context       *contextstore.Store
 	MaxIterations int
+	Model         string
+	Temperature   float64
+	MaxTokens     int
 }
 
 func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.Response, error) {
@@ -42,7 +45,7 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 	}
 	var last model.Response
 	for iteration := 0; iteration < limit; iteration++ {
-		request := model.Request{Messages: l.Context.Messages(), Tools: definitions(l.Tools)}
+		request := model.Request{Model: l.Model, Messages: l.Context.Messages(), Tools: definitions(l.Tools), Temperature: l.Temperature, MaxTokens: l.MaxTokens}
 		var onChunk provider.ChunkHandler
 		if events.OnChunk != nil {
 			onChunk = func(chunk string) error { events.OnChunk(chunk); return nil }
