@@ -23,8 +23,8 @@ class ProofTool(Tool):
         "properties": {
             "action": {
                 "type": "string",
-                "enum": ["plan", "record", "report", "list"],
-                "description": "Aksi bukti yang ingin dilakukan: plan, record, report, list",
+                "enum": ["plan", "record", "report", "list", "replay"],
+                "description": "Aksi bukti yang ingin dilakukan: plan, record, report, list, replay",
             },
             "proof_id": {
                 "type": "string",
@@ -94,6 +94,23 @@ class ProofTool(Tool):
             return "[bold yellow]NEEDS_HUMAN_REVIEW[/bold yellow]", "yellow"
         return "[bold blue]IN_PROGRESS[/bold blue]", "blue"
 
+    def _write_proof_atomic(self, file_path: Path, data: dict[str, Any]) -> None:
+        import tempfile
+        import os
+        fd, temp_path_str = tempfile.mkstemp(dir=str(self.proofs_dir), suffix=".tmp")
+        temp_path = Path(temp_path_str)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            os.replace(temp_path, file_path)
+        except Exception as e:
+            if temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except Exception:
+                    pass
+            raise e
+
     def run(
         self,
         action: str,
@@ -105,6 +122,21 @@ class ProofTool(Tool):
         evidence: str | None = None,
         **kwargs: Any,
     ) -> ToolResult:
+        import re
+
+        if action in ("record", "report"):
+            if not proof_id or not re.match(r"^proof-[A-Za-z0-9T_-]+$", proof_id):
+                return ToolResult(
+                    error="ID proof tidak valid atau mengandung karakter berbahaya.",
+                    ok=False,
+                )
+            file_path = (self.proofs_dir / f"{proof_id}.json").resolve()
+            if not str(file_path).startswith(str(self.proofs_dir.resolve())):
+                return ToolResult(
+                    error="ID proof tidak valid (deteksi path traversal).",
+                    ok=False,
+                )
+
         if action == "plan":
             if not title or not criteria:
                 return ToolResult(error="Aksi 'plan' membutuhkan parameter 'title' dan 'criteria'.", ok=False)
@@ -122,7 +154,7 @@ class ProofTool(Tool):
             }
             file_path = self.proofs_dir / f"{pid}.json"
             try:
-                file_path.write_text(json.dumps(payload, indent=2))
+                self._write_proof_atomic(file_path, payload)
             except Exception as e:
                 return ToolResult(error=f"Gagal menulis file proof: {e}", ok=False)
 
@@ -146,7 +178,7 @@ class ProofTool(Tool):
                 return ToolResult(error=f"Rencana bukti dengan ID '{proof_id}' tidak ditemukan.", ok=False)
 
             try:
-                data = json.loads(file_path.read_text())
+                data = json.loads(file_path.read_text(encoding="utf-8"))
             except Exception as e:
                 return ToolResult(error=f"Gagal membaca file proof: {e}", ok=False)
 
@@ -161,7 +193,7 @@ class ProofTool(Tool):
             data["criteria"] = items
 
             try:
-                file_path.write_text(json.dumps(data, indent=2))
+                self._write_proof_atomic(file_path, data)
             except Exception as e:
                 return ToolResult(error=f"Gagal memperbarui file proof: {e}", ok=False)
 
@@ -177,7 +209,7 @@ class ProofTool(Tool):
                 return ToolResult(error=f"Rencana bukti dengan ID '{proof_id}' tidak ditemukan.", ok=False)
 
             try:
-                data = json.loads(file_path.read_text())
+                data = json.loads(file_path.read_text(encoding="utf-8"))
             except Exception as e:
                 return ToolResult(error=f"Gagal membaca file proof: {e}", ok=False)
 
@@ -218,7 +250,7 @@ class ProofTool(Tool):
             proof_list = []
             for f in files:
                 try:
-                    data = json.loads(f.read_text())
+                    data = json.loads(f.read_text(encoding="utf-8"))
                     proof_list.append(data)
                 except Exception:
                     pass
@@ -252,9 +284,25 @@ class ProofTool(Tool):
                 return ToolResult(error=f"File JSON proof di '{proof_id}' tidak ditemukan.", ok=False)
 
             try:
-                data = json.loads(file_path.read_text())
+                data = json.loads(file_path.read_text(encoding="utf-8"))
             except Exception as e:
                 return ToolResult(error=f"Gagal membaca file JSON proof: {e}", ok=False)
+
+            # JSON Schema Validation
+            if not isinstance(data, dict):
+                return ToolResult(error="File JSON proof harus berupa object/dictionary.", ok=False)
+            if "criteria" not in data or not isinstance(data["criteria"], list):
+                return ToolResult(error="File JSON proof harus mengandung list 'criteria'.", ok=False)
+
+            valid_statuses = {"pending", "passed", "failed", "blocked", "manual_review"}
+            for i, c in enumerate(data["criteria"]):
+                if not isinstance(c, dict):
+                    return ToolResult(error=f"Kriteria ke-{i+1} harus berupa object/dictionary.", ok=False)
+                if "text" not in c or not isinstance(c["text"], str):
+                    return ToolResult(error=f"Kriteria ke-{i+1} harus mengandung key 'text' berupa string.", ok=False)
+                st = c.get("status", "pending")
+                if st not in valid_statuses:
+                    return ToolResult(error=f"Kriteria ke-{i+1} memiliki status '{st}' yang tidak valid.", ok=False)
 
             items = data.get("criteria", [])
             verdict = self._get_verdict(items)
