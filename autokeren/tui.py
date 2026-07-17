@@ -4,6 +4,7 @@ from __future__ import annotations
 import threading
 import queue
 import time
+import re
 from pathlib import Path
 from typing import Any
 
@@ -1020,6 +1021,11 @@ def _assistant_renderable(content: str) -> Markdown | Text:
     return Markdown(content)
 
 
+def _clean_tool_output(line: str) -> str:
+    cleaned = line.replace("**", "").replace("__", "").replace("`", "")
+    return re.sub(r"^(#{1,6})\s+", "", cleaned)
+
+
 class ToolWidget(Static):
     """Widget untuk menampilkan jalannya tool secara inline."""
 
@@ -1039,7 +1045,7 @@ class ToolWidget(Static):
         self.refresh()
 
     def append_line(self, line: str) -> None:
-        self.output_lines.append(line)
+        self.output_lines.append(_clean_tool_output(line))
         self.refresh()
 
     def render(self) -> Text:
