@@ -504,7 +504,11 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Chat.AppendMessage("tool", fmt.Sprintf("│ %s", msg.Line))
 
 	case RetryMsg:
-		m.Chat.AppendMessage("system", fmt.Sprintf("retry #%d (%.0fs) %s", msg.Attempt, msg.Delay, msg.Message))
+		if msg.Attempt > 0 {
+			m.Chat.AppendMessage("system", fmt.Sprintf("retry #%d (%.0fs) %s", msg.Attempt, msg.Delay, msg.Message))
+		} else {
+			m.Chat.AppendMessage("system", msg.Message)
+		}
 
 	case ErrorMsg:
 		m.InitError = msg.Message

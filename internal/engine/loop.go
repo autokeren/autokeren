@@ -9,10 +9,12 @@ import (
 	"github.com/autokeren/autokeren/internal/provider"
 	"github.com/autokeren/autokeren/internal/tool"
 	"strings"
+	"time"
 )
 
 type Events struct {
 	OnChunk           func(string)
+	OnRetry           func(int, time.Duration, string)
 	OnToolStart       func(string, map[string]any)
 	OnToolOutput      func(string, string)
 	OnToolEnd         func(string, tool.Result)

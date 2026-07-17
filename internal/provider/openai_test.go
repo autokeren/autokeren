@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"github.com/autokeren/autokeren/internal/model"
 	"net/http"
 	"net/http/httptest"
@@ -36,5 +37,26 @@ func TestOpenAICompatibleStreaming(t *testing.T) {
 	}
 	if response.Usage.NeuronsUsed != 123 || response.Usage.NeuronsRemaining != 9877 || response.Usage.NeuronsQuota != 10000 {
 		t.Fatalf("unexpected neuron usage: %#v", response.Usage)
+	}
+}
+
+func TestOpenAICompatibleReturnsTypedStatusError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Retry-After", "2")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte("slow down"))
+	}))
+	defer server.Close()
+
+	_, err := (OpenAICompatible{Endpoint: server.URL}).Complete(context.Background(), model.Request{Model: "test"}, nil)
+	if err == nil {
+		t.Fatal("expected provider error")
+	}
+	var providerErr *Error
+	if !errors.As(err, &providerErr) {
+		t.Fatalf("expected typed provider error, got %T", err)
+	}
+	if providerErr.Status != http.StatusTooManyRequests || providerErr.RetryAfter.Seconds() != 2 {
+		t.Fatalf("unexpected provider error: %#v", providerErr)
 	}
 }

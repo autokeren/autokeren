@@ -27,6 +27,10 @@ func RunStandalone(ctx context.Context, cfg config.Config, root, prompt string, 
 }
 
 func RunStandaloneEvents(ctx context.Context, cfg config.Config, root, prompt string, events Events, resume string) (string, error) {
+	return RunStandaloneEventsWithRouterState(ctx, cfg, root, prompt, events, resume, nil)
+}
+
+func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, root, prompt string, events Events, resume string, routerState *provider.RouterState) (string, error) {
 	endpoint := cfg.Auth.BaseURL
 	if endpoint == "" {
 		return "", fmt.Errorf("auth base_url is empty")
@@ -78,7 +82,34 @@ func RunStandaloneEvents(ctx context.Context, cfg config.Config, root, prompt st
 		store.Replace(data.Messages)
 	}
 	store.Replace(withCurrentSystemPrompt(store.Messages()))
-	loop := &Loop{Runner: Runner{Provider: provider.OpenAICompatible{Endpoint: endpoint, APIKey: cfg.Auth.APIKey, Client: &http.Client{Timeout: timeout}}}, Model: config.ResolveModel(cfg.Cloudflare.PrimaryModel, cfg.Auth.Mode), Temperature: cfg.Cloudflare.Temperature, MaxTokens: cfg.Cloudflare.MaxTokens, Tools: registry, Context: store, MaxIterations: cfg.Autokeren.MaxIterations}
+	baseProvider := provider.OpenAICompatible{Endpoint: endpoint, APIKey: cfg.Auth.APIKey, Client: &http.Client{Timeout: timeout}}
+	primaryModel := config.ResolveModel(cfg.Cloudflare.PrimaryModel, cfg.Auth.Mode)
+	secondaryModel := config.ResolveModel(cfg.Cloudflare.SecondaryModel, cfg.Auth.Mode)
+	router, err := provider.NewRouter(provider.RouterConfig{
+		Targets: []provider.Target{
+			{ModelID: primaryModel, Provider: baseProvider},
+			{ModelID: secondaryModel, Provider: baseProvider},
+		},
+		Retry: provider.RetryPolicy{
+			MaxRetries:      cfg.Retry.MaxRetries,
+			BaseDelay:       time.Duration(cfg.Retry.BaseDelay * float64(time.Second)),
+			MaxDelay:        time.Duration(cfg.Retry.MaxDelay * float64(time.Second)),
+			ExponentialBase: cfg.Retry.ExponentialBase,
+			Jitter:          cfg.Retry.Jitter,
+		},
+		CircuitFailureThreshold: cfg.Retry.CircuitFailureThreshold,
+		CircuitOpenDuration:     time.Duration(cfg.Retry.CircuitOpenSeconds) * time.Second,
+		State:                   routerState,
+		OnRetry: func(event provider.RetryEvent) {
+			if events.OnRetry != nil {
+				events.OnRetry(event.Attempt, event.Delay, event.Message)
+			}
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	loop := &Loop{Runner: Runner{Provider: router}, Model: primaryModel, Temperature: cfg.Cloudflare.Temperature, MaxTokens: cfg.Cloudflare.MaxTokens, Tools: registry, Context: store, MaxIterations: cfg.Autokeren.MaxIterations}
 	if events.ConfirmPermission == nil {
 		events.ConfirmPermission = func(name string, _ string, _ map[string]any) bool { return name != "run_shell" }
 	}

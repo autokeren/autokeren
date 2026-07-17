@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type OpenAICompatible struct {
@@ -41,21 +42,41 @@ func (p OpenAICompatible) Complete(ctx context.Context, request model.Request, o
 	}
 	resp, err := p.Client.Do(req)
 	if err != nil {
-		return model.Response{}, fmt.Errorf("provider request: %w", err)
+		return model.Response{}, &Error{Cause: fmt.Errorf("provider request: %w", err)}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return model.Response{}, fmt.Errorf("provider status %d: %s", resp.StatusCode, strings.TrimSpace(string(data)))
+		return model.Response{}, &Error{
+			Status:     resp.StatusCode,
+			RetryAfter: retryAfter(resp.Header.Get("Retry-After")),
+			Cause:      fmt.Errorf("provider status %d: %s", resp.StatusCode, strings.TrimSpace(string(data))),
+		}
 	}
-	result, err := parseSSE(resp.Body, onChunk)
+	result, streamStarted, err := parseSSE(resp.Body, onChunk)
 	if err != nil {
-		return model.Response{}, err
+		return model.Response{}, &Error{StreamStarted: streamStarted, Cause: err}
 	}
 	result.Usage.NeuronsUsed = headerInt(resp.Header.Get("X-Neurons-Used"))
 	result.Usage.NeuronsRemaining = headerInt(resp.Header.Get("X-Neurons-Remaining"))
 	result.Usage.NeuronsQuota = headerInt(resp.Header.Get("X-Neurons-Quota"))
 	return result, nil
+}
+
+func retryAfter(value string) time.Duration {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0
+	}
+	if seconds, err := strconv.Atoi(value); err == nil && seconds > 0 {
+		return time.Duration(seconds) * time.Second
+	}
+	if when, err := http.ParseTime(value); err == nil {
+		if delay := time.Until(when); delay > 0 {
+			return delay
+		}
+	}
+	return 0
 }
 
 func headerInt(value string) int {
@@ -86,9 +107,10 @@ type streamEvent struct {
 	Usage model.Usage `json:"usage"`
 }
 
-func parseSSE(reader io.Reader, onChunk ChunkHandler) (model.Response, error) {
+func parseSSE(reader io.Reader, onChunk ChunkHandler) (model.Response, bool, error) {
 	var result model.Response
 	var calls []model.ToolCall
+	streamStarted := false
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
 	for scanner.Scan() {
@@ -100,9 +122,10 @@ func parseSSE(reader io.Reader, onChunk ChunkHandler) (model.Response, error) {
 		if payload == "[DONE]" {
 			break
 		}
+		streamStarted = true
 		var event streamEvent
 		if err := json.Unmarshal([]byte(payload), &event); err != nil {
-			return model.Response{}, fmt.Errorf("decode provider event: %w", err)
+			return model.Response{}, streamStarted, fmt.Errorf("decode provider event: %w", err)
 		}
 		result.Model = event.Model
 		result.Usage = event.Usage
@@ -114,7 +137,7 @@ func parseSSE(reader io.Reader, onChunk ChunkHandler) (model.Response, error) {
 				result.Content += choice.Delta.Content
 				if onChunk != nil {
 					if err := onChunk(choice.Delta.Content); err != nil {
-						return model.Response{}, err
+						return model.Response{}, streamStarted, err
 					}
 				}
 			}
@@ -134,8 +157,8 @@ func parseSSE(reader io.Reader, onChunk ChunkHandler) (model.Response, error) {
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return model.Response{}, fmt.Errorf("read provider stream: %w", err)
+		return model.Response{}, streamStarted, fmt.Errorf("read provider stream: %w", err)
 	}
 	result.ToolCalls = calls
-	return result, nil
+	return result, streamStarted, nil
 }

@@ -24,3 +24,12 @@ func TestSessionChatMessagesHidesInternalMessages(t *testing.T) {
 		t.Fatalf("unexpected visible messages: %#v", messages)
 	}
 }
+
+func TestFallbackRetryMessageDoesNotUseZeroAttempt(t *testing.T) {
+	m := MainModel{Chat: NewChatModel()}
+	updated, _ := m.Update(RetryMsg{Message: "model primary gagal; fallback ke secondary"})
+	view := updated.(MainModel)
+	if len(view.Chat.Messages) != 1 || view.Chat.Messages[0].Content != "model primary gagal; fallback ke secondary" {
+		t.Fatalf("unexpected fallback message: %#v", view.Chat.Messages)
+	}
+}

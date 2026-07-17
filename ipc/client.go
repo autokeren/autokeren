@@ -26,6 +26,7 @@ import (
 	"github.com/autokeren/autokeren/internal/engine"
 	"github.com/autokeren/autokeren/internal/model"
 	projectstore "github.com/autokeren/autokeren/internal/project"
+	"github.com/autokeren/autokeren/internal/provider"
 	sessionstore "github.com/autokeren/autokeren/internal/session"
 	"github.com/autokeren/autokeren/internal/tool"
 	"github.com/autokeren/autokeren/internal/workflow"
@@ -75,6 +76,7 @@ type Client struct {
 	localRoot             string
 	localConfig           config.Config
 	localConfigPath       string
+	localModelID          string
 	localSession          string
 	localSessionName      string
 	localSessions         *sessionstore.Manager
@@ -86,6 +88,7 @@ type Client struct {
 	localDebug            bool
 	localGhosts           *ghost.GhostManager
 	localProjects         *projectstore.Manager
+	localRouterState      *provider.RouterState
 }
 
 func NewClient(callbacks *IPCCallbacks) *Client {
@@ -216,6 +219,7 @@ func (c *Client) startLocal(projectRoot, configPath string) error {
 	c.localRoot = projectRoot
 	c.localConfig = cfg
 	c.localConfigPath = configPath
+	c.localModelID = cfg.Cloudflare.PrimaryModel
 	c.localSession = "default"
 	c.localSessionName = "default"
 	c.localSessions, err = sessionstore.NewManager(projectRoot)
@@ -224,6 +228,7 @@ func (c *Client) startLocal(projectRoot, configPath string) error {
 	}
 	c.localGhosts = ghost.NewGhostManager(projectRoot)
 	c.localProjects = projectstore.NewManager()
+	c.localRouterState = provider.NewRouterState()
 	atomic.StoreInt32(&c.isClosed, 0)
 	return nil
 }
@@ -247,6 +252,11 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 			OnChunk: func(text string) {
 				if c.callbacks != nil && c.callbacks.OnChunk != nil {
 					c.callbacks.OnChunk(text)
+				}
+			},
+			OnRetry: func(attempt int, delay time.Duration, message string) {
+				if c.callbacks != nil && c.callbacks.OnRetry != nil {
+					c.callbacks.OnRetry(attempt, delay.Seconds(), message)
 				}
 			},
 			OnToolStart: func(name string, args map[string]any) {
@@ -274,6 +284,9 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 				return name != "run_shell"
 			},
 			OnResponse: func(response model.Response) {
+				if response.Model != "" {
+					c.localModelID = response.Model
+				}
 				c.localNeuronsUsed = response.Usage.NeuronsUsed
 				c.localNeuronsRemaining = response.Usage.NeuronsRemaining
 				c.localNeuronsQuota = response.Usage.NeuronsQuota
@@ -290,7 +303,7 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		c.localRunMu.Lock()
 		c.localRunCancel = cancel
 		c.localRunMu.Unlock()
-		content, err := engine.RunStandaloneEvents(runCtx, c.localConfig, c.localRoot, input, events, c.localSession)
+		content, err := engine.RunStandaloneEventsWithRouterState(runCtx, c.localConfig, c.localRoot, input, events, c.localSession, c.localRouterState)
 		c.localRunMu.Lock()
 		c.localRunCancel = nil
 		c.localRunMu.Unlock()
@@ -302,7 +315,7 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 			return err
 		}
 		if c.callbacks != nil && c.callbacks.OnModelEnd != nil {
-			c.callbacks.OnModelEnd(content, c.localConfig.Cloudflare.PrimaryModel, c.localSession, c.localSessionName, nil)
+			c.callbacks.OnModelEnd(content, c.localModelID, c.localSession, c.localSessionName, nil)
 		}
 		if reply != nil {
 			raw, _ := json.Marshal(map[string]any{"content": content, "session_id": c.localSession, "session_name": c.localSessionName})
@@ -310,7 +323,14 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		}
 		return nil
 	case "agent.status":
-		status := map[string]any{"running": false, "engine": "go", "model_id": c.localConfig.Cloudflare.PrimaryModel, "model_name": c.localConfig.Cloudflare.PrimaryModel, "session_id": c.localSession, "session_name": c.localSessionName, "context_info": c.localContextInfo()}
+		modelID := c.localModelID
+		if modelID == "" {
+			modelID = c.localConfig.Cloudflare.PrimaryModel
+		}
+		status := map[string]any{"running": false, "engine": "go", "model_id": modelID, "model_name": modelID, "session_id": c.localSession, "session_name": c.localSessionName, "context_info": c.localContextInfo()}
+		if c.localRouterState != nil {
+			status["model_router"] = c.localRouterState.Status()
+		}
 		if c.localNeuronsQuota > 0 {
 			status["status_bar_info"] = map[string]any{"neurons_used": c.localNeuronsUsed, "neurons_remaining": c.localNeuronsRemaining, "neurons_quota": c.localNeuronsQuota}
 		}
@@ -451,6 +471,7 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		args, _ := params.(map[string]interface{})
 		if modelID, ok := args["model_id"].(string); ok && modelID != "" {
 			c.localConfig.Cloudflare.PrimaryModel = modelID
+			c.localModelID = modelID
 			if c.localConfigPath != "" {
 				_ = config.Save(c.localConfigPath, c.localConfig)
 			}
@@ -953,7 +974,7 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 		c.callbacks.OnChunk(output)
 	}
 	if c.callbacks != nil && c.callbacks.OnModelEnd != nil {
-		c.callbacks.OnModelEnd(output, c.localConfig.Cloudflare.PrimaryModel, c.localSession, c.localSessionName, nil)
+		c.callbacks.OnModelEnd(output, c.localModelID, c.localSession, c.localSessionName, nil)
 	}
 	if reply != nil {
 		raw, _ := json.Marshal(map[string]any{"content": output, "ok": true})
