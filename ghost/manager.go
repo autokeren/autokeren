@@ -189,6 +189,9 @@ func (gm *GhostManager) binaryPath() string {
 			return candidate
 		}
 	}
+	if executable, err := os.Executable(); err == nil {
+		return executable
+	}
 	return "autokeren"
 }
 

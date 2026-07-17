@@ -538,7 +538,7 @@ pipx upgrade autokeren
 `autokeren` memakai runtime Go-first bertahap dengan fallback Python untuk kompatibilitas:
 
 1.  **Runtime agent Go (default untuk mode task/CLI):**
-    Menangani streaming provider, loop multi-turn, tool inti, session, MCP stdio, dan proses ghost native. Bisa dipilih eksplisit dengan `--engine go`.
+    Menangani streaming provider, loop multi-turn, tool inti, session, MCP stdio, dan proses ghost native. Ini adalah runtime default; tetap bisa dipilih eksplisit dengan `--engine go` bila diperlukan.
 2.  **Runtime kompatibilitas Python:**
     Tetap tersedia lewat `--engine python` dan dipakai otomatis saat `--engine auto` gagal menjalankan jalur provider Go.
 3.  **Frontend & TUI (Go):**

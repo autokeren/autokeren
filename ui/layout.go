@@ -115,6 +115,8 @@ var slashCommands = []SlashCommandInfo{
 	{Name: "/model", Description: "Ganti model AI yang digunakan"},
 	{Name: "/lang", Description: "Lihat atau ubah bahasa antarmuka"},
 	{Name: "/permissions", Description: "Lihat status izin tool"},
+	{Name: "/copy", Description: "Salin pesan terakhir atau pesan ke-N"},
+	{Name: "/debug", Description: "Aktifkan/nonaktifkan mode debug"},
 	{Name: "/memory", Description: "Tampilkan memory proyek"},
 	{Name: "/export", Description: "Ekspor percakapan ke Markdown"},
 	{Name: "/ghost", Description: "Kelola background agent"},
@@ -1283,7 +1285,7 @@ func (m MainModel) View() string {
 			Width(chatWidth - 4).
 			Height(chatHeight - 2)
 
-		chatView := chatStyle.Render("⚙ Menghubungkan ke agen Python di latar belakang...\nHarap tunggu sebentar...")
+		chatView := chatStyle.Render("⚙ Menghubungkan ke agen di latar belakang...\nHarap tunggu sebentar...")
 
 		inputView := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -1709,7 +1711,7 @@ func (m MainModel) connectToAgentCmd() tea.Cmd {
 		// Jalankan start client
 		err := m.IPCClient.Start(m.ProjectRoot, m.ConfigPath, m.InitOpts)
 		if err != nil {
-			return ErrorMsg{Message: fmt.Sprintf("Gagal menjalankan daemon Python: %v", err)}
+			return ErrorMsg{Message: fmt.Sprintf("Gagal menjalankan agen: %v", err)}
 		}
 
 		// Ambil status awal

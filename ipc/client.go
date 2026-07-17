@@ -19,6 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/atotto/clipboard"
 	"github.com/autokeren/autokeren/internal/config"
 	contextstore "github.com/autokeren/autokeren/internal/context"
 	"github.com/autokeren/autokeren/internal/engine"
@@ -79,6 +80,7 @@ type Client struct {
 	localNeuronsQuota     int
 	localRunMu            sync.Mutex
 	localRunCancel        context.CancelFunc
+	localDebug            bool
 }
 
 func NewClient(callbacks *IPCCallbacks) *Client {
@@ -516,6 +518,60 @@ func (c *Client) localSessionManager() (*sessionstore.Manager, error) {
 	return manager, nil
 }
 
+func (c *Client) copySessionMessage(selector string) (string, error) {
+	if c.localSession == "default" {
+		return "", errors.New("belum ada pesan untuk disalin")
+	}
+	sessions, err := c.localSessionManager()
+	if err != nil {
+		return "", err
+	}
+	data, err := sessions.Load(c.localSession)
+	if err != nil {
+		return "", err
+	}
+	content, err := copyableSessionMessage(data.Messages, selector)
+	if err != nil {
+		return "", err
+	}
+	if err := clipboard.WriteAll(content); err == nil {
+		return "Pesan disalin ke clipboard.", nil
+	}
+	file, err := os.CreateTemp("", "autokeren-copy-*.txt")
+	if err != nil {
+		return "", err
+	}
+	path := file.Name()
+	if _, err := file.WriteString(content); err != nil {
+		_ = file.Close()
+		return "", err
+	}
+	if err := file.Close(); err != nil {
+		return "", err
+	}
+	return "Clipboard tidak tersedia. Pesan tersimpan: " + path, nil
+}
+
+func copyableSessionMessage(messages []model.Message, selector string) (string, error) {
+	visible := make([]model.Message, 0, len(messages))
+	for _, message := range messages {
+		if (message.Role == "user" || message.Role == "assistant") && message.Content != "" {
+			visible = append(visible, message)
+		}
+	}
+	if len(visible) == 0 {
+		return "", errors.New("belum ada pesan untuk disalin")
+	}
+	if selector == "" || selector == "last" {
+		return visible[len(visible)-1].Content, nil
+	}
+	index, err := strconv.Atoi(selector)
+	if err != nil || index < 1 || index > len(visible) {
+		return "", fmt.Errorf("pesan dengan indeks %q tidak ditemukan", selector)
+	}
+	return visible[index-1].Content, nil
+}
+
 func (c *Client) localContextInfo() map[string]any {
 	tokens := 0
 	if sessions, err := c.localSessionManager(); err == nil && c.localSession != "default" {
@@ -544,6 +600,25 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 		output = "Perintah: /help, /model, /lang, /permissions, /memory, /export, /mcp, /save, /resume, /sessions, /ghost, /research, /proof, /review, /security, /rewind, /config, /local, /approval, /reset, /q"
 	case "/permissions":
 		output = "Tool berisiko akan meminta izin di TUI. Gunakan /approval all untuk mengizinkan semua tool selama sesi ini, atau /approval ask untuk kembali bertanya."
+	case "/debug":
+		c.localDebug = !c.localDebug
+		if c.localDebug {
+			_ = os.Setenv("AUTOKEREN_DEBUG", "1")
+			output = "Mode Debug AKTIF. Detail error akan ditampilkan lebih lengkap."
+		} else {
+			_ = os.Unsetenv("AUTOKEREN_DEBUG")
+			output = "Mode Debug NON-AKTIF."
+		}
+	case "/copy":
+		selector := "last"
+		if len(parts) > 1 {
+			selector = parts[1]
+		}
+		message, err := c.copySessionMessage(selector)
+		if err != nil {
+			return true, err
+		}
+		output = message
 	case "/status":
 		output = fmt.Sprintf("engine: go\nmodel: %s\nproject: %s", c.localConfig.Cloudflare.PrimaryModel, c.localRoot)
 	case "/lang":

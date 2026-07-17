@@ -491,7 +491,7 @@ pipx upgrade autokeren
 `autokeren` uses a staged Go-first runtime with Python compatibility fallback:
 
 1.  **Go agent runtime (default for task/CLI mode):**
-    Handles the provider stream, multi-turn loop, core tools, sessions, MCP stdio, and native ghost processes. Select explicitly with `--engine go`.
+    Handles the provider stream, multi-turn loop, core tools, sessions, MCP stdio, and native ghost processes. This is the default runtime; select it explicitly with `--engine go` when needed.
 2.  **Python compatibility runtime:**
     Remains available with `--engine python` and is used automatically when `--engine auto` cannot start the Go provider path.
 3.  **Frontend & TUI (Go):**

@@ -267,7 +267,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&useAgy, "agy", false, "Gunakan backend Google Antigravity")
 	rootCmd.Flags().BoolVar(&planMode, "plan", false, "Mulai dalam plan mode")
 	rootCmd.Flags().BoolVar(&nonInteractive, "non-interactive", false, "Jalankan single task tanpa REPL")
-	rootCmd.Flags().StringVar(&engineMode, "engine", "auto", "Engine runtime: auto, go, atau python")
+	rootCmd.Flags().StringVar(&engineMode, "engine", "go", "Engine runtime: go (default), auto, atau python")
 	rootCmd.Flags().StringVar(&taskPrompt, "task", "", "Deskripsi task untuk dijalankan")
 	rootCmd.Flags().StringVarP(&resumeSession, "resume", "r", "", "Resume sesi percakapan dari disk")
 }

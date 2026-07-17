@@ -27,7 +27,7 @@ func processIsAutokeren(pid int) bool {
 		return false
 	}
 	cmdline := strings.ReplaceAll(string(data), "\x00", " ")
-	return strings.Contains(cmdline, "autokeren") && strings.Contains(cmdline, "--engine")
+	return strings.Contains(cmdline, "--engine") && strings.Contains(cmdline, "--non-interactive")
 }
 
 func terminatePID(pid int) {

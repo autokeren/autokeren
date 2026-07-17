@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/autokeren/autokeren/internal/config"
+	"github.com/autokeren/autokeren/internal/model"
 )
 
 func TestLocalModelsFetchesAndMarksActive(t *testing.T) {
@@ -59,5 +60,17 @@ func TestExportEmptySessionIsHelpful(t *testing.T) {
 	}
 	if reply["content"] != "Belum ada percakapan untuk diekspor." {
 		t.Fatalf("unexpected export response: %#v", reply)
+	}
+}
+
+func TestCopyableSessionMessage(t *testing.T) {
+	messages := []model.Message{{Role: "system", Content: "internal"}, {Role: "user", Content: "satu"}, {Role: "tool", Content: "hidden"}, {Role: "assistant", Content: "dua"}}
+	last, err := copyableSessionMessage(messages, "last")
+	if err != nil || last != "dua" {
+		t.Fatalf("unexpected last message: %q err=%v", last, err)
+	}
+	first, err := copyableSessionMessage(messages, "1")
+	if err != nil || first != "satu" {
+		t.Fatalf("unexpected selected message: %q err=%v", first, err)
 	}
 }

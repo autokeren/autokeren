@@ -843,7 +843,7 @@ def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
                 pass
 
     if ak_bin.exists():
-        argv = [str(ak_bin)] + sys_argv[1:]
+        argv = [str(ak_bin), "--engine", "go"] + sys_argv[1:]
         try:
             if os.name == "nt":
                 sys.exit(subprocess.call(argv))
