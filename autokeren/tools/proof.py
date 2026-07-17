@@ -294,14 +294,14 @@ class ProofTool(Tool):
             if "criteria" not in data or not isinstance(data["criteria"], list):
                 return ToolResult(error="File JSON proof harus mengandung list 'criteria'.", ok=False)
 
-            valid_statuses = {"pending", "passed", "failed", "blocked", "manual_review"}
+            valid_statuses_set = {"pending", "passed", "failed", "blocked", "manual_review"}
             for i, c in enumerate(data["criteria"]):
                 if not isinstance(c, dict):
                     return ToolResult(error=f"Kriteria ke-{i+1} harus berupa object/dictionary.", ok=False)
                 if "text" not in c or not isinstance(c["text"], str):
                     return ToolResult(error=f"Kriteria ke-{i+1} harus mengandung key 'text' berupa string.", ok=False)
                 st = c.get("status", "pending")
-                if st not in valid_statuses:
+                if st not in valid_statuses_set:
                     return ToolResult(error=f"Kriteria ke-{i+1} memiliki status '{st}' yang tidak valid.", ok=False)
 
             items = data.get("criteria", [])
