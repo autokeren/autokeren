@@ -541,14 +541,14 @@ pipx upgrade autokeren
     Menangani streaming provider, loop multi-turn, tool inti, session, MCP stdio, dan proses ghost native. Bisa dipilih eksplisit dengan `--engine go`.
 2.  **Runtime kompatibilitas Python:**
     Tetap tersedia lewat `--engine python` dan dipakai otomatis saat `--engine auto` gagal menjalankan jalur provider Go.
-3.  **Frontend & TUI (Go):** 
+3.  **Frontend & TUI (Go):**
     Ditulis menggunakan framework **Bubble Tea** dan **Lip Gloss**. Mengelola visual terminal (Layout, File Explorer, Kanban Board, Debate View, input history) dan mengontrol subprocess browser Go-Rod untuk e2e testing.
-2.  **Core AI & Brain (Python):** 
+2.  **Core AI & Brain (Python):**
     Menangani logika multi-turn agentic loop, multi-model fallback routing, static analysis (AST parsing), dan permission screening.
 3.  **Jalur IPC (Inter-Process Communication):**
     Menggunakan protokol **JSON-RPC 2.0** yang dialirkan secara asinkron melalui **Local TCP Socket** pada port dinamis.
-    
-    *Mengapa menggunakan Local TCP Socket?*  
+
+    *Mengapa menggunakan Local TCP Socket?*
     Ini memisahkan data komunikasi JSON-RPC utama dari standard output (stdout) terminal Python. Jika dependensi Python atau kode program mencetak output acak (`print()`), output tersebut akan keluar di stderr background tanpa mencemari data obrolan TUI, menghindarkan crash atau pembekuan antarmuka (*TUI freeze*).
 
 ## Contributing
