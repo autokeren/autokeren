@@ -58,34 +58,26 @@ def test_agent_git_rollback(tmp_path):
     subprocess.run(["git", "add", "init.txt"], cwd=tmp_path)
     subprocess.run(["git", "commit", "-m", "chore: initial commit"], cwd=tmp_path)
     
-    test_file = tmp_path / "test.py"
-    test_file.write_text("x = 1", encoding="utf-8")
-    subprocess.run(["git", "add", "test.py"], cwd=tmp_path)
-    subprocess.run(["git", "commit", "-m", "feat(test): add test file"], cwd=tmp_path)
-    
     cfg = Config()
     cfg.autokeren.git_auto_commit.enabled = True
     
+    class MockRouter:
+        def complete(self, messages, **kwargs):
+            from autokeren.models.base import ModelResponse
+            return ModelResponse(content="feat(test): add test file")
+            
     agent = Agent(cfg, ToolRegistry(), str(tmp_path))
+    agent.router = MockRouter()
     
-    from autokeren.loop.detector import LoopAction
-    class MockLoopBreaker:
-        def track_error(self, **kwargs):
-            return LoopAction(action="break", suggestion="stop", switch_model=False, clear_context=False)
-        def reset(self):
-            pass
-            
-    agent.loop_breaker = MockLoopBreaker()
+    test_file = tmp_path / "test.py"
+    test_file.write_text("x = 1", encoding="utf-8")
+    agent._run_git_micro_commit("test.py")
     
-    lb_action = agent.loop_breaker.track_error(error="failure", tool_name="run_shell", context={})
-    if lb_action.action == "break":
-        if agent._git_auto_commit_enabled:
-            rollback_res = subprocess.run(
-                ["git", "-C", agent.project_root, "reset", "--hard", "HEAD~1"],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            assert rollback_res.returncode == 0
-            
-    assert not test_file.exists()
+    tags_res = subprocess.run(["git", "tag", "-l", "ak-green-*"], cwd=tmp_path, capture_output=True, text=True)
+    assert "ak-green-" in tags_res.stdout
+    
+    test_file.write_text("x = error", encoding="utf-8")
+    
+    agent._rollback_to_latest_green_tag("SyntaxError")
+    
+    assert test_file.read_text(encoding="utf-8") == "x = 1"

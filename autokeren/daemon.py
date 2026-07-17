@@ -69,13 +69,56 @@ class SystemObserver:
 
     def watch_loop(self) -> None:
         """Main loop pemantau berkas."""
+        if not hasattr(self, "_last_tmux_errors"):
+            self._last_tmux_errors: dict[str, str] = {}
         while self.running:
             time.sleep(5)
             try:
                 self._check_logs()
                 self._check_file_modifications()
+                self._check_tmux()
             except Exception:
                 pass
+
+    def _check_tmux(self) -> None:
+        try:
+            import subprocess
+            from autokeren.tools.tmux import TmuxTool
+            tmux_tool = TmuxTool(self.project_root)
+            
+            exists = subprocess.run([tmux_tool.tmux, "has-session", "-t", "autokeren"], capture_output=True).returncode == 0
+            if not exists:
+                return
+                
+            windows_res = subprocess.run(
+                [tmux_tool.tmux, "list-windows", "-t", "autokeren", "-F", "#I:#W"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if windows_res.returncode != 0:
+                return
+                
+            for line in windows_res.stdout.splitlines():
+                if not line.strip():
+                    continue
+                w_id, w_name = line.split(":", 1)
+                
+                sniff_res = tmux_tool.run(action="sniff", session="autokeren", window=w_id)
+                if not sniff_res.ok:
+                    err_str = str(sniff_res.output)
+                    if self._last_tmux_errors.get(w_id) != err_str:
+                        self._last_tmux_errors[w_id] = err_str
+                        self.daemon.trigger_auto_diagnose(
+                            f"Ditemukan error kritis di tmux window {w_id} ({w_name})",
+                            context=f"Log Error Tmux:\n{sniff_res.output}"
+                        )
+                else:
+                    # Hapus cache jika error sudah bersih
+                    if w_id in self._last_tmux_errors:
+                        del self._last_tmux_errors[w_id]
+        except Exception:
+            pass
 
     def _check_logs(self) -> None:
         for path in list(self.log_files):

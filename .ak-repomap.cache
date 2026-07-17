@@ -1,0 +1,2644 @@
+{
+  "files": {
+    "ghost/manager.go": {
+      "mtime": 1783817314.1834164,
+      "summary": "  package ghost\n  func (info GhostAgentInfo) Runtime() float64\n  func NewGhostManager(projectRoot string) *GhostManager\n  func (gm *GhostManager) Spawn(task string) (*GhostAgentInfo, error)\n  func (gm *GhostManager) CheckStatus(agentID int) string\n  func (gm *GhostManager) Kill(agentID int) bool\n  func (gm *GhostManager) List() []*GhostAgentInfo\n  func (gm *GhostManager) GetOutput(agentID int) string",
+      "symbols": [
+        "ghost",
+        "Runtime",
+        "NewGhostManager",
+        "Spawn",
+        "CheckStatus",
+        "Kill",
+        "List",
+        "GetOutput"
+      ]
+    },
+    "cmd/root.go": {
+      "mtime": 1783902272.669765,
+      "summary": "  package cmd\n  func runInteractiveLoop(client *ipc.Client)\n  func Execute()\n  func init()",
+      "symbols": [
+        "cmd",
+        "runInteractiveLoop",
+        "Execute",
+        "init"
+      ]
+    },
+    ".github/PULL_REQUEST_TEMPLATE.md": {
+      "mtime": 1783166658.1317484,
+      "summary": "",
+      "symbols": []
+    },
+    ".github/workflows/ci.yml": {
+      "mtime": 1783166656.3757153,
+      "summary": "",
+      "symbols": []
+    },
+    ".github/workflows/publish.yml": {
+      "mtime": 1783233294.083901,
+      "summary": "",
+      "symbols": []
+    },
+    ".github/ISSUE_TEMPLATE/feature_request.md": {
+      "mtime": 1783166657.206731,
+      "summary": "",
+      "symbols": []
+    },
+    ".github/ISSUE_TEMPLATE/bug_report.md": {
+      "mtime": 1783166657.206731,
+      "summary": "",
+      "symbols": []
+    },
+    "tests/test_daemon_observer.py": {
+      "mtime": 1783787390.95167,
+      "summary": "  def test_system_observer_files_and_logs()",
+      "symbols": [
+        "test_system_observer_files_and_logs"
+      ]
+    },
+    "tests/test_fddm.py": {
+      "mtime": 1783983586.0134172,
+      "summary": "  def test_fddm_tool_schema()\n  def test_fddm_tool_defaults()\n  def test_fddm_tool_custom_url()\n  def test_fddm_emit_mock()\n  def test_fddm_sniff_mock()\n  def test_fddm_stats_mock()\n  def test_fddm_error_handling()\n  def test_fddm_unknown_action()",
+      "symbols": [
+        "test_fddm_tool_schema",
+        "test_fddm_tool_defaults",
+        "test_fddm_tool_custom_url",
+        "test_fddm_emit_mock",
+        "test_fddm_sniff_mock",
+        "test_fddm_stats_mock",
+        "test_fddm_error_handling",
+        "test_fddm_unknown_action"
+      ]
+    },
+    "tests/test_tmux.py": {
+      "mtime": 1784212572.2041945,
+      "summary": "  def test_tmux_tool_permission()\n  def test_tmux_tool_sniff_clean(monkeypatch)\n  def test_tmux_tool_sniff_with_errors(monkeypatch)",
+      "symbols": [
+        "test_tmux_tool_permission",
+        "test_tmux_tool_sniff_clean",
+        "test_tmux_tool_sniff_with_errors"
+      ]
+    },
+    "tests/test_antigravity.py": {
+      "mtime": 1783502070.2330894,
+      "summary": "  class TestAntigravityIntegration(unittest.TestCase):\n    def setUp(self)\n    def tearDown(self)\n    def test_fetch_antigravity_models_success(self, mock_run)\n    def test_fetch_antigravity_models_failure_fallback(self, mock_run)\n    def test_antigravity_model_complete(self, mock_which, mock_refresh, mock_load, mock_stream)\n    def test_router_initialization_antigravity(self)",
+      "symbols": [
+        "TestAntigravityIntegration",
+        "setUp",
+        "tearDown",
+        "test_fetch_antigravity_models_success",
+        "test_fetch_antigravity_models_failure_fallback",
+        "test_antigravity_model_complete",
+        "test_router_initialization_antigravity"
+      ]
+    },
+    "tests/test_tools.py": {
+      "mtime": 1783790661.4140344,
+      "summary": "  class _DummyTool(Tool):\n    def run(self, **kwargs)\n  class TestToolResult:\n    def test_to_dict_success(self)\n    def test_to_dict_error(self)\n    def test_to_dict_with_dict_output(self)\n    def test_ok_defaults_true(self)\n  class TestToolRegistry:\n    def test_register_returns_self(self)\n    def test_get_registered(self)\n    def test_get_unknown_returns_none(self)\n    def test_run_unknown_tool(self)\n    def test_run_valid_tool(self)\n    def test_run_filters_unsupported_extra_args(self)\n    def test_run_catches_exception(self)\n    def test_names(self)\n    def test_schemas(self)\n  class TestIsDangerousCommand:\n    def test_safe_command(self)\n    def test_rm_rf_root(self)\n    def test_case_insensitive(self)\n    def test_custom_blocklist(self)\n    def test_custom_blocklist_safe(self)\n  class TestSanitizeFilename:\n    def test_clean_name(self)\n    def test_spaces_replaced(self)\n    def test_path_traversal_stripped(self)\n    def test_special_chars_replaced(self)\n    def test_keeps_dots_dashes(self)\n  class TestRedact:\n    def test_none(self)\n    def test_empty(self)\n    def test_short_value(self)\n    def test_long_value_default_keep(self)\n    def test_custom_keep(self)\n  class TestHumanSize:\n    def test_bytes(self)\n    def test_kilobytes(self)\n    def test_megabytes(self)\n    def test_gigabytes(self)\n    def test_terabytes(self)\n  def memory(tmp_path, monkeypatch)\n  class TestMemoryManager:\n    def test_init_does_not_create_file(self, memory)\n    def test_save_and_load(self, memory)\n    def test_save_overwrites(self, memory)\n    def test_append_creates_section(self, memory)\n    def test_append_to_existing_section(self, memory)\n    def test_append_multiple_sections(self, memory)\n    def test_clear(self, memory)\n    def test_get_path(self, memory)\n  class TestTodoTool:\n    def test_list_empty(self)\n    def test_add_requires_content(self)\n    def test_add_and_list(self)\n    def test_update_status(self)\n    def test_update_invalid_index(self)\n    def test_update_zero_index(self)\n    def test_clear(self)\n    def test_unknown_action(self)\n    def test_get_todos_returns_copy(self)\n  class TestPatchFileTool:\n    def test_patch_file_returns_correct_line_metadata(self, tmp_path)\n  class TestWriteFileTool:\n    def test_write_file_returns_content(self, tmp_path)",
+      "symbols": [
+        "_DummyTool",
+        "run",
+        "TestToolResult",
+        "test_to_dict_success",
+        "test_to_dict_error",
+        "test_to_dict_with_dict_output",
+        "test_ok_defaults_true",
+        "TestToolRegistry",
+        "test_register_returns_self",
+        "test_get_registered",
+        "test_get_unknown_returns_none",
+        "test_run_unknown_tool",
+        "test_run_valid_tool",
+        "test_run_filters_unsupported_extra_args",
+        "test_run_catches_exception",
+        "test_names",
+        "test_schemas",
+        "TestIsDangerousCommand",
+        "test_safe_command",
+        "test_rm_rf_root",
+        "test_case_insensitive",
+        "test_custom_blocklist",
+        "test_custom_blocklist_safe",
+        "TestSanitizeFilename",
+        "test_clean_name",
+        "test_spaces_replaced",
+        "test_path_traversal_stripped",
+        "test_special_chars_replaced",
+        "test_keeps_dots_dashes",
+        "TestRedact",
+        "test_none",
+        "test_empty",
+        "test_short_value",
+        "test_long_value_default_keep",
+        "test_custom_keep",
+        "TestHumanSize",
+        "test_bytes",
+        "test_kilobytes",
+        "test_megabytes",
+        "test_gigabytes",
+        "test_terabytes",
+        "memory",
+        "TestMemoryManager",
+        "test_init_does_not_create_file",
+        "test_save_and_load",
+        "test_save_overwrites",
+        "test_append_creates_section",
+        "test_append_to_existing_section",
+        "test_append_multiple_sections",
+        "test_clear",
+        "test_get_path",
+        "TestTodoTool",
+        "test_list_empty",
+        "test_add_requires_content",
+        "test_add_and_list",
+        "test_update_status",
+        "test_update_invalid_index",
+        "test_update_zero_index",
+        "test_clear",
+        "test_unknown_action",
+        "test_get_todos_returns_copy",
+        "TestPatchFileTool",
+        "test_patch_file_returns_correct_line_metadata",
+        "TestWriteFileTool",
+        "test_write_file_returns_content"
+      ]
+    },
+    "tests/test_repo_map.py": {
+      "mtime": 1784211953.1946836,
+      "summary": "  def test_repo_map_python_parsing(tmp_path)\n  def test_repo_map_go_parsing(tmp_path)\n  def test_repo_map_js_ts_parsing(tmp_path)\n  def test_repo_map_full_run(tmp_path)\n  def test_repo_map_relevance_filtering(tmp_path)",
+      "symbols": [
+        "test_repo_map_python_parsing",
+        "test_repo_map_go_parsing",
+        "test_repo_map_js_ts_parsing",
+        "test_repo_map_full_run",
+        "test_repo_map_relevance_filtering"
+      ]
+    },
+    "tests/test_dynamic_loader.py": {
+      "mtime": 1783787138.4015985,
+      "summary": "  def test_load_dynamic_tools()",
+      "symbols": [
+        "test_load_dynamic_tools"
+      ]
+    },
+    "tests/test_review.py": {
+      "mtime": 1783393497.981442,
+      "summary": "  def test_selector_different_vendor()\n  def test_selector_different_vendor_full_id()\n  def test_selector_is_different_vendor()\n  def test_parse_no_issues()\n  def test_parse_critical_issue()\n  def test_parse_multiple_issues()\n  def test_format_review_for_agent()",
+      "symbols": [
+        "test_selector_different_vendor",
+        "test_selector_different_vendor_full_id",
+        "test_selector_is_different_vendor",
+        "test_parse_no_issues",
+        "test_parse_critical_issue",
+        "test_parse_multiple_issues",
+        "test_format_review_for_agent"
+      ]
+    },
+    "tests/test_kanban_tool.py": {
+      "mtime": 1783775825.547554,
+      "summary": "  def test_kanban_tool_execution(tmp_path)",
+      "symbols": [
+        "test_kanban_tool_execution"
+      ]
+    },
+    "tests/test_git_integration.py": {
+      "mtime": 1784212524.188229,
+      "summary": "  def test_git_auto_commit_tool(tmp_path)\n  def test_agent_git_micro_commit(tmp_path)\n  def test_agent_git_rollback(tmp_path)",
+      "symbols": [
+        "test_git_auto_commit_tool",
+        "test_agent_git_micro_commit",
+        "test_agent_git_rollback"
+      ]
+    },
+    "tests/test_memory_db.py": {
+      "mtime": 1783787260.65354,
+      "summary": "  def test_memory_db_logging_and_search()",
+      "symbols": [
+        "test_memory_db_logging_and_search"
+      ]
+    },
+    "tests/test_kanban_db.py": {
+      "mtime": 1783770722.1957853,
+      "summary": "  def test_kanban_db_crud(tmp_path)",
+      "symbols": [
+        "test_kanban_db_crud"
+      ]
+    },
+    "tests/test_path_security.py": {
+      "mtime": 1783741815.5637352,
+      "summary": "  class TestHardSensitiveReadPath:\n    def test_ssh_key_blocked(self)\n    def test_aws_credentials_blocked(self)\n    def test_pem_file_blocked(self)\n    def test_firebase_adminsdk_blocked(self)\n    def test_kube_config_blocked(self)\n    def test_env_file_NOT_hard_blocked(self)\n    def test_config_yaml_NOT_hard_blocked(self)\n    def test_normal_python_file_allowed(self)\n  class TestSoftSensitiveReadPath:\n    def test_env_file_soft_blocked(self)\n    def test_env_production_soft_blocked(self)\n    def test_config_yaml_soft_blocked(self)\n    def test_config_yml_soft_blocked(self)\n    def test_npmrc_soft_blocked(self)\n    def test_ssh_NOT_soft_blocked(self)\n    def test_normal_file_allowed(self)\n  class TestSensitiveReadPathCompat:\n    def test_ssh_still_blocked(self)\n    def test_env_still_blocked(self)\n    def test_normal_file_still_allowed(self)\n  class TestReadFileToolPermission:\n    def setup_method(self)\n    def test_env_needs_permission(self)\n    def test_config_yaml_needs_permission(self)\n    def test_normal_file_no_permission(self)\n    def test_ssh_no_permission_because_hard_block(self)\n    def test_permission_desc_contains_path(self)\n    def test_hard_block_returns_error_in_run(self, tmp_path)\n    def test_soft_block_readable_after_permission(self, tmp_path)",
+      "symbols": [
+        "TestHardSensitiveReadPath",
+        "test_ssh_key_blocked",
+        "test_aws_credentials_blocked",
+        "test_pem_file_blocked",
+        "test_firebase_adminsdk_blocked",
+        "test_kube_config_blocked",
+        "test_env_file_NOT_hard_blocked",
+        "test_config_yaml_NOT_hard_blocked",
+        "test_normal_python_file_allowed",
+        "TestSoftSensitiveReadPath",
+        "test_env_file_soft_blocked",
+        "test_env_production_soft_blocked",
+        "test_config_yaml_soft_blocked",
+        "test_config_yml_soft_blocked",
+        "test_npmrc_soft_blocked",
+        "test_ssh_NOT_soft_blocked",
+        "test_normal_file_allowed",
+        "TestSensitiveReadPathCompat",
+        "test_ssh_still_blocked",
+        "test_env_still_blocked",
+        "test_normal_file_still_allowed",
+        "TestReadFileToolPermission",
+        "setup_method",
+        "test_env_needs_permission",
+        "test_config_yaml_needs_permission",
+        "test_normal_file_no_permission",
+        "test_ssh_no_permission_because_hard_block",
+        "test_permission_desc_contains_path",
+        "test_hard_block_returns_error_in_run",
+        "test_soft_block_readable_after_permission"
+      ]
+    },
+    "tests/test_rewind.py": {
+      "mtime": 1783392778.4529629,
+      "summary": "  def test_checkpoint_save_and_count(tmp_path)\n  def test_rewind_write_file_creates(tmp_path)\n  def test_rewind_modify_file(tmp_path)\n  def test_rewind_multiple_steps(tmp_path)\n  def test_rewind_non_file_tool(tmp_path)\n  def test_checkpoint_rotation(tmp_path)\n  def test_list_checkpoints(tmp_path)\n  def test_rewind_no_checkpoints(tmp_path)\n  def test_clear(tmp_path)",
+      "symbols": [
+        "test_checkpoint_save_and_count",
+        "test_rewind_write_file_creates",
+        "test_rewind_modify_file",
+        "test_rewind_multiple_steps",
+        "test_rewind_non_file_tool",
+        "test_checkpoint_rotation",
+        "test_list_checkpoints",
+        "test_rewind_no_checkpoints",
+        "test_clear"
+      ]
+    },
+    "tests/test_security.py": {
+      "mtime": 1783402108.081684,
+      "summary": "  def test_secret_detection_api_key()\n  def test_secret_detection_aws_key()\n  def test_secret_detection_github_token()\n  def test_secret_detection_password()\n  def test_secret_env_example_ok()\n  def test_sqli_string_concat()\n  def test_sqli_fstring()\n  def test_sqli_parameterized_ok()\n  def test_xss_innerhtml()\n  def test_xss_dangerously_set_inner_html()\n  def test_forbidden_eval()\n  def test_scan_all_checkers()\n  def test_format_findings_empty()\n  def test_format_findings_with_issues()",
+      "symbols": [
+        "test_secret_detection_api_key",
+        "test_secret_detection_aws_key",
+        "test_secret_detection_github_token",
+        "test_secret_detection_password",
+        "test_secret_env_example_ok",
+        "test_sqli_string_concat",
+        "test_sqli_fstring",
+        "test_sqli_parameterized_ok",
+        "test_xss_innerhtml",
+        "test_xss_dangerously_set_inner_html",
+        "test_forbidden_eval",
+        "test_scan_all_checkers",
+        "test_format_findings_empty",
+        "test_format_findings_with_issues"
+      ]
+    },
+    "tests/test_spec.py": {
+      "mtime": 1783397869.679279,
+      "summary": "  def test_interview_session_basic()\n  def test_interview_format_qa()\n  def test_spec_plan_progress()\n  def test_spec_plan_mark_done_idempotent()\n  def test_spec_plan_mark_done_out_of_range()\n  def test_spec_plan_save(tmp_path)\n  def test_spec_planner_default_questions()\n  def test_spec_planner_generate_plan_no_router()\n  def test_spec_planner_generate_plan_not_complete()",
+      "symbols": [
+        "test_interview_session_basic",
+        "test_interview_format_qa",
+        "test_spec_plan_progress",
+        "test_spec_plan_mark_done_idempotent",
+        "test_spec_plan_mark_done_out_of_range",
+        "test_spec_plan_save",
+        "test_spec_planner_default_questions",
+        "test_spec_planner_generate_plan_no_router",
+        "test_spec_planner_generate_plan_not_complete"
+      ]
+    },
+    "tests/test_enforcer.py": {
+      "mtime": 1783394127.3562272,
+      "summary": "  def _write_rules(tmp_path, content)\n  def test_enforce_max_file_lines_block(tmp_path)\n  def test_enforce_max_file_lines_ok(tmp_path)\n  def test_enforce_no_eval_block(tmp_path)\n  def test_enforce_warn_only(tmp_path)\n  def test_enforce_no_rules_file(tmp_path)\n  def test_enforce_multiple_violations(tmp_path)\n  def test_generate_default_rules(tmp_path)",
+      "symbols": [
+        "_write_rules",
+        "test_enforce_max_file_lines_block",
+        "test_enforce_max_file_lines_ok",
+        "test_enforce_no_eval_block",
+        "test_enforce_warn_only",
+        "test_enforce_no_rules_file",
+        "test_enforce_multiple_violations",
+        "test_generate_default_rules"
+      ]
+    },
+    "tests/test_genome.py": {
+      "mtime": 1783392837.2160637,
+      "summary": "  def _make_project(tmp_path)\n  def test_scanner_detects_modules(tmp_path)\n  def test_scanner_detects_language(tmp_path)\n  def test_scanner_indexes_functions(tmp_path)\n  def test_guardian_block_duplicate_function(tmp_path)\n  def test_guardian_allow_unique_function(tmp_path)\n  def test_guardian_allow_extend_existing_module(tmp_path)\n  def test_genome_empty_project(tmp_path)\n  def test_genome_find_duplicate_functions(tmp_path)\n  def test_genome_to_markdown(tmp_path)",
+      "symbols": [
+        "_make_project",
+        "test_scanner_detects_modules",
+        "test_scanner_detects_language",
+        "test_scanner_indexes_functions",
+        "test_guardian_block_duplicate_function",
+        "test_guardian_allow_unique_function",
+        "test_guardian_allow_extend_existing_module",
+        "test_genome_empty_project",
+        "test_genome_find_duplicate_functions",
+        "test_genome_to_markdown"
+      ]
+    },
+    "tests/test_research.py": {
+      "mtime": 1783398025.5001984,
+      "summary": "  def test_reddit_search(mock_get)\n  def test_reddit_get_content(mock_get)\n  def test_reddit_filter_deleted(mock_get)\n  def test_hn_search(mock_get)\n  def test_hn_get_content(mock_get)\n  def test_orchestrator_rank_results()\n  def test_orchestrator_no_sources()\n  def test_orchestrator_format_report()\n  def test_research_tool_no_query()\n  def test_research_tool_empty_sources()\n  class _MockSource:\n    def __init__(self, name, results, content)\n    def name(self)\n    def search(self, query, limit)\n    def get_content(self, item_id)\n  def test_orchestrator_with_mock_sources()",
+      "symbols": [
+        "test_reddit_search",
+        "test_reddit_get_content",
+        "test_reddit_filter_deleted",
+        "test_hn_search",
+        "test_hn_get_content",
+        "test_orchestrator_rank_results",
+        "test_orchestrator_no_sources",
+        "test_orchestrator_format_report",
+        "test_research_tool_no_query",
+        "test_research_tool_empty_sources",
+        "_MockSource",
+        "__init__",
+        "name",
+        "search",
+        "get_content",
+        "test_orchestrator_with_mock_sources"
+      ]
+    },
+    "tests/test_session.py": {
+      "mtime": 1783168196.3413332,
+      "summary": "  def session_manager(tmp_path, monkeypatch)\n  class TestSessionManager:\n    def test_save_creates_file(self, session_manager)\n    def test_save_sanitizes_filename(self, session_manager)\n    def test_load_by_name(self, session_manager)\n    def test_load_by_id(self, session_manager)\n    def test_load_not_found(self, session_manager)\n    def test_list_sorted(self, session_manager)\n    def test_delete(self, session_manager)\n    def test_delete_not_found(self, session_manager)",
+      "symbols": [
+        "session_manager",
+        "TestSessionManager",
+        "test_save_creates_file",
+        "test_save_sanitizes_filename",
+        "test_load_by_name",
+        "test_load_by_id",
+        "test_load_not_found",
+        "test_list_sorted",
+        "test_delete",
+        "test_delete_not_found"
+      ]
+    },
+    "tests/test_loop.py": {
+      "mtime": 1783393127.3984997,
+      "summary": "  def test_loop_detection_same_error()\n  def test_loop_detection_different_error()\n  def test_loop_detection_normalized()\n  def test_loop_break_switch_model()\n  def test_loop_break_context_clear()\n  def test_loop_reset()\n  def test_pattern_same_tool_same_args()\n  def test_pattern_write_test_fail_cycle()\n  def test_pattern_file_thrashing()\n  def test_pattern_no_loop()\n  def test_pattern_apology_loop()",
+      "symbols": [
+        "test_loop_detection_same_error",
+        "test_loop_detection_different_error",
+        "test_loop_detection_normalized",
+        "test_loop_break_switch_model",
+        "test_loop_break_context_clear",
+        "test_loop_reset",
+        "test_pattern_same_tool_same_args",
+        "test_pattern_write_test_fail_cycle",
+        "test_pattern_file_thrashing",
+        "test_pattern_no_loop",
+        "test_pattern_apology_loop"
+      ]
+    },
+    "tests/test_self_evolution.py": {
+      "mtime": 1783787479.1047869,
+      "summary": "  def test_agent_run_self_improvement()",
+      "symbols": [
+        "test_agent_run_self_improvement"
+      ]
+    },
+    "tests/test_collaborate.py": {
+      "mtime": 1783774083.8212128,
+      "summary": "  def test_collaborate_tool(mock_run, tmp_path)",
+      "symbols": [
+        "test_collaborate_tool"
+      ]
+    },
+    "tests/test_camofox.py": {
+      "mtime": 1783821184.2083755,
+      "summary": "  class MockConfig:\n  def test_camofox_tool_rpc_not_configured()\n  def test_camofox_tool_navigate()\n  def test_camofox_tool_net_start_and_get()\n  def test_camofox_tool_screenshot(tmp_path)\n  def test_camofox_tool_on_output()\n  def test_camofox_tool_screenshot_default_path()",
+      "symbols": [
+        "MockConfig",
+        "test_camofox_tool_rpc_not_configured",
+        "test_camofox_tool_navigate",
+        "test_camofox_tool_net_start_and_get",
+        "test_camofox_tool_screenshot",
+        "test_camofox_tool_on_output",
+        "test_camofox_tool_screenshot_default_path"
+      ]
+    },
+    "tests/test_aistudio.py": {
+      "mtime": 1783576093.1065328,
+      "summary": "  class TestAIStudioIntegration(unittest.TestCase):\n    def setUp(self)\n    def test_fetch_aistudio_models_success(self, mock_get)\n    def test_fetch_aistudio_models_failure_fallback(self, mock_get)\n    def test_aistudio_model_complete_non_stream(self, mock_post)\n    def test_aistudio_model_complete_stream(self, mock_stream)\n    def test_router_initialization_aistudio(self)\n    def test_model_id_resolution(self)\n    def test_parse_text_tool_calls_single(self)\n    def test_parse_text_tool_calls_with_surrounding_text(self)\n    def test_parse_text_tool_calls_multiple(self)\n    def test_parse_text_tool_calls_none(self)\n    def test_aistudio_fallback_text_tool_call(self, mock_post)",
+      "symbols": [
+        "TestAIStudioIntegration",
+        "setUp",
+        "test_fetch_aistudio_models_success",
+        "test_fetch_aistudio_models_failure_fallback",
+        "test_aistudio_model_complete_non_stream",
+        "test_aistudio_model_complete_stream",
+        "test_router_initialization_aistudio",
+        "test_model_id_resolution",
+        "test_parse_text_tool_calls_single",
+        "test_parse_text_tool_calls_with_surrounding_text",
+        "test_parse_text_tool_calls_multiple",
+        "test_parse_text_tool_calls_none",
+        "test_aistudio_fallback_text_tool_call"
+      ]
+    },
+    "tests/test_tdd.py": {
+      "mtime": 1783331948.4670303,
+      "summary": "  class TestTDDEngine:\n    def test_detect_environment_python_default(self, tmp_path)\n    def test_detect_environment_js(self, tmp_path)\n    def test_extract_code_markdown(self, tmp_path)\n    def test_extract_code_plain(self, tmp_path)",
+      "symbols": [
+        "TestTDDEngine",
+        "test_detect_environment_python_default",
+        "test_detect_environment_js",
+        "test_extract_code_markdown",
+        "test_extract_code_plain"
+      ]
+    },
+    "tests/test_ghost.py": {
+      "mtime": 1783796184.2083166,
+      "summary": "  class MockTmux:\n    def __init__(self)\n    def run(self, args, **kwargs)\n  def test_ghost_agent_info_is_running()\n  def test_ghost_agent_info_completed()\n  def test_ghost_agent_info_to_dict()\n  def test_ghost_spawn(tmp_path)\n  def test_ghost_spawn_max_limit(tmp_path)\n  def test_ghost_kill(tmp_path)\n  def test_ghost_kill_nonexistent(tmp_path)\n  def test_ghost_check_status_running(tmp_path)\n  def test_ghost_check_status_completed(tmp_path)\n  def test_ghost_check_status_unknown(tmp_path)\n  def test_ghost_active_count(tmp_path)\n  def test_ghost_get_output(tmp_path)\n  def test_ghost_get_output_no_log(tmp_path)\n  def test_ghost_spawn_avoids_existing_tmux_sessions(tmp_path)",
+      "symbols": [
+        "MockTmux",
+        "__init__",
+        "run",
+        "test_ghost_agent_info_is_running",
+        "test_ghost_agent_info_completed",
+        "test_ghost_agent_info_to_dict",
+        "test_ghost_spawn",
+        "test_ghost_spawn_max_limit",
+        "test_ghost_kill",
+        "test_ghost_kill_nonexistent",
+        "test_ghost_check_status_running",
+        "test_ghost_check_status_completed",
+        "test_ghost_check_status_unknown",
+        "test_ghost_active_count",
+        "test_ghost_get_output",
+        "test_ghost_get_output_no_log",
+        "test_ghost_spawn_avoids_existing_tmux_sessions"
+      ]
+    },
+    "tests/test_mermaid.py": {
+      "mtime": 1783210973.2406948,
+      "summary": "  class TestExtractMermaid:\n    def test_extract_single_block(self)\n    def test_extract_multiple_blocks(self)\n    def test_no_blocks(self)\n    def test_empty_block(self)\n  class TestRenderSequence:\n    def test_render_basic_sequence(self)\n    def test_render_loop(self)\n    def test_render_alt(self)\n  class TestRenderFlowchart:\n    def test_render_basic_flowchart(self)\n  class TestExtractAndRender:\n    def test_full_pipeline(self, monkeypatch)\n    def test_no_mermaid_no_output(self)",
+      "symbols": [
+        "TestExtractMermaid",
+        "test_extract_single_block",
+        "test_extract_multiple_blocks",
+        "test_no_blocks",
+        "test_empty_block",
+        "TestRenderSequence",
+        "test_render_basic_sequence",
+        "test_render_loop",
+        "test_render_alt",
+        "TestRenderFlowchart",
+        "test_render_basic_flowchart",
+        "TestExtractAndRender",
+        "test_full_pipeline",
+        "test_no_mermaid_no_output"
+      ]
+    },
+    "BUILD_DEPLOY.md": {
+      "mtime": 1783776408.733305,
+      "summary": "",
+      "symbols": []
+    },
+    "beol-app/worker.js": {
+      "mtime": 1783774372.4219937,
+      "summary": "  function handleAPI()\n  function ensureSchema()\n  function seedData()\n  function jsonResponse()",
+      "symbols": [
+        "handleAPI",
+        "ensureSchema",
+        "seedData",
+        "jsonResponse"
+      ]
+    },
+    ".ak-tools/README.md": {
+      "mtime": 1783787965.8794847,
+      "summary": "",
+      "symbols": []
+    },
+    "scratch/ts_sandbox/package.json": {
+      "mtime": 1783336448.8987257,
+      "summary": "",
+      "symbols": []
+    },
+    "scratch/ts_sandbox/tests/kalkulator.test.js": {
+      "mtime": 1783336502.5997365,
+      "summary": "",
+      "symbols": []
+    },
+    "scratch/ts_sandbox/jest.config.js": {
+      "mtime": 1783336448.8397245,
+      "summary": "",
+      "symbols": []
+    },
+    "scratch/ts_sandbox/kalkulator.js": {
+      "mtime": 1783336582.5282407,
+      "summary": "  function tambah()\n  function kurang()\n  function kali()\n  function bagi()",
+      "symbols": [
+        "tambah",
+        "kurang",
+        "kali",
+        "bagi"
+      ]
+    },
+    "scratch/ts_sandbox/package-lock.json": {
+      "mtime": 1783336447.8147054,
+      "summary": "",
+      "symbols": []
+    },
+    "scratch/test_preview.py": {
+      "mtime": 1783331094.4119596,
+      "summary": "  def sample_test_function()",
+      "symbols": [
+        "sample_test_function"
+      ]
+    },
+    "CONTRIBUTING.md": {
+      "mtime": 1783166566.6030197,
+      "summary": "",
+      "symbols": []
+    },
+    "config.example.yaml": {
+      "mtime": 1783297928.232304,
+      "summary": "",
+      "symbols": []
+    },
+    "GEMINI_3.5_ERROR_REPORT.md": {
+      "mtime": 1783522945.2314253,
+      "summary": "",
+      "symbols": []
+    },
+    "CHANGELOG.md": {
+      "mtime": 1784212941.154996,
+      "summary": "",
+      "symbols": []
+    },
+    "README.md": {
+      "mtime": 1783867658.3466756,
+      "summary": "",
+      "symbols": []
+    },
+    "ipc/client.go": {
+      "mtime": 1783902240.6041286,
+      "summary": "  package ipc\n  func NewClient(callbacks *IPCCallbacks) *Client\n  func (c *Client) Start(projectRoot string, configPath string, opts map[string]interface{}) error\n  func (c *Client) Close()\n  func (c *Client) send(msg *JSONRPCMessage) error\n  func (c *Client) Call(method string, params interface{}, reply interface{}) error\n  func (c *Client) handleNotification(msg *JSONRPCMessage)\n  func (c *Client) handleRequest(msg *JSONRPCMessage)\n  func (c *Client) listen()",
+      "symbols": [
+        "ipc",
+        "NewClient",
+        "Start",
+        "Close",
+        "send",
+        "Call",
+        "handleNotification",
+        "handleRequest",
+        "listen"
+      ]
+    },
+    "ipc/browser.go": {
+      "mtime": 1783823743.1885686,
+      "summary": "  package ipc\n  func GetBrowserManager() *BrowserManager\n  func (bm *BrowserManager) Close()\n  func (bm *BrowserManager) getPage() (*rod.Page, error)\n  func (bm *BrowserManager) Execute(action string, args map[string]interface{}) (interface",
+      "symbols": [
+        "ipc",
+        "GetBrowserManager",
+        "Close",
+        "getPage",
+        "Execute"
+      ]
+    },
+    "README.es.md": {
+      "mtime": 1783826372.8871977,
+      "summary": "",
+      "symbols": []
+    },
+    "README.pt-BR.md": {
+      "mtime": 1783826364.7190375,
+      "summary": "",
+      "symbols": []
+    },
+    "apps/kopi-juara/package.json": {
+      "mtime": 1783775630.2869499,
+      "summary": "",
+      "symbols": []
+    },
+    "apps/kopi-juara/package-lock.json": {
+      "mtime": 1783775633.3290217,
+      "summary": "",
+      "symbols": []
+    },
+    "apps/kopi-juara/build.js": {
+      "mtime": 1783775641.9362247,
+      "summary": "",
+      "symbols": []
+    },
+    "apps/kopi-juara/src/index.js": {
+      "mtime": 1783775609.5574613,
+      "summary": "",
+      "symbols": []
+    },
+    "apps/kopi-juara/src/html/page.js": {
+      "mtime": 1783775567.3864667,
+      "summary": "  function renderHTML()",
+      "symbols": [
+        "renderHTML"
+      ]
+    },
+    "apps/kopi-juara/src/html/styles.js": {
+      "mtime": 1783775523.638422,
+      "summary": "",
+      "symbols": []
+    },
+    "apps/kopi-juara/src/html/script.js": {
+      "mtime": 1783775598.5042005,
+      "summary": "  function renderSteps()\n  function updateButtonState()\n  function submitQuiz()\n  function appendChat()",
+      "symbols": [
+        "renderSteps",
+        "updateButtonState",
+        "submitQuiz",
+        "appendChat"
+      ]
+    },
+    "apps/kopi-juara/src/db/queries.js": {
+      "mtime": 1783775230.5061758,
+      "summary": "  function initDB()\n  function saveRecommendation()\n  function saveChatMessage()\n  function countRecommendations()",
+      "symbols": [
+        "initDB",
+        "saveRecommendation",
+        "saveChatMessage",
+        "countRecommendations"
+      ]
+    },
+    "apps/kopi-juara/src/api/index.js": {
+      "mtime": 1783775477.1032321,
+      "summary": "  function jsonError()",
+      "symbols": [
+        "jsonError"
+      ]
+    },
+    "apps/kopi-juara/src/api/recommend.js": {
+      "mtime": 1783775265.8340116,
+      "summary": "  function handleRecommend()\n  function extractField()\n  function extractBlock()\n  function jsonResponse()\n  function jsonError()",
+      "symbols": [
+        "handleRecommend",
+        "extractField",
+        "extractBlock",
+        "jsonResponse",
+        "jsonError"
+      ]
+    },
+    "apps/kopi-juara/src/api/chat.js": {
+      "mtime": 1783775274.093207,
+      "summary": "  function handleChat()\n  function jsonResponse()",
+      "symbols": [
+        "handleChat",
+        "jsonResponse"
+      ]
+    },
+    "apps/kopi-juara/src/api/stats.js": {
+      "mtime": 1783775277.3032827,
+      "summary": "  function handleStats()",
+      "symbols": [
+        "handleStats"
+      ]
+    },
+    "apps/kopi-juara/src/config/prompts.js": {
+      "mtime": 1783775248.7476072,
+      "summary": "  function buildRoutinePrompt()",
+      "symbols": [
+        "buildRoutinePrompt"
+      ]
+    },
+    "TODOLIST.md": {
+      "mtime": 1784211875.6220489,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2600.json": {
+      "mtime": 1784212463.2790043,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2605.json": {
+      "mtime": 1784212672.6472545,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2595.json": {
+      "mtime": 1784211947.188557,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2601.json": {
+      "mtime": 1784212505.684857,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2587.json": {
+      "mtime": 1784211295.9810646,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/meta.json": {
+      "mtime": 1784214220.5160847,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2593.json": {
+      "mtime": 1784211893.2444203,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2610.json": {
+      "mtime": 1784212894.4829981,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2585.json": {
+      "mtime": 1784211132.5767412,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2596.json": {
+      "mtime": 1784211980.6172614,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2599.json": {
+      "mtime": 1784212417.853091,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2584.json": {
+      "mtime": 1784211093.3599436,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2609.json": {
+      "mtime": 1784212841.4778645,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2588.json": {
+      "mtime": 1784211770.738839,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2603.json": {
+      "mtime": 1784212606.8538911,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2592.json": {
+      "mtime": 1784211880.9541614,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2598.json": {
+      "mtime": 1784212050.2627,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2594.json": {
+      "mtime": 1784211934.0652804,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2604.json": {
+      "mtime": 1784212636.931496,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2602.json": {
+      "mtime": 1784212548.7277224,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2606.json": {
+      "mtime": 1784212724.1333554,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2607.json": {
+      "mtime": 1784212756.9130564,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2611.json": {
+      "mtime": 1784213055.2283084,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2590.json": {
+      "mtime": 1784211830.211092,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2608.json": {
+      "mtime": 1784212797.0499146,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2589.json": {
+      "mtime": 1784211791.5952783,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2591.json": {
+      "mtime": 1784211850.2645147,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2586.json": {
+      "mtime": 1784211194.1109927,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2597.json": {
+      "mtime": 1784212018.5400605,
+      "summary": "",
+      "symbols": []
+    },
+    "ui/kanban.go": {
+      "mtime": 1783817314.1844163,
+      "summary": "  package ui\n  func (m MainModel) KanbanView(panelWidth int, panelHeight int) string\n  func renderColumnContent(tasks []KanbanTask, colID int, selectedCol int, selectedTaskIndex int, width int) string\n  func renderAddDialog(input textinput.Model, width int) string",
+      "symbols": [
+        "ui",
+        "KanbanView",
+        "renderColumnContent",
+        "renderAddDialog"
+      ]
+    },
+    "ui/layout.go": {
+      "mtime": 1784212941.0909946,
+      "summary": "  package ui\n  func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot, configPath string, opts map[string]interface{}) MainModel\n  func (m MainModel) Init() tea.Cmd\n  func spinnerTick() tea.Cmd\n  func (m MainModel) pollPeriodicCmd() tea.Cmd\n  func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd)\n  func (m MainModel) View() string\n  func jsonMarshalIndent(v interface{}) (string, error)\n  func (m *MainModel) handleGhostCommand(args string)\n  func (m MainModel) connectToAgentCmd() tea.Cmd\n  func (m MainModel) fetchModelsCmd() tea.Cmd\n  func (m MainModel) switchModelCmd(modelID string) tea.Cmd\n  func parseStatusReply(statusReply map[string]interface{}, projectRoot string) StatusUpdateMsg\n  func (m MainModel) getSelectedTask() (KanbanTask, bool)\n  func renderMcpAddDialog(nameInput, cmdInput textinput.Model, activeField int, width int) string",
+      "symbols": [
+        "ui",
+        "NewMainModel",
+        "Init",
+        "spinnerTick",
+        "pollPeriodicCmd",
+        "Update",
+        "View",
+        "jsonMarshalIndent",
+        "handleGhostCommand",
+        "connectToAgentCmd",
+        "fetchModelsCmd",
+        "switchModelCmd",
+        "parseStatusReply",
+        "getSelectedTask",
+        "renderMcpAddDialog"
+      ]
+    },
+    "ui/chat.go": {
+      "mtime": 1784186544.2348418,
+      "summary": "  package ui\n  func NewChatModel() ChatModel\n  func (m *ChatModel) Resize(width, height int)\n  func (m *ChatModel) AppendMessage(role, content string)\n  func renderToolLine(content string, textWidth int) string\n  func (m *ChatModel) UpdateViewport()\n  func (m *ChatModel) UpdateViewportScroll(force bool)\n  func (m ChatModel) View() string",
+      "symbols": [
+        "ui",
+        "NewChatModel",
+        "Resize",
+        "AppendMessage",
+        "renderToolLine",
+        "UpdateViewport",
+        "UpdateViewportScroll",
+        "View"
+      ]
+    },
+    "ui/sidebar.go": {
+      "mtime": 1784212941.101995,
+      "summary": "  package ui\n  func NewSidebarModel() SidebarModel\n  func (m SidebarModel) View() string\n  func truncate(s string, max int) string\n  func humanTokens(n int) string\n  func wrapText(s string, maxW int) string",
+      "symbols": [
+        "ui",
+        "NewSidebarModel",
+        "View",
+        "truncate",
+        "humanTokens",
+        "wrapText"
+      ]
+    },
+    "ui/debate.go": {
+      "mtime": 1783788680.9087732,
+      "summary": "  package ui\n  func (m MainModel) DebateView(panelWidth int, panelHeight int) string",
+      "symbols": [
+        "ui",
+        "DebateView"
+      ]
+    },
+    "AGENTS.md": {
+      "mtime": 1783815408.8201435,
+      "summary": "",
+      "symbols": []
+    },
+    "README.ja.md": {
+      "mtime": 1783826381.2213612,
+      "summary": "",
+      "symbols": []
+    },
+    "main.go": {
+      "mtime": 1783730874.0393384,
+      "summary": "  package main\n  func main()",
+      "symbols": [
+        "main",
+        "main"
+      ]
+    },
+    "pemeriksa-tata-bahasa.worker.js": {
+      "mtime": 1783743813.2539194,
+      "summary": "  function initDb()\n  function handleAnalyze()\n  function handleHistory()\n  function handleDeleteHistory()\n  function ensureTables()\n  function parseAiJson()\n  function safeJsonParse()\n  function extractDocx()\n  function extractPdf()\n  function jsonResponse()\n  function setFile()\n  function formatSize()\n  function showToast()\n  function analyze()\n  function setLoading()\n  function renderResult()\n  function escapeHtml()\n  function loadHistory()\n  function renderHistory()\n  function renderHistoryDetail()\n  function clearHistory()",
+      "symbols": [
+        "initDb",
+        "handleAnalyze",
+        "handleHistory",
+        "handleDeleteHistory",
+        "ensureTables",
+        "parseAiJson",
+        "safeJsonParse",
+        "extractDocx",
+        "extractPdf",
+        "jsonResponse",
+        "setFile",
+        "formatSize",
+        "showToast",
+        "analyze",
+        "setLoading",
+        "renderResult",
+        "escapeHtml",
+        "loadHistory",
+        "renderHistory",
+        "renderHistoryDetail",
+        "clearHistory"
+      ]
+    },
+    "README.id.md": {
+      "mtime": 1783867663.0297744,
+      "summary": "",
+      "symbols": []
+    },
+    "worker-kopi-juara.js": {
+      "mtime": 1783774128.0762525,
+      "summary": "  function initDB()\n  function renderHTML()\n  function renderSteps()\n  function updateButtonState()\n  function submitQuiz()\n  function appendChat()",
+      "symbols": [
+        "initDB",
+        "renderHTML",
+        "renderSteps",
+        "updateButtonState",
+        "submitQuiz",
+        "appendChat"
+      ]
+    },
+    "docs/private/features/09-research-tool.md": {
+      "mtime": 1783391667.156143,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/private/features/01-time-travel.md": {
+      "mtime": 1783391057.2697124,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/private/features/08-ghost-agent.md": {
+      "mtime": 1783391571.810356,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/private/features/05-live-enforcement.md": {
+      "mtime": 1783391360.1593893,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/private/features/04-cross-model-review.md": {
+      "mtime": 1783391299.4982524,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/private/features/03-loop-breaker.md": {
+      "mtime": 1783391173.877898,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/private/features/07-spec-planning.md": {
+      "mtime": 1783391498.8659887,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/private/features/02-architecture-guardian.md": {
+      "mtime": 1783391115.0937963,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/private/features/06-vibe-security.md": {
+      "mtime": 1783391440.4638944,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/private/ROADMAP-VIBE.md": {
+      "mtime": 1783512260.0283883,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/private/aistudio-integration.md": {
+      "mtime": 1783512275.535677,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/private/RUNBOOK.md": {
+      "mtime": 1783220149.0292294,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/private/ECOSYSTEM.md": {
+      "mtime": 1783220074.0628152,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/private/antigravity-integration.md": {
+      "mtime": 1783480972.1085484,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/DECISIONS.md": {
+      "mtime": 1783220819.7208824,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/JOURNEY.md": {
+      "mtime": 1783787774.2188742,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/kanban/journey.md": {
+      "mtime": 1783770504.461776,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/kanban/todolist.md": {
+      "mtime": 1783770870.1221888,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/kanban/runbook.md": {
+      "mtime": 1783770508.8838778,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/ARCHITECTURE.md": {
+      "mtime": 1783220275.0236063,
+      "summary": "",
+      "symbols": []
+    },
+    "docs/ROADMAP.md": {
+      "mtime": 1783787777.4479518,
+      "summary": "",
+      "symbols": []
+    },
+    "README.zh-CN.md": {
+      "mtime": 1783826356.7788818,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/fddm_hook.py": {
+      "mtime": 1784007618.201618,
+      "summary": "  def fddm_sniff(url, query, top_k, radius, api_key)\n  def fddm_emit(url, type_, text, emitter_id, api_key)\n  def build_sniff_context(fddm_url, query, api_key)\n  def auto_emit_completion(fddm_url, user_task, agent_response, api_key)",
+      "symbols": [
+        "fddm_sniff",
+        "fddm_emit",
+        "build_sniff_context",
+        "auto_emit_completion"
+      ]
+    },
+    "autokeren/ui.py": {
+      "mtime": 1783901432.325083,
+      "summary": "  class AgentUI:\n    def __init__(self, console)\n    def show_banner(self, version)\n    def _start_timer(self, label)\n    def _stop_timer(self)\n    def _timer_loop(self)\n    def set_model_name(self, name)\n    def on_model_start(self)\n    def on_chunk(self, text)\n    def _final_render(self)\n    def on_model_end(self, resp)\n    def on_retry(self, attempt, delay, msg)\n    def show_response(self, resp)\n    def on_tool_start(self, name, arguments)\n    def on_tool_end(self, name, result)\n    def _print_write_file_preview(self, output)\n    def _print_patch_diff(self, output)\n    def on_tool_output(self, name, line)\n    def confirm_permission(self, tool_name, description, arguments)\n    def permission_status(self)\n    def reset_permissions(self)\n    def show_todos(self, todos)\n    def show_status_bar(self, info)\n    def show_context_status(self, info)\n    def render_last_diagram(self)\n    def cleanup(self)\n    def _stop_all(self)\n    def _stop_status(self)\n    def _stop_live(self)\n  def _sep()\n  def _render_markdown(text, console, mermaid_render, store_blocks)\n  def _format_tool_call(name, arguments)\n  def _tool_verb(name)\n  def _key_arg(name, arguments)\n  def _format_args(arguments)\n  def _summarize_tool_result(name, output)",
+      "symbols": [
+        "AgentUI",
+        "__init__",
+        "show_banner",
+        "_start_timer",
+        "_stop_timer",
+        "_timer_loop",
+        "set_model_name",
+        "on_model_start",
+        "on_chunk",
+        "_final_render",
+        "on_model_end",
+        "on_retry",
+        "show_response",
+        "on_tool_start",
+        "on_tool_end",
+        "_print_write_file_preview",
+        "_print_patch_diff",
+        "on_tool_output",
+        "confirm_permission",
+        "permission_status",
+        "reset_permissions",
+        "show_todos",
+        "show_status_bar",
+        "show_context_status",
+        "render_last_diagram",
+        "cleanup",
+        "_stop_all",
+        "_stop_status",
+        "_stop_live",
+        "_sep",
+        "_render_markdown",
+        "_format_tool_call",
+        "_tool_verb",
+        "_key_arg",
+        "_format_args",
+        "_summarize_tool_result"
+      ]
+    },
+    "autokeren/ghost/__init__.py": {
+      "mtime": 1783397281.840266,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/ghost/manager.py": {
+      "mtime": 1784080492.9561825,
+      "summary": "  class GhostAgentInfo:\n    def to_dict(self)\n    def runtime(self)\n    def is_running(self)\n    def meta_file(self)\n  class GhostManager:\n    def __init__(self, project_root, max_agents, prefix)\n    def _load_existing(self)\n    def spawn(self, task, role, model_id)\n    def check_status(self, agent_id)\n    def kill(self, agent_id)\n    def list_agents(self)\n    def get_output(self, agent_id, max_chars)\n    def active_count(self)",
+      "symbols": [
+        "GhostAgentInfo",
+        "to_dict",
+        "runtime",
+        "is_running",
+        "meta_file",
+        "GhostManager",
+        "__init__",
+        "_load_existing",
+        "spawn",
+        "check_status",
+        "kill",
+        "list_agents",
+        "get_output",
+        "active_count"
+      ]
+    },
+    "autokeren/agent.py": {
+      "mtime": 1784212164.4769964,
+      "summary": "  class Agent:\n    def __init__(self, cfg, tools, project_root, memory, sessions, role, model_id)\n    def _build_system_prompt(self, role)\n    def _ensure_genome_scanned(self)\n    def check_interrupt(self)\n    def _add_assistant_and_log(self, resp)\n    def run(self, user_input)\n    def _auto_save_session(self)\n    def _run_cf_verify_after_deploy(self, deploy_result)\n    def _generate_commit_message_from_diff(self, diff)\n    def _run_git_micro_commit(self, file_path)\n    def _run_git_auto_commit(self, summary)\n    def approve_plan(self)\n    def reset(self)\n    def save_session(self, name)\n    def _update_existing_session(self)\n    def resume_session(self, identifier)\n    def _clean_orphaned_tool_calls(messages)\n    def context_info(self)\n    def status_bar_info(self)\n    def should_compact(self)\n    def prune_context(self, keep_turns)\n    def compact(self)\n    def status(self)\n    def run_autonomous(self, goal, context)\n    def run_self_improvement(self, failed_tool_name, error_message, tool_args)",
+      "symbols": [
+        "Agent",
+        "__init__",
+        "_build_system_prompt",
+        "_ensure_genome_scanned",
+        "check_interrupt",
+        "_add_assistant_and_log",
+        "run",
+        "_auto_save_session",
+        "_run_cf_verify_after_deploy",
+        "_generate_commit_message_from_diff",
+        "_run_git_micro_commit",
+        "_run_git_auto_commit",
+        "approve_plan",
+        "reset",
+        "save_session",
+        "_update_existing_session",
+        "resume_session",
+        "_clean_orphaned_tool_calls",
+        "context_info",
+        "status_bar_info",
+        "should_compact",
+        "prune_context",
+        "compact",
+        "status",
+        "run_autonomous",
+        "run_self_improvement"
+      ]
+    },
+    "autokeren/autoplan/executor.py": {
+      "mtime": 1784080331.5789974,
+      "summary": "  class ExecutionResult:\n    def to_dict(self)\n  class PlanExecutor:\n    def __init__(self, agent, router, max_retries_per_task, on_task_start, on_task_done, on_progress)\n    def execute_plan(self, goal, context)\n    def _execute_task(self, task, tracker)\n    def _build_prompt(self, task)\n    def _evaluate_success(self, task, output)\n    def _llm_evaluate_success(self, task, output)\n    def _heuristic_evaluate_success(self, output)\n    def _replan(self, failed_task, tracker)\n    def _log(self, msg)",
+      "symbols": [
+        "ExecutionResult",
+        "to_dict",
+        "PlanExecutor",
+        "__init__",
+        "execute_plan",
+        "_execute_task",
+        "_build_prompt",
+        "_evaluate_success",
+        "_llm_evaluate_success",
+        "_heuristic_evaluate_success",
+        "_replan",
+        "_log"
+      ]
+    },
+    "autokeren/autoplan/decomposer.py": {
+      "mtime": 1783777440.168625,
+      "summary": "  class SubTask:\n    def to_dict(self)\n  class GoalDecomposer:\n    def __init__(self, router, max_tasks)\n    def decompose(self, goal, context)\n    def _parse_tasks(self, raw)\n    def _extract_json(text)\n    def _fallback_decompose(self, goal)",
+      "symbols": [
+        "SubTask",
+        "to_dict",
+        "GoalDecomposer",
+        "__init__",
+        "decompose",
+        "_parse_tasks",
+        "_extract_json",
+        "_fallback_decompose"
+      ]
+    },
+    "autokeren/autoplan/__init__.py": {
+      "mtime": 1783777402.6837413,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/autoplan/reflection.py": {
+      "mtime": 1783784750.3501694,
+      "summary": "  class Lesson:\n    def to_dict(self)\n  class Reflector:\n    def __init__(self, router, memory)\n    def reflect(self, task, result)\n    def _heuristic_reflect(self, task, result)\n    def _extract_pattern(task, result)\n    def _save_to_memory(self, lesson)\n    def summary(self)\n    def get_patterns(self)",
+      "symbols": [
+        "Lesson",
+        "to_dict",
+        "Reflector",
+        "__init__",
+        "reflect",
+        "_heuristic_reflect",
+        "_extract_pattern",
+        "_save_to_memory",
+        "summary",
+        "get_patterns"
+      ]
+    },
+    "autokeren/autoplan/tracker.py": {
+      "mtime": 1784080298.7033472,
+      "summary": "  class TaskStatus(str, Enum):\n  class PlanTracker:\n    def __post_init__(self)\n    def add_task(self, task)\n    def set_status(self, task_id, status)\n    def get_status(self, task_id)\n    def get_ready_tasks(self)\n    def _deps_satisfied(self, task)\n    def _validate_dependencies(self)\n    def all_done(self)\n    def summary(self)\n    def progress_pct(self)\n    def to_dict(self)",
+      "symbols": [
+        "TaskStatus",
+        "PlanTracker",
+        "__post_init__",
+        "add_task",
+        "set_status",
+        "get_status",
+        "get_ready_tasks",
+        "_deps_satisfied",
+        "_validate_dependencies",
+        "all_done",
+        "summary",
+        "progress_pct",
+        "to_dict"
+      ]
+    },
+    "autokeren/mermaid.py": {
+      "mtime": 1783211951.5250278,
+      "summary": "  def extract_mermaid_blocks(text)\n  def extract_and_render(text, console)\n  def _can_render_image()\n  def _try_render_image(code, console)\n  def _detect_terminal()\n  def _try_inline_image(png_data)\n  def _try_chafa(png_data, console)\n  def _save_and_hint(png_data, console)\n  def render_mermaid_text(code, console)\n  def _render_sequence(lines, console)\n  def _render_flowchart(lines, console)",
+      "symbols": [
+        "extract_mermaid_blocks",
+        "extract_and_render",
+        "_can_render_image",
+        "_try_render_image",
+        "_detect_terminal",
+        "_try_inline_image",
+        "_try_chafa",
+        "_save_and_hint",
+        "render_mermaid_text",
+        "_render_sequence",
+        "_render_flowchart"
+      ]
+    },
+    "autokeren/prompts.py": {
+      "mtime": 1783983545.1866837,
+      "summary": "  def _load_agents_md(project_root)\n  def build_system_prompt(project_root, tools, plan_mode, memory, max_tool_calls)",
+      "symbols": [
+        "_load_agents_md",
+        "build_system_prompt"
+      ]
+    },
+    "autokeren/checkpoints/storage.py": {
+      "mtime": 1783811355.0249107,
+      "summary": "  def _checkpoint_dir(project_root, session_id)\n  class CheckpointStorage:\n    def __init__(self, project_root, session_id, max_checkpoints)\n    def save(self, checkpoint_id, data)\n    def load(self, checkpoint_id)\n    def delete(self, checkpoint_id)\n    def list_ids(self)\n    def save_meta(self, meta)\n    def load_meta(self)\n    def _rotate(self)\n    def clear(self)\n    def count(self)\n    def latest_id(self)",
+      "symbols": [
+        "_checkpoint_dir",
+        "CheckpointStorage",
+        "__init__",
+        "save",
+        "load",
+        "delete",
+        "list_ids",
+        "save_meta",
+        "load_meta",
+        "_rotate",
+        "clear",
+        "count",
+        "latest_id"
+      ]
+    },
+    "autokeren/checkpoints/__init__.py": {
+      "mtime": 1783391860.3917644,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/checkpoints/manager.py": {
+      "mtime": 1783392297.668956,
+      "summary": "  class FileChange:\n  class Checkpoint:\n  class CheckpointManager:\n    def __init__(self, project_root, session_id, max_checkpoints, auto_checkpoint)\n    def _init_next_id(self)\n    def _snapshot_file(self, path)\n    def _detect_changes(self, tool_name, tool_args, before_snapshot)\n    def save(self, tool_name, tool_args, tool_result, tool_ok, before_snapshot)\n    def rewind(self, steps)\n    def _revert_changes(self, changes)\n    def list_checkpoints(self)\n    def count(self)\n    def clear(self)\n    def snapshot_files(self, paths)",
+      "symbols": [
+        "FileChange",
+        "Checkpoint",
+        "CheckpointManager",
+        "__init__",
+        "_init_next_id",
+        "_snapshot_file",
+        "_detect_changes",
+        "save",
+        "rewind",
+        "_revert_changes",
+        "list_checkpoints",
+        "count",
+        "clear",
+        "snapshot_files"
+      ]
+    },
+    "autokeren/tui.py": {
+      "mtime": 1783901707.0865383,
+      "summary": "  class ThinkingWidget(Static):\n    def tui(self)\n    def on_mount(self)\n    def next_frame(self)\n  class ModelSelectScreen(ModalScreen[str]):\n    def __init__(self, models, current_model)\n    def tui(self)\n    def compose(self)\n    def on_mount(self)\n    def on_option_list_option_selected(self, event)\n    def on_key(self, event)\n  class LanguageSelectScreen(ModalScreen[str]):\n    def __init__(self, current_lang)\n    def tui(self)\n    def compose(self)\n    def on_mount(self)\n    def on_option_list_option_selected(self, event)\n    def on_key(self, event)\n  class MCPManageScreen(ModalScreen[str]):\n    def __init__(self, mcp_clients)\n    def tui(self)\n    def compose(self)\n    def _build_options(self)\n    def on_option_list_option_selected(self, event)\n    def _toggle_add_form(self)\n    def on_input_submitted(self, event)\n    def _save_new_server(self)\n    def on_key(self, event)\n  class PermissionSelectScreen(ModalScreen[str]):\n    def __init__(self, tool_call_label, description)\n    def tui(self)\n    def compose(self)\n    def on_option_list_option_selected(self, event)\n    def on_key(self, event)\n  class ApprovalSelectScreen(ModalScreen[bool]):\n    def tui(self)\n    def compose(self)\n    def on_option_list_option_selected(self, event)\n    def on_key(self, event)\n  class StatusWidget(Static):\n    def __init__(self, agent, cfg)\n    def tui(self)\n    def on_mount(self)\n    def update_status(self)\n    def async on_click(self)\n  class ProjectFileTree(DirectoryTree):\n    def __init__(self, path, **kwargs)\n    def on_directory_tree_file_selected(self, event)\n  class MessageWidget(Static):\n    def __init__(self, role, content)\n    def tui(self)\n    def on_mount(self)\n    def update_content(self, new_content)\n  class ToolWidget(Static):\n    def __init__(self, name, arguments)\n    def update_status(self, status, summary, payload)\n    def append_line(self, line)\n    def render(self)\n  class ChatArea(Container):\n    def on_resize(self, event)\n  class AutokerenTUI(App):\n    def __init__(self, agent, cfg)\n    def t(self, key, **kwargs)\n    def detect_system_language(self)\n    def compose(self)\n    def on_key(self, event)\n    def async on_input_submitted(self, event)\n    def on_mount(self)\n    def action_toggle_filetree(self)\n    def _on_file_selected(self, file_path)\n    def async check_for_updates(self)\n    def on_model_start(self)\n    def on_chunk(self, text)\n    def on_model_end(self, resp)\n    def on_retry(self, attempt, delay, msg)\n    def on_tool_start(self, name, arguments)\n    def on_tool_output(self, name, line)\n    def on_tool_end(self, name, result)\n    def confirm_permission(self, tool_name, description, arguments)\n    def append_chat_message(self, role, content)\n    def scroll_chat_to_end(self)\n    def _focus_input(self)\n    def update_status(self)\n    def _run_agent_flow(self, user_input)\n    def prompt_plan_approval(self)\n    def async action_help(self)\n    def async action_model(self)\n    def async action_lang(self)\n    def async action_cancel(self)\n    def async action_reset(self)\n    def _copy_text(self, text)\n    def _save_to_temp_file(self, text)\n    def _find_copyable_message(self, selector)\n    def async action_copy_last(self)\n    def async action_compact(self)\n    def async handle_slash_command(self, cmd_line)\n    def async _handle_config_cmd(self, arg)\n    def async _handle_local_cmd(self, arg)\n    def async _handle_approval_cmd(self, arg)\n    def async _handle_project_cmd(self, arg)\n    def rebuild_chat_history(self)\n    def async _run_tdd_workflow(self, target_name, task_desc)\n    def _run_research(self, query, sources)\n    def _run_spec_interview(self, request)\n    def _run_deploy(self, prompt)\n  def run_tui(agent, cfg)",
+      "symbols": [
+        "ThinkingWidget",
+        "tui",
+        "on_mount",
+        "next_frame",
+        "ModelSelectScreen",
+        "__init__",
+        "tui",
+        "compose",
+        "on_mount",
+        "on_option_list_option_selected",
+        "on_key",
+        "LanguageSelectScreen",
+        "__init__",
+        "tui",
+        "compose",
+        "on_mount",
+        "on_option_list_option_selected",
+        "on_key",
+        "MCPManageScreen",
+        "__init__",
+        "tui",
+        "compose",
+        "_build_options",
+        "on_option_list_option_selected",
+        "_toggle_add_form",
+        "on_input_submitted",
+        "_save_new_server",
+        "on_key",
+        "PermissionSelectScreen",
+        "__init__",
+        "tui",
+        "compose",
+        "on_option_list_option_selected",
+        "on_key",
+        "ApprovalSelectScreen",
+        "tui",
+        "compose",
+        "on_option_list_option_selected",
+        "on_key",
+        "StatusWidget",
+        "__init__",
+        "tui",
+        "on_mount",
+        "update_status",
+        "on_click",
+        "ProjectFileTree",
+        "__init__",
+        "on_directory_tree_file_selected",
+        "MessageWidget",
+        "__init__",
+        "tui",
+        "on_mount",
+        "update_content",
+        "ToolWidget",
+        "__init__",
+        "update_status",
+        "append_line",
+        "render",
+        "ChatArea",
+        "on_resize",
+        "AutokerenTUI",
+        "__init__",
+        "t",
+        "detect_system_language",
+        "compose",
+        "on_key",
+        "on_input_submitted",
+        "on_mount",
+        "action_toggle_filetree",
+        "_on_file_selected",
+        "check_for_updates",
+        "on_model_start",
+        "on_chunk",
+        "on_model_end",
+        "on_retry",
+        "on_tool_start",
+        "on_tool_output",
+        "on_tool_end",
+        "confirm_permission",
+        "append_chat_message",
+        "scroll_chat_to_end",
+        "_focus_input",
+        "update_status",
+        "_run_agent_flow",
+        "prompt_plan_approval",
+        "action_help",
+        "action_model",
+        "action_lang",
+        "action_cancel",
+        "action_reset",
+        "_copy_text",
+        "_save_to_temp_file",
+        "_find_copyable_message",
+        "action_copy_last",
+        "action_compact",
+        "handle_slash_command",
+        "_handle_config_cmd",
+        "_handle_local_cmd",
+        "_handle_approval_cmd",
+        "_handle_project_cmd",
+        "rebuild_chat_history",
+        "_run_tdd_workflow",
+        "_run_research",
+        "_run_spec_interview",
+        "_run_deploy",
+        "run_tui"
+      ]
+    },
+    "autokeren/__main__.py": {
+      "mtime": 1783152689.035036,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/review/selector.py": {
+      "mtime": 1783393317.6260633,
+      "summary": "  class ReviewerSelector:\n    def __init__(self, vendor_map)\n    def select(self, coder_model)\n    def is_different_vendor(self, coder, reviewer)",
+      "symbols": [
+        "ReviewerSelector",
+        "__init__",
+        "select",
+        "is_different_vendor"
+      ]
+    },
+    "autokeren/review/__init__.py": {
+      "mtime": 1783393303.988808,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/review/parser.py": {
+      "mtime": 1783393564.1556818,
+      "summary": "  class ReviewIssue:\n  class ReviewResult:\n    def critical_count(self)\n    def high_count(self)\n    def approved(self)\n  def parse_review_output(raw, reviewer_model)\n  def format_review_for_agent(result)",
+      "symbols": [
+        "ReviewIssue",
+        "ReviewResult",
+        "critical_count",
+        "high_count",
+        "approved",
+        "parse_review_output",
+        "format_review_for_agent"
+      ]
+    },
+    "autokeren/genome/__init__.py": {
+      "mtime": 1783392501.8257806,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/genome/scanner.py": {
+      "mtime": 1783566023.7360325,
+      "summary": "  class GenomeScanner:\n    def __init__(self, project_root)\n    def scan(self)\n    def _detect_modules(self, genome)\n    def _walk_skipping_ignored(self, root, max_depth)\n    def _detect_language(self, dir_path)\n    def _analyze_functions(self, genome)\n    def _extract_functions(self, content, module, file)\n    def _analyze_imports(self, genome)\n    def _extract_imports(self, content, language)\n    def _resolve_import_target(self, import_path, modules)",
+      "symbols": [
+        "GenomeScanner",
+        "__init__",
+        "scan",
+        "_detect_modules",
+        "_walk_skipping_ignored",
+        "_detect_language",
+        "_analyze_functions",
+        "_extract_functions",
+        "_analyze_imports",
+        "_extract_imports",
+        "_resolve_import_target"
+      ]
+    },
+    "autokeren/genome/models.py": {
+      "mtime": 1783392778.4409626,
+      "summary": "  class FunctionEntry:\n  class Dependency:\n  class Module:\n  class ProjectGenome:\n    def to_markdown(self)\n    def find_duplicate_functions(self)\n    def find_module_by_path(self, file_path)\n    def find_similar_modules(self, name, keywords)",
+      "symbols": [
+        "FunctionEntry",
+        "Dependency",
+        "Module",
+        "ProjectGenome",
+        "to_markdown",
+        "find_duplicate_functions",
+        "find_module_by_path",
+        "find_similar_modules"
+      ]
+    },
+    "autokeren/genome/checker.py": {
+      "mtime": 1783392595.0795276,
+      "summary": "  class GuardResult:\n  class GuardianChecker:\n    def __init__(self, genome, block_duplicates)\n    def check_before_write(self, file_path, content)\n    def _extract_function_names(self, content)\n    def _looks_like_new_module(self, file_path)\n    def _infer_module_name(self, file_path)\n    def _check_function_duplicates(self, new_funcs, file_path)",
+      "symbols": [
+        "GuardResult",
+        "GuardianChecker",
+        "__init__",
+        "check_before_write",
+        "_extract_function_names",
+        "_looks_like_new_module",
+        "_infer_module_name",
+        "_check_function_duplicates"
+      ]
+    },
+    "autokeren/mcp/tool.py": {
+      "mtime": 1783317747.3714623,
+      "summary": "  class MCPTool(Tool):\n    def __init__(self, mcp_client, tool_schema)\n    def run(self, **kwargs)\n    def permission_desc(self, **kwargs)",
+      "symbols": [
+        "MCPTool",
+        "__init__",
+        "run",
+        "permission_desc"
+      ]
+    },
+    "autokeren/mcp/__init__.py": {
+      "mtime": 1783317751.1725333,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/mcp/client.py": {
+      "mtime": 1783832770.4277098,
+      "summary": "  class MCPError(Exception):\n  class MCPClient:\n    def __init__(self, name, command, env)\n    def start(self)\n    def stop(self)\n    def is_alive(self)\n    def _read_stdout(self)\n    def _readline_timeout(self)\n    def _send_request(self, method, params)\n    def _send_notification(self, method, params)\n    def _initialize(self)\n    def _list_tools(self)\n    def tools(self)\n    def call_tool(self, tool_name, arguments)",
+      "symbols": [
+        "MCPError",
+        "MCPClient",
+        "__init__",
+        "start",
+        "stop",
+        "is_alive",
+        "_read_stdout",
+        "_readline_timeout",
+        "_send_request",
+        "_send_notification",
+        "_initialize",
+        "_list_tools",
+        "tools",
+        "call_tool"
+      ]
+    },
+    "autokeren/daemon.py": {
+      "mtime": 1783902468.103645,
+      "summary": "  class SystemObserver:\n    def __init__(self, project_root, daemon)\n    def _scan_files(self)\n    def watch_loop(self)\n    def _check_logs(self)\n    def _check_file_modifications(self)\n  class JSONRPCDaemon:\n    def __init__(self, port)\n    def send_notification(self, method, params)\n    def send_request(self, method, params)\n    def send_response(self, req_id, result, error)\n    def trigger_auto_diagnose(self, issue, context)\n    def handle_request(self, req)\n    def handle_agent_init(self, req_id, params)\n    def handle_agent_run(self, req_id, params)\n    def handle_agent_interrupt(self, req_id)\n    def handle_agent_compact(self, req_id)\n    def handle_agent_status(self, req_id)\n    def handle_agent_reset(self, req_id)\n    def handle_agent_switch_model(self, req_id, params)\n    def handle_agent_list_models(self, req_id)\n    def _get_kanban_db(self)\n    def handle_kanban_list(self, req_id)\n    def handle_kanban_add(self, req_id, params)\n    def handle_kanban_move(self, req_id, params)\n    def handle_kanban_delete(self, req_id, params)\n    def handle_agent_save_session(self, req_id, params)\n    def handle_agent_resume_session(self, req_id, params)\n    def handle_agent_list_sessions(self, req_id)\n    def run(self)",
+      "symbols": [
+        "SystemObserver",
+        "__init__",
+        "_scan_files",
+        "watch_loop",
+        "_check_logs",
+        "_check_file_modifications",
+        "JSONRPCDaemon",
+        "__init__",
+        "send_notification",
+        "send_request",
+        "send_response",
+        "trigger_auto_diagnose",
+        "handle_request",
+        "handle_agent_init",
+        "handle_agent_run",
+        "handle_agent_interrupt",
+        "handle_agent_compact",
+        "handle_agent_status",
+        "handle_agent_reset",
+        "handle_agent_switch_model",
+        "handle_agent_list_models",
+        "_get_kanban_db",
+        "handle_kanban_list",
+        "handle_kanban_add",
+        "handle_kanban_move",
+        "handle_kanban_delete",
+        "handle_agent_save_session",
+        "handle_agent_resume_session",
+        "handle_agent_list_sessions",
+        "run"
+      ]
+    },
+    "autokeren/commands/__init__.py": {
+      "mtime": 1784080629.009868,
+      "summary": "  def register(cmd)\n  def dispatch_slash(cmd_line, agent, cfg, mcp_clients, set_allow_all_fn, console)",
+      "symbols": [
+        "register",
+        "dispatch_slash"
+      ]
+    },
+    "autokeren/commands/sync.py": {
+      "mtime": 1784080725.4627717,
+      "summary": "  def handle_slash_command_sync(cmd_line, agent, cfg, mcp_clients, set_allow_all_fn)",
+      "symbols": [
+        "handle_slash_command_sync"
+      ]
+    },
+    "autokeren/utils.py": {
+      "mtime": 1783243800.1264484,
+      "summary": "  def now_iso()\n  def redact(value, keep)\n  def sanitize_filename(name)\n  def is_dangerous_command(cmd, blocklist)\n  def make_backup(path)\n  def human_size(num)",
+      "symbols": [
+        "now_iso",
+        "redact",
+        "sanitize_filename",
+        "is_dangerous_command",
+        "make_backup",
+        "human_size"
+      ]
+    },
+    "autokeren/signing.py": {
+      "mtime": 1783229980.3715563,
+      "summary": "  def generate_signature(filepath, content)\n  def verify_signature(filepath, content, sig)\n  def get_comment_syntax(filepath)\n  def sign_content(filepath, content)\n  def check_signed(filepath, content)",
+      "symbols": [
+        "generate_signature",
+        "verify_signature",
+        "get_comment_syntax",
+        "sign_content",
+        "check_signed"
+      ]
+    },
+    "autokeren/telegram_gateway.py": {
+      "mtime": 1784080210.0635886,
+      "summary": "  class TelegramSession:\n    def __init__(self, chat_id, agent)\n    def is_allowed(self, username, allowed)\n  class TelegramGateway:\n    def __init__(self, token, project_root, config_path, allowed_usernames)\n    def async _get_or_create_session(self, chat_id)\n    def _bind_permission_callback(self, session)\n    def start(self)\n    def async _cmd_start(self, update, context)\n    def async _cmd_reset(self, update, context)\n    def async _cmd_sessions(self, update, context)\n    def async _handle_text(self, update, context)\n    def async _send_approval(self, context, chat_id, tool_name, description, req_id)\n    def async _handle_callback(self, update, context)\n    def async _send_long_message(self, context, chat_id, text)\n  def run_telegram_gateway(token, project_root, config_path, allowed_usernames)",
+      "symbols": [
+        "TelegramSession",
+        "__init__",
+        "is_allowed",
+        "TelegramGateway",
+        "__init__",
+        "_get_or_create_session",
+        "_bind_permission_callback",
+        "start",
+        "_cmd_start",
+        "_cmd_reset",
+        "_cmd_sessions",
+        "_handle_text",
+        "_send_approval",
+        "_handle_callback",
+        "_send_long_message",
+        "run_telegram_gateway"
+      ]
+    },
+    "autokeren/kanban/db.py": {
+      "mtime": 1783811347.3067596,
+      "summary": "  class KanbanDB:\n    def __init__(self, project_root)\n    def _get_connection(self)\n    def _init_db(self)\n    def set_metadata(self, key, value)\n    def get_metadata(self, key, default)\n    def get_all_metadata(self)\n    def _auto_seed_metadata(self)\n    def add_task(self, title, description, status, priority)\n    def update_task(self, task_id, title, description, status, priority)\n    def move_task(self, task_id, status)\n    def delete_task(self, task_id)\n    def list_tasks(self)\n    def clear_tasks(self)",
+      "symbols": [
+        "KanbanDB",
+        "__init__",
+        "_get_connection",
+        "_init_db",
+        "set_metadata",
+        "get_metadata",
+        "get_all_metadata",
+        "_auto_seed_metadata",
+        "add_task",
+        "update_task",
+        "move_task",
+        "delete_task",
+        "list_tasks",
+        "clear_tasks"
+      ]
+    },
+    "autokeren/kanban/__init__.py": {
+      "mtime": 1783770716.0286436,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/loop/__init__.py": {
+      "mtime": 1783392888.4450233,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/loop/patterns.py": {
+      "mtime": 1784080535.8130283,
+      "summary": "  class ToolCallEntry:\n  class PatternResult:\n  class PatternDetector:\n    def __init__(self, on_pattern)\n    def track(self, entry)\n    def detect(self)\n    def _check_same_tool_same_args(self, n)\n    def _check_write_test_fail_cycle(self, n)\n    def _check_file_thrashing(self, n)\n    def _check_apology_loop(self, n)\n    def reset(self)\n    def entries(self)",
+      "symbols": [
+        "ToolCallEntry",
+        "PatternResult",
+        "PatternDetector",
+        "__init__",
+        "track",
+        "detect",
+        "_check_same_tool_same_args",
+        "_check_write_test_fail_cycle",
+        "_check_file_thrashing",
+        "_check_apology_loop",
+        "reset",
+        "entries"
+      ]
+    },
+    "autokeren/loop/detector.py": {
+      "mtime": 1783393161.4771383,
+      "summary": "  class ErrorEntry:\n  class LoopAction:\n  class LoopBreaker:\n    def __init__(self, max_repeats, auto_switch_model, auto_clear_context)\n    def track_error(self, error, tool_name, context)\n    def _hash_error(self, error)\n    def _count_similar_recent(self, error_hash)\n    def _break(self, repeat_count, entry)\n    def reset(self)\n    def history(self)\n    def status(self)",
+      "symbols": [
+        "ErrorEntry",
+        "LoopAction",
+        "LoopBreaker",
+        "__init__",
+        "track_error",
+        "_hash_error",
+        "_count_similar_recent",
+        "_break",
+        "reset",
+        "history",
+        "status"
+      ]
+    },
+    "autokeren/selector.py": {
+      "mtime": 1783238116.5849707,
+      "summary": "  def select_option(options, title, console)",
+      "symbols": [
+        "select_option"
+      ]
+    },
+    "autokeren/__init__.py": {
+      "mtime": 1784212941.0549939,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/commands.py": {
+      "mtime": 1784080750.2042599,
+      "summary": "  def handle_slash_command_sync(cmd_line, agent, cfg, mcp_clients, set_allow_all_fn)",
+      "symbols": [
+        "handle_slash_command_sync"
+      ]
+    },
+    "autokeren/security.py": {
+      "mtime": 1783741268.3883586,
+      "summary": "  def is_hard_sensitive_read_path(path)\n  def is_soft_sensitive_read_path(path)\n  def is_sensitive_read_path(path)\n  def is_sensitive_write_path(path)\n  def is_dangerous_command(cmd, blocklist)",
+      "symbols": [
+        "is_hard_sensitive_read_path",
+        "is_soft_sensitive_read_path",
+        "is_sensitive_read_path",
+        "is_sensitive_write_path",
+        "is_dangerous_command"
+      ]
+    },
+    "autokeren/tools/review.py": {
+      "mtime": 1783393541.6192596,
+      "summary": "  class ReviewTool(Tool):\n    def __init__(self, project_root, coder_model, router)\n    def run(self, diff, files, **_)\n  def collect_git_diff(project_root, staged)",
+      "symbols": [
+        "ReviewTool",
+        "__init__",
+        "run",
+        "collect_git_diff"
+      ]
+    },
+    "autokeren/tools/search.py": {
+      "mtime": 1783152689.035036,
+      "summary": "  class SearchCodeTool(Tool):\n    def __init__(self, project_root)\n    def run(self, pattern, path, file_glob, case_sensitive, **_)",
+      "symbols": [
+        "SearchCodeTool",
+        "__init__",
+        "run"
+      ]
+    },
+    "autokeren/tools/remember.py": {
+      "mtime": 1783161703.6521783,
+      "summary": "  class RememberTool(Tool):\n    def __init__(self, memory)\n    def run(self, section, note, **_)",
+      "symbols": [
+        "RememberTool",
+        "__init__",
+        "run"
+      ]
+    },
+    "autokeren/tools/spawn_agent.py": {
+      "mtime": 1783796060.330462,
+      "summary": "  class SpawnAgentTool(Tool):\n    def __init__(self, cfg, project_root, memory)\n    def permission_desc(self, **kwargs)\n    def run(self, task, agent_name, context, role, model_id, background)",
+      "symbols": [
+        "SpawnAgentTool",
+        "__init__",
+        "permission_desc",
+        "run"
+      ]
+    },
+    "autokeren/tools/cf_infra.py": {
+      "mtime": 1783166146.1040783,
+      "summary": "  def _cf_get(account_id, api_token, path, timeout)\n  def _cf_post(account_id, api_token, path, body, timeout)\n  def _cf_put(account_id, api_token, path, content, timeout)\n  class CloudflareKVTool(Tool):\n    def __init__(self, cfg)\n    def run(self, action, namespace_id, key, value, **_)\n    def permission_desc(self, action, namespace_id, key, **_)\n  class CloudflareD1Tool(Tool):\n    def __init__(self, cfg)\n    def run(self, action, database_id, sql, **_)\n    def permission_desc(self, action, database_id, sql, **_)",
+      "symbols": [
+        "_cf_get",
+        "_cf_post",
+        "_cf_put",
+        "CloudflareKVTool",
+        "__init__",
+        "run",
+        "permission_desc",
+        "CloudflareD1Tool",
+        "__init__",
+        "run",
+        "permission_desc"
+      ]
+    },
+    "autokeren/tools/camofox.py": {
+      "mtime": 1783821220.0680785,
+      "summary": "  class CamofoxTool(Tool):\n    def __init__(self, cfg)\n    def set_rpc_callback(self, callback)\n    def needs_permission(self, action, **_)\n    def permission_desc(self, action, **_)\n    def run(self, action, **kwargs)",
+      "symbols": [
+        "CamofoxTool",
+        "__init__",
+        "set_rpc_callback",
+        "needs_permission",
+        "permission_desc",
+        "run"
+      ]
+    },
+    "autokeren/tools/web.py": {
+      "mtime": 1783208028.8155384,
+      "summary": "  def _is_url_safe(url)\n  class FetchURLTool(Tool):\n    def run(self, url, max_chars, **_)\n    def _to_text(self, html)",
+      "symbols": [
+        "_is_url_safe",
+        "FetchURLTool",
+        "run",
+        "_to_text"
+      ]
+    },
+    "autokeren/tools/fddm.py": {
+      "mtime": 1784007618.201618,
+      "summary": "  class FDDMTool(Tool):\n    def __init__(self, base_url, api_key)\n    def headers(self)\n    def _post(self, path, payload)\n    def _get(self, path)\n    def run(self, **kwargs)",
+      "symbols": [
+        "FDDMTool",
+        "__init__",
+        "headers",
+        "_post",
+        "_get",
+        "run"
+      ]
+    },
+    "autokeren/tools/todo.py": {
+      "mtime": 1783158612.813848,
+      "summary": "  class TodoTool(Tool):\n    def __init__(self)\n    def run(self, action, content, index, status, **_)\n    def get_todos(self)\n    def _format_list(self)",
+      "symbols": [
+        "TodoTool",
+        "__init__",
+        "run",
+        "get_todos",
+        "_format_list"
+      ]
+    },
+    "autokeren/tools/dynamic_loader.py": {
+      "mtime": 1783787087.676378,
+      "summary": "  def load_dynamic_tools(project_root, registry, cfg, memory)",
+      "symbols": [
+        "load_dynamic_tools"
+      ]
+    },
+    "autokeren/tools/repo_map.py": {
+      "mtime": 1784212033.3813605,
+      "summary": "  class RepoMapTool(Tool):\n    def __init__(self, project_root)\n    def run(self, max_files, query, **_)\n    def _cache_path(self)\n    def load_cache(self)\n    def save_cache(self, cache)\n    def update_index(self)\n    def get_relevant_map(self, query, max_files)\n    def _walk_files(self, root)\n    def _parse_file(self, filepath)\n    def _parse_python(self, content)\n    def _parse_go(self, content)\n    def _parse_js_ts(self, content)",
+      "symbols": [
+        "RepoMapTool",
+        "__init__",
+        "run",
+        "_cache_path",
+        "load_cache",
+        "save_cache",
+        "update_index",
+        "get_relevant_map",
+        "_walk_files",
+        "_parse_file",
+        "_parse_python",
+        "_parse_go",
+        "_parse_js_ts"
+      ]
+    },
+    "autokeren/tools/__init__.py": {
+      "mtime": 1783983305.382021,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/tools/base.py": {
+      "mtime": 1783790648.966736,
+      "summary": "  class ToolResult:\n    def __init__(self, output, error, ok)\n    def to_dict(self)\n    def to_string(self, max_length)\n  class Tool(ABC):\n    def needs_permission(self, *args, **kwargs)\n    def permission_desc(self, *args, **kwargs)\n    def run(self, *args, **kwargs)\n    def schema(self)\n  class ToolRegistry:\n    def __init__(self)\n    def register(self, tool)\n    def get(self, name)\n    def schemas(self)\n    def names(self)\n    def check_permission(self, name, arguments)\n    def run(self, name, arguments, **extra)",
+      "symbols": [
+        "ToolResult",
+        "__init__",
+        "to_dict",
+        "to_string",
+        "Tool",
+        "needs_permission",
+        "permission_desc",
+        "run",
+        "schema",
+        "ToolRegistry",
+        "__init__",
+        "register",
+        "get",
+        "schemas",
+        "names",
+        "check_permission",
+        "run"
+      ]
+    },
+    "autokeren/tools/project.py": {
+      "mtime": 1783230350.454519,
+      "summary": "  def _headers(cfg)\n  class CreateProjectTool(Tool):\n    def __init__(self, cfg)\n    def run(self, name, description, **_)\n  class DeployProjectTool(Tool):\n    def __init__(self, cfg)\n    def run(self, project_id, script, file_path, **_)\n  class ListProjectsTool(Tool):\n    def __init__(self, cfg)\n    def run(self, **_)",
+      "symbols": [
+        "_headers",
+        "CreateProjectTool",
+        "__init__",
+        "run",
+        "DeployProjectTool",
+        "__init__",
+        "run",
+        "ListProjectsTool",
+        "__init__",
+        "run"
+      ]
+    },
+    "autokeren/tools/genome.py": {
+      "mtime": 1783392643.569436,
+      "summary": "  class GenomeTool(Tool):\n    def __init__(self, scanner, genome)\n    def run(self, action, **_)\n    def _format_summary(self)",
+      "symbols": [
+        "GenomeTool",
+        "__init__",
+        "run",
+        "_format_summary"
+      ]
+    },
+    "autokeren/tools/file.py": {
+      "mtime": 1784080372.393803,
+      "summary": "  def _git_blob_backup(project_root, filepath)\n  def _git_blob_diff(project_root, filepath, backup_sha)\n  class ReadFileTool(Tool):\n    def __init__(self, project_root)\n    def needs_permission(self, path, **_)\n    def permission_desc(self, path, **_)\n    def run(self, path, offset, limit, **_)\n    def _resolve(self, path)\n  class WriteFileTool(Tool):\n    def __init__(self, project_root)\n    def run(self, path, content, **_)\n    def permission_desc(self, path, content, **_)\n    def _resolve(self, path)\n  class PatchFileTool(Tool):\n    def __init__(self, project_root)\n    def run(self, path, old_string, new_string, **_)\n    def permission_desc(self, path, old_string, new_string, **_)\n    def _resolve(self, path)\n  class ListFilesTool(Tool):\n    def __init__(self, project_root)\n    def run(self, path, recursive, **_)\n    def _resolve(self, path)",
+      "symbols": [
+        "_git_blob_backup",
+        "_git_blob_diff",
+        "ReadFileTool",
+        "__init__",
+        "needs_permission",
+        "permission_desc",
+        "run",
+        "_resolve",
+        "WriteFileTool",
+        "__init__",
+        "run",
+        "permission_desc",
+        "_resolve",
+        "PatchFileTool",
+        "__init__",
+        "run",
+        "permission_desc",
+        "_resolve",
+        "ListFilesTool",
+        "__init__",
+        "run",
+        "_resolve"
+      ]
+    },
+    "autokeren/tools/shell.py": {
+      "mtime": 1784209923.3332822,
+      "summary": "  def _strip_ansi(text)\n  class ShellTool(Tool):\n    def __init__(self, project_root, allowlist, default_timeout)\n    def permission_desc(self, command, **_)\n    def run(self, command, timeout, workdir, stdin, on_output, check_interrupt, **_)\n    def _run_pty(self, command, cwd, env, timeout, stdin, on_output, check_interrupt)\n    def _run_subprocess(self, command, cwd, env, timeout, stdin, on_output, check_interrupt)\n    def _close_fd(fd)",
+      "symbols": [
+        "_strip_ansi",
+        "ShellTool",
+        "__init__",
+        "permission_desc",
+        "run",
+        "_run_pty",
+        "_run_subprocess",
+        "_close_fd"
+      ]
+    },
+    "autokeren/tools/cloudflare.py": {
+      "mtime": 1783168967.052453,
+      "summary": "  class CloudflareDeployTool(Tool):\n    def __init__(self, project_root)\n    def permission_desc(self, target, **_)\n    def run(self, target, path, project_name, worker_name, **_)\n  class CloudflareBuildTool(Tool):\n    def __init__(self, project_root)\n    def run(self, path, package_manager, **_)",
+      "symbols": [
+        "CloudflareDeployTool",
+        "__init__",
+        "permission_desc",
+        "run",
+        "CloudflareBuildTool",
+        "__init__",
+        "run"
+      ]
+    },
+    "autokeren/tools/git.py": {
+      "mtime": 1783831054.003003,
+      "summary": "  class _GitBase(Tool):\n    def __init__(self, project_root)\n    def _git(self, args)\n  class GitStatusTool(_GitBase):\n    def run(self, **_)\n  class GitDiffTool(_GitBase):\n    def run(self, staged, **_)\n  class GitCommitTool(_GitBase):\n    def run(self, message, **_)\n    def permission_desc(self, message, **_)\n  class GitLogTool(_GitBase):\n    def run(self, n, oneline, **_)\n  class GitBranchTool(_GitBase):\n    def run(self, action, name, **_)\n    def permission_desc(self, action, name, **_)\n    def needs_permission(self, action, **_)\n  class GitAutoCommitTool(_GitBase):\n    def run(self, files, summary, **_)\n    def _infer_prefix(self, files)\n    def _infer_scope(self, files)",
+      "symbols": [
+        "_GitBase",
+        "__init__",
+        "_git",
+        "GitStatusTool",
+        "run",
+        "GitDiffTool",
+        "run",
+        "GitCommitTool",
+        "run",
+        "permission_desc",
+        "GitLogTool",
+        "run",
+        "GitBranchTool",
+        "run",
+        "permission_desc",
+        "needs_permission",
+        "GitAutoCommitTool",
+        "run",
+        "_infer_prefix",
+        "_infer_scope"
+      ]
+    },
+    "autokeren/tools/rewind.py": {
+      "mtime": 1783391949.30343,
+      "summary": "  class RewindTool(Tool):\n    def __init__(self, manager)\n    def run(self, steps, **_)",
+      "symbols": [
+        "RewindTool",
+        "__init__",
+        "run"
+      ]
+    },
+    "autokeren/tools/check_agent.py": {
+      "mtime": 1783796063.3595319,
+      "summary": "  class CheckAgentTool(Tool):\n    def __init__(self, cfg, project_root, memory)\n    def permission_desc(self, **kwargs)\n    def run(self, agent_id, **_)",
+      "symbols": [
+        "CheckAgentTool",
+        "__init__",
+        "permission_desc",
+        "run"
+      ]
+    },
+    "autokeren/tools/cf_verify.py": {
+      "mtime": 1783831255.4809542,
+      "summary": "  class _VerifyReport:\n    def to_dict(self)\n  class CfVerifyTool(Tool):\n    def __init__(self, project_root)\n    def run(self, url, assert_text, assert_selector, wait_seconds, **_)\n    def _browser_verify(self, url, assert_text, assert_selector, wait_seconds, verify_dir, report)\n    def _save_report(self, verify_dir, report)",
+      "symbols": [
+        "_VerifyReport",
+        "to_dict",
+        "CfVerifyTool",
+        "__init__",
+        "run",
+        "_browser_verify",
+        "_save_report"
+      ]
+    },
+    "autokeren/tools/kanban.py": {
+      "mtime": 1783775835.819796,
+      "summary": "  class KanbanTool(Tool):\n    def __init__(self, project_root)\n    def run(self, action, task_id, title, description, status, priority, **kwargs)",
+      "symbols": [
+        "KanbanTool",
+        "__init__",
+        "run"
+      ]
+    },
+    "autokeren/tools/research.py": {
+      "mtime": 1783397398.150445,
+      "summary": "  class ResearchTool(Tool):\n    def __init__(self, router, max_results, max_depth, summarize, min_comment_score)\n    def run(self, query, sources, depth, **_)",
+      "symbols": [
+        "ResearchTool",
+        "__init__",
+        "run"
+      ]
+    },
+    "autokeren/tools/tmux.py": {
+      "mtime": 1784212559.401937,
+      "summary": "  class TmuxTool(Tool):\n    def __init__(self, project_root)\n    def needs_permission(self, action, **_)\n    def permission_desc(self, action, command, session, **_)\n    def run(self, action, session, command, window, pane, lines, **_)",
+      "symbols": [
+        "TmuxTool",
+        "__init__",
+        "needs_permission",
+        "permission_desc",
+        "run"
+      ]
+    },
+    "autokeren/tools/collaborate.py": {
+      "mtime": 1783774076.0580304,
+      "summary": "  class CollaborateTool(Tool):\n    def __init__(self, cfg, project_root, memory)\n    def permission_desc(self, **kwargs)\n    def run(self, task, coder_role, critic_role, max_turns, model_id, **_)",
+      "symbols": [
+        "CollaborateTool",
+        "__init__",
+        "permission_desc",
+        "run"
+      ]
+    },
+    "autokeren/diagram.py": {
+      "mtime": 1783212276.3701167,
+      "summary": "  class Canvas:\n    def __init__(self, width, height)\n    def put(self, x, y, text)\n    def render(self)\n  def _box_w(label)\n  def _draw_box(cv, cx, y, label, shape)\n  def _draw_arrow_v(cv, x, y, label)\n  def _draw_branch(cv, cx, y, targets)\n  def _draw_merge(cv, sources, cx, y)\n  def render_flowchart_visual(lines, console)\n  def _compute_levels(nodes, edges)\n  def _layout(nodes, edges, levels)\n  def _draw_flowchart(nodes, edges, levels, positions, console)\n  def render_sequence_visual(lines, console)\n  def _draw_sequence(participants, events, console)",
+      "symbols": [
+        "Canvas",
+        "__init__",
+        "put",
+        "render",
+        "_box_w",
+        "_draw_box",
+        "_draw_arrow_v",
+        "_draw_branch",
+        "_draw_merge",
+        "render_flowchart_visual",
+        "_compute_levels",
+        "_layout",
+        "_draw_flowchart",
+        "render_sequence_visual",
+        "_draw_sequence"
+      ]
+    },
+    "autokeren/memory.py": {
+      "mtime": 1783787248.2962427,
+      "summary": "  def _project_slug(project_root)\n  def _config_base()\n  def tokenize(text)\n  def compute_tfidf_similarity(query, documents)\n  class MemoryManager:\n    def __init__(self, project_root, max_lines)\n    def _init_db(self)\n    def log_message(self, session_id, role, content)\n    def search_relevant(self, query, limit)\n    def load(self)\n    def _initialize_default_memory(self)\n    def save(self, content)\n    def append(self, section, note)\n    def clear(self)\n    def get_path(self)\n    def exists(self)\n    def line_count(self)",
+      "symbols": [
+        "_project_slug",
+        "_config_base",
+        "tokenize",
+        "compute_tfidf_similarity",
+        "MemoryManager",
+        "__init__",
+        "_init_db",
+        "log_message",
+        "search_relevant",
+        "load",
+        "_initialize_default_memory",
+        "save",
+        "append",
+        "clear",
+        "get_path",
+        "exists",
+        "line_count"
+      ]
+    },
+    "autokeren/cli.py": {
+      "mtime": 1784070087.4645393,
+      "summary": "  def build_registry(cfg, project_root, memory)\n  def load_mcp_servers(cfg, registry)\n  def stop_mcp_servers()\n  def _read_input(console)\n  def chat_loop(agent, cfg, ui)\n  def _try_run_go_tui(args, sys_argv)\n  def main()",
+      "symbols": [
+        "build_registry",
+        "load_mcp_servers",
+        "stop_mcp_servers",
+        "_read_input",
+        "chat_loop",
+        "_try_run_go_tui",
+        "main"
+      ]
+    },
+    "autokeren/config.py": {
+      "mtime": 1784009498.3358111,
+      "summary": "  def _config_dir()\n  def _config_path()\n  class AuthConfig(BaseModel):\n  class CloudflareConfig(BaseModel):\n  class RetryConfig(BaseModel):\n  class TimeTravelConfig(BaseModel):\n  class ArchitectureGuardianConfig(BaseModel):\n  class LoopBreakerConfig(BaseModel):\n  class CrossModelReviewConfig(BaseModel):\n  class VibeSecurityConfig(BaseModel):\n  class LiveEnforcementConfig(BaseModel):\n  class SpecDrivenConfig(BaseModel):\n  class GitAutoCommitConfig(BaseModel):\n  class CfVerifyConfig(BaseModel):\n  class FDDMConfig(BaseModel):\n  class TelegramConfig(BaseModel):\n  class GhostAgentConfig(BaseModel):\n  class ResearchConfig(BaseModel):\n  class AutokerenConfig(BaseModel):\n  class CamofoxConfig(BaseModel):\n  class MCPServerConfig(BaseModel):\n  class Config(BaseModel):\n  def load_config(path)\n  def save_config(cfg, path)\n  def init_config(interactive)\n  def ensure_config()",
+      "symbols": [
+        "_config_dir",
+        "_config_path",
+        "AuthConfig",
+        "CloudflareConfig",
+        "RetryConfig",
+        "TimeTravelConfig",
+        "ArchitectureGuardianConfig",
+        "LoopBreakerConfig",
+        "CrossModelReviewConfig",
+        "VibeSecurityConfig",
+        "LiveEnforcementConfig",
+        "SpecDrivenConfig",
+        "GitAutoCommitConfig",
+        "CfVerifyConfig",
+        "FDDMConfig",
+        "TelegramConfig",
+        "GhostAgentConfig",
+        "ResearchConfig",
+        "AutokerenConfig",
+        "CamofoxConfig",
+        "MCPServerConfig",
+        "Config",
+        "load_config",
+        "save_config",
+        "init_config",
+        "ensure_config"
+      ]
+    },
+    "autokeren/research/hackernews.py": {
+      "mtime": 1783397437.7361867,
+      "summary": "  class HackerNewsSource:\n    def __init__(self, min_comment_score, timeout)\n    def name(self)\n    def search(self, query, limit)\n    def get_content(self, item_id)\n    def _extract_comments(self, children, depth)\n    def _fetch_json(self, url)",
+      "symbols": [
+        "HackerNewsSource",
+        "__init__",
+        "name",
+        "search",
+        "get_content",
+        "_extract_comments",
+        "_fetch_json"
+      ]
+    },
+    "autokeren/research/web.py": {
+      "mtime": 1783397869.676279,
+      "summary": "  class WebSource:\n    def __init__(self, timeout)\n    def name(self)\n    def search(self, query, limit)\n    def get_content(self, url)\n    def _fetch_html(self, url)\n    def _extract_title(html)\n    def _html_to_text(html)",
+      "symbols": [
+        "WebSource",
+        "__init__",
+        "name",
+        "search",
+        "get_content",
+        "_fetch_html",
+        "_extract_title",
+        "_html_to_text"
+      ]
+    },
+    "autokeren/research/reddit.py": {
+      "mtime": 1783397578.3718214,
+      "summary": "  class RedditSource:\n    def __init__(self, min_comment_score, timeout)\n    def name(self)\n    def search(self, query, limit)\n    def get_content(self, url)\n    def _extract_comments(self, children, depth)\n    def _fetch_json(self, url)",
+      "symbols": [
+        "RedditSource",
+        "__init__",
+        "name",
+        "search",
+        "get_content",
+        "_extract_comments",
+        "_fetch_json"
+      ]
+    },
+    "autokeren/research/__init__.py": {
+      "mtime": 1783397290.2564237,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/research/orchestrator.py": {
+      "mtime": 1783397997.8776808,
+      "summary": "  class ResearchOrchestrator:\n    def __init__(self, sources, router, max_results, max_depth, summarize, min_comment_score)\n    def research(self, query, depth, summarize)\n    def _rank_results(self, results, query)\n    def _find_source(self, source_name)\n    def _summarize(self, query, contents)\n    def format_report(report)",
+      "symbols": [
+        "ResearchOrchestrator",
+        "__init__",
+        "research",
+        "_rank_results",
+        "_find_source",
+        "_summarize",
+        "format_report"
+      ]
+    },
+    "autokeren/research/models.py": {
+      "mtime": 1783397298.4815779,
+      "summary": "  class Comment:\n  class SearchResult:\n  class ResearchContent:\n  class ResearchReport:",
+      "symbols": [
+        "Comment",
+        "SearchResult",
+        "ResearchContent",
+        "ResearchReport"
+      ]
+    },
+    "autokeren/security_guard/__init__.py": {
+      "mtime": 1783393614.2046194,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/security_guard/scanner.py": {
+      "mtime": 1783393869.1193948,
+      "summary": "  class SecurityFinding:\n  class Checker(Protocol):\n    def check(self, file_path, content)\n  class SecretChecker:\n    def check(self, file_path, content)\n  class SQLiChecker:\n    def check(self, file_path, content)\n  class XSSChecker:\n    def check(self, file_path, content)\n  class ForbiddenCodeChecker:\n    def check(self, file_path, content)\n  def _is_code_file(file_path, content)\n  class SecurityScanner:\n    def __init__(self, checks)\n    def scan(self, file_path, content)\n    def scan_file(self, path)\n    def format_findings(findings)",
+      "symbols": [
+        "SecurityFinding",
+        "Checker",
+        "check",
+        "SecretChecker",
+        "check",
+        "SQLiChecker",
+        "check",
+        "XSSChecker",
+        "check",
+        "ForbiddenCodeChecker",
+        "check",
+        "_is_code_file",
+        "SecurityScanner",
+        "__init__",
+        "scan",
+        "scan_file",
+        "format_findings"
+      ]
+    },
+    "autokeren/session.py": {
+      "mtime": 1783909764.6243787,
+      "summary": "  class SessionManager:\n    def __init__(self, project_root)\n    def _init_db(self)\n    def save(self, name, messages, usage, session_id)\n    def load(self, identifier)\n    def list(self)\n    def delete(self, identifier)",
+      "symbols": [
+        "SessionManager",
+        "__init__",
+        "_init_db",
+        "save",
+        "load",
+        "list",
+        "delete"
+      ]
+    },
+    "autokeren/multiagent/__init__.py": {
+      "mtime": 1783317914.3615882,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/multiagent/project.py": {
+      "mtime": 1784080428.236905,
+      "summary": "  class WorkerStatus(str, Enum):\n  class AgentWorker:\n    def elapsed(self)\n    def status_icon(self)\n    def set_status(self, status)\n    def set_output(self, output)\n    def get_state(self)\n  class AgentProject:\n    def add_worker(self, name, task, depends_on)\n    def get_worker(self, name)\n    def share_context(self, key, value)\n    def get_shared_context(self)\n    def get_ready_workers(self)\n    def summary(self)\n    def all_done(self)\n  class ProjectManager:\n    def __init__(self)\n    def new_project(self, name)\n    def get_active(self)\n    def switch(self, name)\n    def run_project(self, project, agent_factory, on_worker_done)",
+      "symbols": [
+        "WorkerStatus",
+        "AgentWorker",
+        "elapsed",
+        "status_icon",
+        "set_status",
+        "set_output",
+        "get_state",
+        "AgentProject",
+        "add_worker",
+        "get_worker",
+        "share_context",
+        "get_shared_context",
+        "get_ready_workers",
+        "summary",
+        "all_done",
+        "ProjectManager",
+        "__init__",
+        "new_project",
+        "get_active",
+        "switch",
+        "run_project"
+      ]
+    },
+    "autokeren/multiagent/tdd.py": {
+      "mtime": 1783333175.0911117,
+      "summary": "  class TDDEngine:\n    def __init__(self, agent, project_root, log_fn)\n    def detect_environment(self)\n    def _extract_code(self, text)\n    def run_tests(self, runner_cmd, target_test_path)\n    def execute_tdd_flow(self, task_description, target_name)",
+      "symbols": [
+        "TDDEngine",
+        "__init__",
+        "detect_environment",
+        "_extract_code",
+        "run_tests",
+        "execute_tdd_flow"
+      ]
+    },
+    "autokeren/spec/__init__.py": {
+      "mtime": 1783394177.486165,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/spec/planner.py": {
+      "mtime": 1783397990.7725477,
+      "summary": "  class InterviewSession:\n    def is_complete(self)\n    def answer(self, text)\n    def current_question(self)\n    def format_qa(self)\n  class SpecPlan:\n    def progress(self)\n    def mark_done(self, step_idx)\n    def save(self, project_root)\n  class SpecPlanner:\n    def __init__(self, router, num_questions)\n    def session(self)\n    def plan(self)\n    def start_interview(self, request)\n    def _parse_questions(self, text)\n    def _default_questions(self, request)\n    def generate_plan(self)\n    def _split_plan(self, content)\n    def _extract_steps(self, tech_md)",
+      "symbols": [
+        "InterviewSession",
+        "is_complete",
+        "answer",
+        "current_question",
+        "format_qa",
+        "SpecPlan",
+        "progress",
+        "mark_done",
+        "save",
+        "SpecPlanner",
+        "__init__",
+        "session",
+        "plan",
+        "start_interview",
+        "_parse_questions",
+        "_default_questions",
+        "generate_plan",
+        "_split_plan",
+        "_extract_steps"
+      ]
+    },
+    "autokeren/context.py": {
+      "mtime": 1783431943.318816,
+      "summary": "  class SessionContext:\n    def add_user(self, text)\n    def add_assistant(self, response)\n    def add_tool_result(self, tool_call_id, name, result, ok)\n    def reset(self)\n    def estimate_tokens(self)\n    def summary(self)",
+      "symbols": [
+        "SessionContext",
+        "add_user",
+        "add_assistant",
+        "add_tool_result",
+        "reset",
+        "estimate_tokens",
+        "summary"
+      ]
+    },
+    "autokeren/enforcer/engine.py": {
+      "mtime": 1783393991.7986913,
+      "summary": "  class Violation:\n  class EnforcementResult:\n    def blocked(self)\n    def warnings(self)\n  class EnforcementEngine:\n    def __init__(self, rules_path)\n    def check_before_write(self, file_path, content)\n    def _check_rule(self, rule, file_path, content)\n    def has_rules(self)\n    def rule_count(self)",
+      "symbols": [
+        "Violation",
+        "EnforcementResult",
+        "blocked",
+        "warnings",
+        "EnforcementEngine",
+        "__init__",
+        "check_before_write",
+        "_check_rule",
+        "has_rules",
+        "rule_count"
+      ]
+    },
+    "autokeren/enforcer/rules.py": {
+      "mtime": 1783394143.818535,
+      "summary": "  class Rule:\n  def load_rules(rules_path)\n  def _detect_type(name, cfg)\n  def generate_default_rules(project_root)",
+      "symbols": [
+        "Rule",
+        "load_rules",
+        "_detect_type",
+        "generate_default_rules"
+      ]
+    },
+    "autokeren/enforcer/__init__.py": {
+      "mtime": 1783393923.4884133,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/models/antigravity.py": {
+      "mtime": 1783504343.118776,
+      "summary": "  def fetch_antigravity_models()\n  class AntigravityModel:\n    def complete(self, messages, tools, on_chunk, on_retry, **params)",
+      "symbols": [
+        "fetch_antigravity_models",
+        "AntigravityModel",
+        "complete"
+      ]
+    },
+    "autokeren/models/retry.py": {
+      "mtime": 1784066369.3736174,
+      "summary": "  class CircuitState(Enum):\n  class CircuitBreaker:\n    def record_success(self)\n    def record_failure(self)\n    def allow(self)\n    def state(self)\n  class RetryPolicy:\n    def should_retry(self, exc, status, attempt)\n    def sleep_for(self, attempt, exc)\n  def retry_call(fn, policy, breaker, on_retry)",
+      "symbols": [
+        "CircuitState",
+        "CircuitBreaker",
+        "record_success",
+        "record_failure",
+        "allow",
+        "state",
+        "RetryPolicy",
+        "should_retry",
+        "sleep_for",
+        "retry_call"
+      ]
+    },
+    "autokeren/models/google_auth.py": {
+      "mtime": 1783512411.6902106,
+      "summary": "  def save_token(token_data)\n  def load_token()\n  def verify_or_login(console)\n  def exchange_code_for_token(auth_code)\n  def refresh_access_token(refresh_token)",
+      "symbols": [
+        "save_token",
+        "load_token",
+        "verify_or_login",
+        "exchange_code_for_token",
+        "refresh_access_token"
+      ]
+    },
+    "autokeren/models/__init__.py": {
+      "mtime": 1783151198.453404,
+      "summary": "",
+      "symbols": []
+    },
+    "autokeren/models/base.py": {
+      "mtime": 1783519260.4346611,
+      "summary": "  class TokenUsage:\n    def __add__(self, other)\n  class ToolCall:\n  class ModelResponse:",
+      "symbols": [
+        "TokenUsage",
+        "__add__",
+        "ToolCall",
+        "ModelResponse"
+      ]
+    },
+    "autokeren/models/cloudflare.py": {
+      "mtime": 1784019382.4575245,
+      "summary": "  def resolve_model_id(model_id, auth_mode)\n  def fetch_available_models(cfg)\n  def _extract_partial_args(raw)\n  class CloudflareAIError(Exception):\n    def __init__(self, message, status, response, retry_after)\n  class CloudflareModel:\n    def _endpoint(self)\n    def _openai_endpoint(self)\n    def _headers(self)\n    def from_config(cls, cfg)\n    def _call_once(self, messages, tools, **params)\n    def _call_once_openai(self, messages, tools, **params)\n    def _parse_response(self, result)\n    def _parse_openai_response(self, data, headers)\n    def complete(self, messages, tools, on_chunk, on_retry, **params)\n    def _stream_once(self, messages, tools, on_chunk, **params)",
+      "symbols": [
+        "resolve_model_id",
+        "fetch_available_models",
+        "_extract_partial_args",
+        "CloudflareAIError",
+        "__init__",
+        "CloudflareModel",
+        "_endpoint",
+        "_openai_endpoint",
+        "_headers",
+        "from_config",
+        "_call_once",
+        "_call_once_openai",
+        "_parse_response",
+        "_parse_openai_response",
+        "complete",
+        "_stream_once"
+      ]
+    },
+    "autokeren/models/router.py": {
+      "mtime": 1784066373.9037075,
+      "summary": "  class ModelRouter:\n    def __post_init__(self)\n    def healthy_models(self)\n    def swap_models(self)\n    def reset_breakers(self)\n    def has_healthy(self)\n    def set_primary(self, model_id)\n    def switch_model(self, model_id)\n    def current_model_id(self)\n    def model_aliases(self)\n    def complete(self, messages, tools, on_chunk, on_retry, **params)\n    def status(self)\n    def redacted_dict(self)",
+      "symbols": [
+        "ModelRouter",
+        "__post_init__",
+        "healthy_models",
+        "swap_models",
+        "reset_breakers",
+        "has_healthy",
+        "set_primary",
+        "switch_model",
+        "current_model_id",
+        "model_aliases",
+        "complete",
+        "status",
+        "redacted_dict"
+      ]
+    },
+    "autokeren/models/aistudio.py": {
+      "mtime": 1784080245.4772913,
+      "summary": "  def fetch_aistudio_models(cfg)\n  def _is_thinking_model(model_id)\n  def resolve_aistudio_model_id(model_id)\n  def _parse_text_tool_calls(content)\n  class AIStudioModel:\n    def __post_init__(self)\n    def _flatten_gemini_history(self, messages)\n    def complete(self, messages, tools, on_chunk, on_retry, **params)",
+      "symbols": [
+        "fetch_aistudio_models",
+        "_is_thinking_model",
+        "resolve_aistudio_model_id",
+        "_parse_text_tool_calls",
+        "AIStudioModel",
+        "__post_init__",
+        "_flatten_gemini_history",
+        "complete"
+      ]
+    },
+    "autokeren/models/local.py": {
+      "mtime": 1783826680.6282341,
+      "summary": "  class LocalModel:\n    def complete(self, messages, tools, on_chunk, on_retry, **params)",
+      "symbols": [
+        "LocalModel",
+        "complete"
+      ]
+    },
+    "MIGRATION_PLAN.md": {
+      "mtime": 1783730661.9225597,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2621.json": {
+      "mtime": 1784213383.5169358,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2624.json": {
+      "mtime": 1784213593.6811786,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2613.json": {
+      "mtime": 1784213109.6224065,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2630.json": {
+      "mtime": 1784214146.5485578,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2627.json": {
+      "mtime": 1784213678.6048985,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2616.json": {
+      "mtime": 1784213170.0556266,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2631.json": {
+      "mtime": 1784214167.967,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2612.json": {
+      "mtime": 1784213086.1539328,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2628.json": {
+      "mtime": 1784213936.0952137,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2615.json": {
+      "mtime": 1784213143.2040846,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2617.json": {
+      "mtime": 1784213213.5835054,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2626.json": {
+      "mtime": 1784213656.8914545,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2614.json": {
+      "mtime": 1784213117.6255682,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2632.json": {
+      "mtime": 1784214199.8296576,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2620.json": {
+      "mtime": 1784213324.4487433,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2623.json": {
+      "mtime": 1784213572.547752,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2618.json": {
+      "mtime": 1784213234.8319342,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2625.json": {
+      "mtime": 1784213640.2891195,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2633.json": {
+      "mtime": 1784214220.5150847,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2619.json": {
+      "mtime": 1784213300.203254,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2622.json": {
+      "mtime": 1784213516.384618,
+      "summary": "",
+      "symbols": []
+    },
+    ".ak-checkpoints/session-default/2629.json": {
+      "mtime": 1784213965.9878306,
+      "summary": "",
+      "symbols": []
+    }
+  }
+}

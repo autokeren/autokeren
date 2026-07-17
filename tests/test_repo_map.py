@@ -116,3 +116,23 @@ def test_repo_map_relevance_filtering(tmp_path):
     # File 'utils.py' tidak relevan dengan query, jadi hanya dicantumkan nama berkasnya saja tanpa signature
     assert "src/utils.py" in res.output
     assert "def helper_fn()" not in res.output
+
+
+def test_repo_map_dependency_graphing(tmp_path):
+    (tmp_path / "autokeren").mkdir()
+    agent_file = tmp_path / "autokeren" / "agent.py"
+    agent_file.write_text("from autokeren.context import SessionContext", encoding="utf-8")
+    
+    context_file = tmp_path / "autokeren" / "context.py"
+    context_file.write_text("class SessionContext:\n    pass", encoding="utf-8")
+
+    tool = RepoMapTool(tmp_path)
+    cache = tool.update_index()
+    
+    agent_info = cache["files"]["autokeren/agent.py"]
+    assert "autokeren/context.py" in agent_info["dependencies"]
+
+    res = tool.run(query="agent", max_files=2)
+    assert res.ok
+    assert "autokeren/context.py" in res.output
+    assert "class SessionContext" in res.output

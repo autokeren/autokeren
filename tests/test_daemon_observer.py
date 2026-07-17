@@ -49,3 +49,35 @@ def test_system_observer_files_and_logs() -> None:
         args, kwargs = mock_daemon.trigger_auto_diagnose.call_args
         assert "Ditemukan error kritis di file log: error.log" in args[0]
         assert "fatal error: server crashed!" in kwargs["context"]
+
+
+def test_system_observer_tmux(monkeypatch) -> None:
+    mock_daemon = MagicMock(spec=JSONRPCDaemon)
+    observer = SystemObserver(".", mock_daemon)
+    observer._last_tmux_errors = {}
+    
+    def mock_run(args, **kwargs):
+        class MockCompletedProcess:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+        res = MockCompletedProcess()
+        
+        if "has-session" in args:
+            res.returncode = 0
+        elif "list-windows" in args:
+            res.stdout = "0:server\n"
+        elif "capture-pane" in args:
+            res.stdout = "TypeError: 'NoneType' object is not callable\n"
+        return res
+        
+    import subprocess
+    monkeypatch.setattr(subprocess, "run", mock_run)
+    
+    observer._check_tmux()
+    
+    mock_daemon.trigger_auto_diagnose.assert_called_once()
+    args, kwargs = mock_daemon.trigger_auto_diagnose.call_args
+    assert "Ditemukan error kritis di tmux window 0 (server)" in args[0]
+    assert "TypeError: 'NoneType' object is not callable" in kwargs["context"]
+    assert "0" in observer._last_tmux_errors

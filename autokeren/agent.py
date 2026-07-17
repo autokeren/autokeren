@@ -403,21 +403,8 @@ class Agent:
                                     "content": lb_action.suggestion,
                                 })
                             if self._git_auto_commit_enabled:
-                                try:
-                                    import subprocess
-                                    rollback_res = subprocess.run(
-                                        ["git", "-C", self.project_root, "reset", "--hard", "HEAD~1"],
-                                        capture_output=True,
-                                        text=True,
-                                        timeout=30,
-                                    )
-                                    if rollback_res.returncode == 0:
-                                        self.context.messages.append({
-                                            "role": "system",
-                                            "content": "⏪ Auto-rollback berhasil: codebase di-revert ke HEAD~1 (state hijau terakhir) karena kesalahan beruntun."
-                                        })
-                                except Exception:
-                                    pass
+                                err_msg = raw_result.error or str(raw_result.to_dict())
+                                self._rollback_to_latest_green_tag(err_msg)
                             self.run_self_improvement(
                                 failed_tool_name=tc.name,
                                 error_message=raw_result.error or str(raw_result.to_dict()),
@@ -563,6 +550,86 @@ class Agent:
             pass
         return "auto-commit"
 
+    def _create_green_tag(self) -> None:
+        if not self._git_auto_commit_enabled:
+            return
+        try:
+            import subprocess
+            import time
+            timestamp = int(time.time())
+            tag_name = f"ak-green-{timestamp}"
+            
+            subprocess.run(
+                ["git", "-C", self.project_root, "tag", tag_name, "HEAD"],
+                capture_output=True,
+                timeout=10,
+            )
+            
+            tags_res = subprocess.run(
+                ["git", "-C", self.project_root, "tag", "-l", "ak-green-*"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            tags = sorted(tags_res.stdout.splitlines())
+            if len(tags) > 5:
+                for old_tag in tags[:-5]:
+                    subprocess.run(
+                        ["git", "-C", self.project_root, "tag", "-d", old_tag],
+                        capture_output=True,
+                        timeout=10,
+                    )
+        except Exception:
+            pass
+
+    def _rollback_to_latest_green_tag(self, error_message: str) -> None:
+        try:
+            import subprocess
+            tags_res = subprocess.run(
+                ["git", "-C", self.project_root, "tag", "-l", "ak-green-*"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            tags = sorted(tags_res.stdout.splitlines())
+            if tags:
+                latest_tag = tags[-1]
+                rollback_res = subprocess.run(
+                    ["git", "-C", self.project_root, "reset", "--hard", latest_tag],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                if rollback_res.returncode == 0:
+                    self.context.messages.append({
+                        "role": "system",
+                        "content": (
+                            f"⏪ Tindakan Korektif Terpicu: Kode telah di-rollback ke versi hijau terdekat "
+                            f"(`{latest_tag}`) karena error berikut:\n"
+                            f"{error_message}\n\n"
+                            "Cari pendekatan alternatif yang tidak memicu error tersebut."
+                        )
+                    })
+                    return
+                    
+            rollback_res = subprocess.run(
+                ["git", "-C", self.project_root, "reset", "--hard", "HEAD~1"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if rollback_res.returncode == 0:
+                self.context.messages.append({
+                    "role": "system",
+                    "content": (
+                        "⏪ Tindakan Korektif Terpicu: Codebase di-revert ke HEAD~1 (state hijau terakhir) "
+                        f"karena error berikut:\n{error_message}\n\n"
+                        "Cari pendekatan alternatif yang tidak memicu error tersebut."
+                    )
+                })
+        except Exception:
+            pass
+
     def _run_git_micro_commit(self, file_path: str) -> None:
         if not self._git_auto_commit_enabled:
             return
@@ -594,6 +661,7 @@ class Agent:
                     "role": "system",
                     "content": f"📝 Auto-committed changes in `{file_path}`: `{commit_msg}`"
                 })
+                self._create_green_tag()
         except Exception:
             pass
 

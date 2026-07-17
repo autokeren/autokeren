@@ -1,4 +1,4 @@
-"""Codebase structure indexing tool (Repo Map) with caching and semantic relevance filtering."""
+"""Codebase structure indexing tool (Repo Map) with caching, AST dependency graphing, and relevance filtering."""
 from __future__ import annotations
 
 import ast
@@ -80,11 +80,17 @@ class RepoMapTool(Tool):
                 
             cached = cache_files.get(rel_path)
             if not cached or cached.get("mtime") != mtime:
+                try:
+                    content = filepath.read_text(encoding="utf-8", errors="replace")
+                except Exception:
+                    content = ""
                 summary, symbols = self._parse_file(filepath)
+                deps = self._extract_dependencies(filepath, content)
                 cache_files[rel_path] = {
                     "mtime": mtime,
                     "summary": summary,
                     "symbols": symbols,
+                    "dependencies": deps,
                 }
         self.save_cache(cache)
         return cache
@@ -120,20 +126,101 @@ class RepoMapTool(Tool):
             
         scored_files.sort(key=lambda item: item[1], reverse=True)
         
-        output = []
-        relevant_count = 0
+        base_relevant_limit = max(1, max_files // 2)
+        top_matches = [item for item in scored_files if item[1] > 0][:base_relevant_limit]
+        
+        high_relevance_set = {item[0] for item in top_matches}
+        for rel_path, score, info in top_matches:
+            deps = info.get("dependencies", [])
+            for dep in deps:
+                if dep in cache_files and len(high_relevance_set) < max_files:
+                    high_relevance_set.add(dep)
+                    
         for rel_path, score, info in scored_files:
+            if score > 0 and rel_path not in high_relevance_set and len(high_relevance_set) < max_files:
+                high_relevance_set.add(rel_path)
+                
+        output = []
+        for rel_path, info in sorted(cache_files.items()):
             summary = info.get("summary", "")
-            if score > 0 and relevant_count < max_files:
-                if summary:
-                    output.append(f"- {rel_path} [relevance: {score}]\n{summary}")
-                else:
-                    output.append(f"- {rel_path} [relevance: {score}] (empty)")
-                relevant_count += 1
+            if rel_path in high_relevance_set:
+                output.append(f"- {rel_path}\n{summary}")
             else:
                 output.append(f"- {rel_path}")
                 
         return "\n".join(output)
+
+    def _extract_dependencies(self, filepath: Path, content: str) -> list[str]:
+        deps = []
+        suffix = filepath.suffix
+        
+        if suffix == ".py":
+            import_pat = re.compile(r"^\s*(?:import\s+([a-zA-Z0-9_.]+)|from\s+([a-zA-Z0-9_.]+)\s+import)", re.MULTILINE)
+            relative_pat = re.compile(r"^\s*from\s+(\.+)([a-zA-Z0-9_.]*)\s+import", re.MULTILINE)
+            
+            for match in import_pat.finditer(content):
+                mod_name = match.group(1) or match.group(2)
+                if not mod_name:
+                    continue
+                if mod_name.startswith("autokeren"):
+                    parts = mod_name.split(".")
+                    py_path = "/".join(parts) + ".py"
+                    init_path = "/".join(parts) + "/__init__.py"
+                    if (self.project_root / py_path).exists():
+                        deps.append(py_path)
+                    elif (self.project_root / init_path).exists():
+                        deps.append(init_path)
+                        
+            for match in relative_pat.finditer(content):
+                dots = len(match.group(1))
+                sub_mod = match.group(2)
+                target_dir = filepath.parent
+                for _ in range(dots - 1):
+                    target_dir = target_dir.parent
+                
+                rel_parts = sub_mod.split(".") if sub_mod else []
+                if rel_parts:
+                    py_filepath = target_dir / ("/".join(rel_parts) + ".py")
+                    init_filepath = target_dir / ("/".join(rel_parts) + "/__init__.py")
+                    if py_filepath.exists():
+                        deps.append(str(py_filepath.relative_to(self.project_root)))
+                    elif init_filepath.exists():
+                        deps.append(str(init_filepath.relative_to(self.project_root)))
+                else:
+                    init_filepath = target_dir / "__init__.py"
+                    if init_filepath.exists():
+                        deps.append(str(init_filepath.relative_to(self.project_root)))
+                        
+        elif suffix == ".go":
+            go_module = "github.com/autokeren/autokeren"
+            import_pat = re.compile(r'"' + re.escape(go_module) + r'/([^"]+)"')
+            for match in import_pat.finditer(content):
+                pkg_path = match.group(1)
+                pkg_dir = self.project_root / pkg_path
+                if pkg_dir.exists() and pkg_dir.is_dir():
+                    for f in pkg_dir.iterdir():
+                        if f.is_file() and f.suffix == ".go":
+                            deps.append(str(f.relative_to(self.project_root)))
+                            
+        elif suffix in (".js", ".ts", ".jsx", ".tsx"):
+            import_pat = re.compile(r"(?:import|from)\s+['\"](\.[^'\"]+)['\"]")
+            for match in import_pat.finditer(content):
+                rel_path = match.group(1)
+                target_path = (filepath.parent / rel_path).resolve()
+                
+                for ext in (".ts", ".js", ".tsx", ".jsx"):
+                    f_path = target_path.with_suffix(ext)
+                    if f_path.exists() and f_path.is_relative_to(self.project_root):
+                        deps.append(str(f_path.relative_to(self.project_root)))
+                        break
+                else:
+                    for ext in (".ts", ".js", ".tsx", ".jsx"):
+                        f_path = target_path / f"index{ext}"
+                        if f_path.exists() and f_path.is_relative_to(self.project_root):
+                            deps.append(str(f_path.relative_to(self.project_root)))
+                            break
+                            
+        return sorted(list(set(deps)))
 
     def _walk_files(self, root: Path) -> Iterator[Path]:
         for path in root.iterdir():
