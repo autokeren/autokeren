@@ -135,6 +135,12 @@ class ProofTool(Tool):
                     error="Aksi 'record' membutuhkan parameter 'proof_id', 'criterion_num', dan 'status'.",
                     ok=False,
                 )
+            valid_statuses = ["pending", "passed", "failed", "blocked", "manual_review"]
+            if status not in valid_statuses:
+                return ToolResult(
+                    error=f"Status '{status}' tidak valid. Harus salah satu dari: {', '.join(valid_statuses)}.",
+                    ok=False,
+                )
             file_path = self.proofs_dir / f"{proof_id}.json"
             if not file_path.exists():
                 return ToolResult(error=f"Rencana bukti dengan ID '{proof_id}' tidak ditemukan.", ok=False)
@@ -233,6 +239,42 @@ class ProofTool(Tool):
             console = Console(record=True)
             with console.capture() as capture:
                 console.print(table)
+
+            return ToolResult(output=capture.get(), ok=True)
+
+        elif action == "replay":
+            if not proof_id:
+                return ToolResult(
+                    error="Aksi 'replay' membutuhkan parameter 'proof_id' yang berisi path ke file JSON.", ok=False
+                )
+            file_path = Path(proof_id)
+            if not file_path.exists():
+                return ToolResult(error=f"File JSON proof di '{proof_id}' tidak ditemukan.", ok=False)
+
+            try:
+                data = json.loads(file_path.read_text())
+            except Exception as e:
+                return ToolResult(error=f"Gagal membaca file JSON proof: {e}", ok=False)
+
+            items = data.get("criteria", [])
+            verdict = self._get_verdict(items)
+            verdict_formatted, color = self._format_verdict_style(verdict)
+
+            title_text = f"AUTOKEREN PROOF REPLAY — {verdict_formatted}"
+            panel_body = f"[bold]{data.get('title')}[/bold]\n"
+            panel_body += f"[dim]ID: {data.get('id')} | Commit: {data.get('source_commit') or 'none'}[/dim]\n\n"
+
+            for i, c in enumerate(items):
+                st = c.get("status", "pending")
+                icon = "✓" if st == "passed" else "✗" if st in ("failed", "blocked") else "?"
+                color_st = "green" if st == "passed" else "red" if st in ("failed", "blocked") else "yellow"
+                panel_body += f"[{color_st}]{icon} {i + 1}. {c.get('text')} [{st}][/{color_st}]\n"
+                if c.get("evidence"):
+                    panel_body += f"   [dim]Evidence: {c.get('evidence')}[/dim]\n"
+
+            console = Console(record=True)
+            with console.capture() as capture:
+                console.print(Panel(panel_body, title=title_text, border_style=color, expand=False))
 
             return ToolResult(output=capture.get(), ok=True)
 

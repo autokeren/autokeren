@@ -733,7 +733,7 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
 
 def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
     """Mencoba meluncurkan TUI Go (ak). Mengembalikan False jika harus fallback ke Python TUI."""
-    if args.about or args.init or args.login or args.prompt or args.task or args.non_interactive or args.telegram:
+    if args.about or args.init or args.login or args.prompt or args.task or args.non_interactive or args.telegram or args.proof:
         return False
 
     import os
@@ -875,6 +875,7 @@ def main() -> int:
     parser.add_argument("--telegram", action="store_true", help="Jalankan Telegram gateway")
     parser.add_argument("--telegram-token", help="Telegram bot token (override config)")
     parser.add_argument("--telegram-allow-user", action="append", help="Username Telegram yang diizinkan (bisa berkali-kali)")
+    parser.add_argument("--proof", nargs="+", help="Jalankan proof action (list, report, replay, plan, record)")
     parser.add_argument("prompt", nargs="?", help="Single prompt to run non-interactively")
     args = parser.parse_args()
 
@@ -1110,6 +1111,100 @@ def main() -> int:
     _try_run_go_tui(args, sys.argv)
     memory = MemoryManager(str(project_root))
     reg = build_registry(cfg, project_root, memory)
+    
+    if args.proof:
+        tool = reg.get("proof")
+        if not tool:
+            console.print("[red]Tool 'proof' tidak terdaftar.[/red]")
+            return 1
+        
+        action = args.proof[0]
+        if action == "list":
+            res = tool.run(action="list")
+            if res.ok:
+                console.print(res.output)
+                return 0
+            else:
+                console.print(f"[red]Gagal list proof:[/red] {res.error}")
+                return 1
+        elif action == "report":
+            if len(args.proof) < 2:
+                console.print("[red]Format salah. Gunakan: autokeren --proof report <proof-id>[/red]")
+                return 1
+            res = tool.run(action="report", proof_id=args.proof[1])
+            if res.ok:
+                console.print(res.output)
+                return 0
+            else:
+                console.print(f"[red]Gagal report proof:[/red] {res.error}")
+                return 1
+        elif action == "replay":
+            if len(args.proof) < 2:
+                console.print("[red]Format salah. Gunakan: autokeren --proof replay <file-path>[/red]")
+                return 1
+            res = tool.run(action="replay", proof_id=args.proof[1])
+            if res.ok:
+                console.print(res.output)
+                return 0
+            else:
+                console.print(f"[red]Gagal replay proof:[/red] {res.error}")
+                return 1
+        elif action == "plan":
+            if len(args.proof) < 3:
+                console.print("[red]Format salah. Gunakan: autokeren --proof plan <title> | <kriteria1> | <kriteria2>[/red]")
+                return 1
+            rest = " ".join(args.proof[1:])
+            subparts = [p.strip() for p in rest.split("|")]
+            title = subparts[0]
+            criteria = subparts[1:]
+            if not title or not criteria:
+                console.print("[red]Judul dan minimal 1 kriteria harus diisi.[/red]")
+                return 1
+            res = tool.run(action="plan", title=title, criteria=criteria)
+            if res.ok and isinstance(res.output, dict):
+                console.print(res.output.get("message"))
+                return 0
+            else:
+                console.print(f"[red]Gagal plan proof:[/red] {res.error}")
+                return 1
+        elif action == "record":
+            if len(args.proof) < 4:
+                console.print("[red]Format salah. Gunakan: autokeren --proof record <proof-id> <nomor> <status> | <evidence>[/red]")
+                return 1
+            rest = " ".join(args.proof[1:])
+            evidence_parts = rest.split("|", 1)
+            left_side = evidence_parts[0].strip()
+            evidence = evidence_parts[1].strip() if len(evidence_parts) > 1 else ""
+            
+            left_tokens = left_side.split()
+            if len(left_tokens) < 3:
+                console.print("[red]Format salah. Harus berisi: proof_id, nomor kriteria, dan status.[/red]")
+                return 1
+            proof_id = left_tokens[0]
+            try:
+                criterion_num = int(left_tokens[1])
+            except ValueError:
+                console.print("[red]Nomor kriteria harus berupa angka.[/red]")
+                return 1
+            status = left_tokens[2]
+            
+            res = tool.run(
+                action="record",
+                proof_id=proof_id,
+                criterion_num=criterion_num,
+                status=status,
+                evidence=evidence,
+            )
+            if res.ok and isinstance(res.output, dict):
+                console.print(res.output.get("message"))
+                return 0
+            else:
+                console.print(f"[red]Gagal record proof:[/red] {res.error}")
+                return 1
+        else:
+            console.print(f"[red]Aksi proof '{action}' tidak dikenal. Pilihan: list, report, replay, plan, record.[/red]")
+            return 1
+
     load_mcp_servers(cfg, reg)
     agent = Agent(cfg, reg, str(project_root), memory=memory, role=args.role)
     if agent.checkpoints:

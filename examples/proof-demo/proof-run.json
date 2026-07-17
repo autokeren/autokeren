@@ -2,7 +2,7 @@
   "id": "proof-20260717T120000Z",
   "title": "Validasi email pada Checkout endpoint",
   "created_at": "2026-07-17T12:00:00+00:00",
-  "source_commit": "2452901c34a2e584f938aa82b3d3ee12bf40523a",
+  "source_commit": "9e8b2c4ba0c7c7b2904a77fb7c002c5420bd4b56",
   "criteria": [
     {
       "text": "Email tanpa karakter '@' harus diblokir dengan status 400",

@@ -78,7 +78,7 @@ PYTHONPATH=. pytest
 ---
 
 ## 5. Alur Rilis & Deploy Versi Baru (Semua Platform)
-Proyek ini dilengkapi dengan skrip otomatisasi rilis [`./scripts/release.sh`](file:///data/media_backup/autokeren/scripts/release.sh). Skrip ini otomatis:
+Proyek ini dilengkapi dengan skrip otomatisasi rilis [`scripts/release.sh`](scripts/release.sh). Skrip ini otomatis:
 1.  Melakukan validasi kebersihan git working tree.
 2.  Menaikkan (*bump*) nomor versi di `autokeren/__init__.py` dan `pyproject.toml`.
 3.  Memasukkan entri fitur baru ke `CHANGELOG.md`.

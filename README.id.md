@@ -27,11 +27,11 @@ autokeren sudah ada sebelum OpenAI Build Week (dimulai sejak 2026-07-04) dan did
 
 ### Fitur yang dibangun selama hackathon
 
-- **Integrasi Model OpenAI** ([openai.py](file:///data/media_backup/autokeren/autokeren/models/openai.py)): Klien model native yang mendukung completions, streaming, dan tool calling untuk GPT-5.6 dan Codex.
-- **Wizard Login Interaktif** ([cli.py](file:///data/media_backup/autokeren/autokeren/cli.py)): Wizard setup interaktif untuk memilih provider (termasuk OpenAI API) dan mengonfigurasi model utama & cadangan.
-- **Proof Tool** ([proof.py](file:///data/media_backup/autokeren/autokeren/tools/proof.py)): Tool native untuk merencanakan (plan), merekam bukti (record), membuat laporan (report), dan melihat daftar (list) bukti rilis.
-- **Slash Command `/proof`** ([cli.py](file:///data/media_backup/autokeren/autokeren/cli.py), [tui.py](file:///data/media_backup/autokeren/autokeren/tui.py)): Perintah interaktif di terminal dan TUI untuk menjalankan tugas-tugas bukti rilis.
-- **Aplikasi Demo Deterministik** ([app.py](file:///data/media_backup/autokeren/examples/proof-demo/app.py)): Aplikasi endpoint checkout sederhana yang menunjukkan cacat validasi email dan log verifikasinya.
+- **Integrasi Model OpenAI** ([openai.py](autokeren/models/openai.py)): Klien model native yang mendukung completions, streaming, dan tool calling untuk GPT-5.6 dan Codex.
+- **Wizard Login Interaktif** ([cli.py](autokeren/cli.py)): Wizard setup interaktif untuk memilih provider (termasuk OpenAI API) dan mengonfigurasi model utama & cadangan.
+- **Proof Tool** ([proof.py](autokeren/tools/proof.py)): Tool native untuk merencanakan (plan), merekam bukti (record), membuat laporan (report), dan melihat daftar (list) bukti rilis.
+- **Slash Command `/proof`** ([cli.py](autokeren/cli.py), [tui.py](autokeren/tui.py)): Perintah interaktif di terminal dan TUI untuk menjalankan tugas-tugas bukti rilis.
+- **Aplikasi Demo Deterministik** ([app.py](examples/proof-demo/app.py)): Aplikasi endpoint checkout sederhana yang menunjukkan cacat validasi email dan log verifikasinya.
 
 ---
 

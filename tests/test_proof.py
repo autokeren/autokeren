@@ -120,3 +120,32 @@ class TestProofTool(unittest.TestCase):
         memory = MemoryManager(self.project_root / ".ak-memory.json")
         registry = build_registry(cfg, self.project_root, memory)
         self.assertIn("proof", registry.names())
+
+    def test_replay_renders_correctly(self) -> None:
+        proof_data = {
+            "id": "proof-123456",
+            "title": "Replay Title",
+            "created_at": "2026-07-17T12:00:00Z",
+            "criteria": [
+                {"text": "Crit A", "status": "passed", "evidence": "some evidence", "verified_at": "2026-07-17T12:01:00Z"}
+            ]
+        }
+        json_path = self.project_root / "test-replay.json"
+        json_path.write_text(json.dumps(proof_data))
+
+        res = self.tool.run(action="replay", proof_id=str(json_path))
+        self.assertTrue(res.ok)
+        self.assertIn("AUTOKEREN PROOF REPLAY", str(res.output))
+        self.assertIn("Replay Title", str(res.output))
+
+    def test_record_status_validation(self) -> None:
+        res_plan = self.tool.run(action="plan", title="Status Test", criteria=["Crit 1"])
+        assert res_plan.output is not None
+        proof_id = res_plan.output["proof_id"]
+
+        res_ok = self.tool.run(action="record", proof_id=proof_id, criterion_num=1, status="passed")
+        self.assertTrue(res_ok.ok)
+
+        res_err = self.tool.run(action="record", proof_id=proof_id, criterion_num=1, status="super_invalid")
+        self.assertFalse(res_err.ok)
+        self.assertIn("tidak valid", res_err.error or "")
