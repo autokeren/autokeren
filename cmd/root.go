@@ -10,6 +10,7 @@ import (
 	"github.com/autokeren/autokeren/ghost"
 	"github.com/autokeren/autokeren/internal/config"
 	"github.com/autokeren/autokeren/internal/engine"
+	"github.com/autokeren/autokeren/internal/workflow"
 	"github.com/autokeren/autokeren/ipc"
 	"github.com/autokeren/autokeren/ui"
 	tea "github.com/charmbracelet/bubbletea"
@@ -41,6 +42,12 @@ var rootCmd = &cobra.Command{
 		}
 		if taskPrompt != "" {
 			prompt = taskPrompt
+		}
+		if expanded, handled, err := workflow.Expand(prompt); err != nil {
+			fmt.Printf("Error workflow: %v\n", err)
+			return
+		} else if handled {
+			prompt = expanded
 		}
 
 		// Tentukan project root default ke direktori kerja saat ini

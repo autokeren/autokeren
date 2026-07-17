@@ -28,6 +28,7 @@ import (
 	projectstore "github.com/autokeren/autokeren/internal/project"
 	sessionstore "github.com/autokeren/autokeren/internal/session"
 	"github.com/autokeren/autokeren/internal/tool"
+	"github.com/autokeren/autokeren/internal/workflow"
 )
 
 // JSONRPCMessage mewakili request, response, atau notification JSON-RPC 2.0
@@ -236,6 +237,11 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		}
 		if handled, err := c.localSlash(input, reply); handled {
 			return err
+		}
+		if expanded, handled, err := workflow.Expand(input); err != nil {
+			return err
+		} else if handled {
+			input = expanded
 		}
 		events := engine.Events{
 			OnChunk: func(text string) {
@@ -674,6 +680,25 @@ func (c *Client) projectCommand(argument string) (string, error) {
 	}
 }
 
+func specProgress(plan string) string {
+	total := 0
+	completed := 0
+	for _, line := range strings.Split(plan, "\n") {
+		trimmed := strings.TrimSpace(strings.ToLower(line))
+		if strings.HasPrefix(trimmed, "- [ ]") {
+			total++
+		}
+		if strings.HasPrefix(trimmed, "- [x]") {
+			total++
+			completed++
+		}
+	}
+	if total == 0 {
+		return "Plan belum memiliki checklist implementasi."
+	}
+	return fmt.Sprintf("Progress: %.0f%% (%d/%d langkah selesai)", float64(completed)*100/float64(total), completed, total)
+}
+
 func (c *Client) localContextInfo() map[string]any {
 	tokens := 0
 	if sessions, err := c.localSessionManager(); err == nil && c.localSession != "default" {
@@ -727,6 +752,37 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 			return true, err
 		}
 		output = message
+	case "/spec":
+		argument := strings.TrimSpace(strings.TrimPrefix(input, "/spec"))
+		if argument == "" {
+			output = "/spec <request> | answer <text> | generate | show | progress"
+			break
+		}
+		if argument == "show" {
+			data, err := os.ReadFile(filepath.Join(c.localRoot, "plan.md"))
+			if errors.Is(err, os.ErrNotExist) {
+				output = "Belum ada plan. Mulai dengan /spec <request>."
+				break
+			}
+			if err != nil {
+				return true, err
+			}
+			output = string(data)
+			break
+		}
+		if argument == "progress" {
+			data, err := os.ReadFile(filepath.Join(c.localRoot, "plan.md"))
+			if errors.Is(err, os.ErrNotExist) {
+				output = "Belum ada plan."
+				break
+			}
+			if err != nil {
+				return true, err
+			}
+			output = specProgress(string(data))
+			break
+		}
+		return false, nil
 	case "/status":
 		output = fmt.Sprintf("engine: go\nmodel: %s\nproject: %s", c.localConfig.Cloudflare.PrimaryModel, c.localRoot)
 	case "/lang":

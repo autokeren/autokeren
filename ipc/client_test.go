@@ -89,3 +89,10 @@ func TestProjectCommandBuildsNativeProject(t *testing.T) {
 		t.Fatalf("unexpected status: %q err=%v", output, err)
 	}
 }
+
+func TestSpecProgress(t *testing.T) {
+	progress := specProgress("- [x] selesai\n- [ ] berikutnya")
+	if progress != "Progress: 50% (1/2 langkah selesai)" {
+		t.Fatalf("unexpected progress: %q", progress)
+	}
+}
