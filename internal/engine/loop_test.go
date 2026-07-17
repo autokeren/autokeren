@@ -42,3 +42,23 @@ func TestLoopDispatchesToolAndContinues(t *testing.T) {
 		t.Fatalf("unexpected response %#v calls=%d", response, p.calls)
 	}
 }
+
+type contentAndToolProvider struct{ calls int }
+
+func (p *contentAndToolProvider) Complete(_ context.Context, _ model.Request, _ provider.ChunkHandler) (model.Response, error) {
+	p.calls++
+	if p.calls == 1 {
+		return model.Response{Content: "Saya mulai dulu.", ToolCalls: []model.ToolCall{{ID: "1", Type: "function", Function: model.ToolCallFunction{Name: "echo", Arguments: `{"value":"ok"}`}}}}, nil
+	}
+	return model.Response{Content: "Selesai."}, nil
+}
+
+func TestLoopDoesNotStopWhenContentAndToolCallsCoexist(t *testing.T) {
+	registry := tool.NewRegistry().Register(echoTool{})
+	p := &contentAndToolProvider{}
+	loop := &Loop{Runner: Runner{Provider: p}, Tools: registry, MaxIterations: 3}
+	response, err := loop.Run(context.Background(), "hello", Events{})
+	if err != nil || response.Content != "Selesai." || p.calls != 2 {
+		t.Fatalf("loop stopped before tool dispatch: response=%#v err=%v calls=%d", response, err, p.calls)
+	}
+}

@@ -54,11 +54,13 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 		if err != nil {
 			return model.Response{}, err
 		}
-		if last.Content != "" || len(last.ToolCalls) == 0 {
-			l.Context.Add(model.Message{Role: "assistant", Content: last.Content, ToolCalls: last.ToolCalls})
+		if len(last.ToolCalls) == 0 {
+			l.Context.Add(model.Message{Role: "assistant", Content: last.Content})
 			return last, nil
 		}
-		l.Context.Add(model.Message{Role: "assistant", ToolCalls: last.ToolCalls})
+		// Preserve any streamed reasoning/content alongside tool calls, but always
+		// dispatch the calls before deciding that the turn is complete.
+		l.Context.Add(model.Message{Role: "assistant", Content: last.Content, ToolCalls: last.ToolCalls})
 		for _, call := range last.ToolCalls {
 			args := map[string]any{}
 			if call.Function.Arguments != "" {
