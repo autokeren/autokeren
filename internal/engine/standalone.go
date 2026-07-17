@@ -116,7 +116,7 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 	if err != nil {
 		return "", err
 	}
-	loop := &Loop{Runner: Runner{Provider: router}, Model: primaryModel, Temperature: cfg.Cloudflare.Temperature, MaxTokens: cfg.Cloudflare.MaxTokens, Tools: registry, Context: store, RequestPrelude: prelude, MaxIterations: cfg.Autokeren.MaxIterations}
+	loop := &Loop{Runner: Runner{Provider: router}, Model: primaryModel, Temperature: cfg.Cloudflare.Temperature, MaxTokens: cfg.Cloudflare.MaxTokens, Tools: registry, Context: store, RequestPrelude: prelude, MaxIterations: cfg.Autokeren.MaxIterations, PlanMode: cfg.Autokeren.PlanMode}
 	if events.ConfirmPermission == nil {
 		events.ConfirmPermission = func(name string, _ string, _ map[string]any) bool { return name != "run_shell" }
 	}

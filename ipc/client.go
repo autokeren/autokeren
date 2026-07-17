@@ -103,7 +103,7 @@ func NewClient(callbacks *IPCCallbacks) *Client {
 
 func (c *Client) Start(projectRoot string, configPath string, opts map[string]interface{}) error {
 	if opts != nil && opts["engine"] == "go" {
-		return c.startLocal(projectRoot, configPath)
+		return c.startLocal(projectRoot, configPath, opts)
 	}
 	if c.cmd != nil {
 		return errors.New("client sudah berjalan")
@@ -212,7 +212,7 @@ func (c *Client) Close() {
 	}
 }
 
-func (c *Client) startLocal(projectRoot, configPath string) error {
+func (c *Client) startLocal(projectRoot, configPath string, opts map[string]interface{}) error {
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		return err
@@ -220,6 +220,14 @@ func (c *Client) startLocal(projectRoot, configPath string) error {
 	c.local = true
 	c.localRoot = projectRoot
 	c.localConfig = cfg
+	if opts != nil {
+		if enabled, ok := opts["plan"].(bool); ok && enabled {
+			c.localConfig.Autokeren.PlanMode = true
+		}
+		if modelID, ok := opts["model"].(string); ok && modelID != "" {
+			c.localConfig.Cloudflare.PrimaryModel = modelID
+		}
+	}
 	c.localConfigPath = configPath
 	c.localModelID = cfg.Cloudflare.PrimaryModel
 	c.localSession = "default"
@@ -229,7 +237,10 @@ func (c *Client) startLocal(projectRoot, configPath string) error {
 		return err
 	}
 	c.localGhosts = ghost.NewGhostManager(projectRoot)
-	c.localProjects = projectstore.NewManager()
+	c.localProjects, err = projectstore.NewPersistentManager(projectRoot)
+	if err != nil {
+		return err
+	}
 	c.localRouterState = provider.NewRouterState()
 	atomic.StoreInt32(&c.isClosed, 0)
 	return nil
@@ -661,7 +672,9 @@ func (c *Client) projectCommand(argument string) (string, error) {
 		}
 		return fmt.Sprintf("Menjalankan %d agent Go secara paralel. Pantau dengan /project status.", launched), nil
 	case "status":
-		c.localProjects.Refresh(c.localGhosts)
+		if err := c.localProjects.Refresh(c.localGhosts); err != nil {
+			return "", err
+		}
 		project := c.localProjects.Active()
 		if project == nil {
 			return "", errors.New("belum ada project aktif")
@@ -676,7 +689,9 @@ func (c *Client) projectCommand(argument string) (string, error) {
 		if rest == "" {
 			return "", errors.New("format: /project output <nama_agent>")
 		}
-		c.localProjects.Refresh(c.localGhosts)
+		if err := c.localProjects.Refresh(c.localGhosts); err != nil {
+			return "", err
+		}
 		project := c.localProjects.Active()
 		if project == nil {
 			return "", errors.New("belum ada project aktif")
@@ -825,6 +840,32 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 		return false, nil
 	case "/status":
 		output = fmt.Sprintf("engine: go\nmodel: %s\nproject: %s", c.localConfig.Cloudflare.PrimaryModel, c.localRoot)
+	case "/plan":
+		if len(parts) == 1 {
+			state := "nonaktif"
+			if c.localConfig.Autokeren.PlanMode {
+				state = "aktif"
+			}
+			output = "Plan mode " + state + ". Gunakan /plan on atau /plan off."
+			break
+		}
+		switch strings.ToLower(parts[1]) {
+		case "on":
+			c.localConfig.Autokeren.PlanMode = true
+			output = "Plan mode aktif. Tool tidak akan dijalankan sebelum /approve."
+		case "off":
+			c.localConfig.Autokeren.PlanMode = false
+			output = "Plan mode nonaktif."
+		default:
+			return true, errors.New("format: /plan on|off")
+		}
+	case "/approve":
+		if !c.localConfig.Autokeren.PlanMode {
+			output = "Tidak ada plan yang menunggu persetujuan."
+			break
+		}
+		c.localConfig.Autokeren.PlanMode = false
+		output = "Plan disetujui untuk sesi ini. Kirim 'lanjutkan' agar agen menjalankan langkah yang sudah disetujui."
 	case "/lang":
 		if len(parts) == 1 {
 			output = fmt.Sprintf("Bahasa aktif: %s. Gunakan /lang <kode>.", c.localConfig.Autokeren.Language)

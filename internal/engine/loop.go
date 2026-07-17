@@ -32,6 +32,7 @@ type Loop struct {
 	Model          string
 	Temperature    float64
 	MaxTokens      int
+	PlanMode       bool
 }
 
 func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.Response, error) {
@@ -79,6 +80,14 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 				continue
 			}
 			return last, nil
+		}
+		if l.PlanMode {
+			content := strings.TrimSpace(last.Content)
+			if content == "" {
+				content = "Rencana memiliki aksi yang mengubah state. Tinjau rencana ini lalu jalankan /approve dan kirimkan perintah untuk melanjutkan."
+			}
+			l.Context.Add(model.Message{Role: "assistant", Content: content})
+			return model.Response{Content: content, Model: last.Model, Usage: last.Usage}, nil
 		}
 		// Preserve any streamed reasoning/content alongside tool calls, but always
 		// dispatch the calls before deciding that the turn is complete.

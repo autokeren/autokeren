@@ -45,6 +45,28 @@ func TestLocalModelsSupportsGeminiCatalogShape(t *testing.T) {
 	}
 }
 
+func TestGoPlanModeRequiresApprovalInLocalSession(t *testing.T) {
+	c := NewClient(nil)
+	if err := c.Start(t.TempDir(), filepath.Join(t.TempDir(), "config.yaml"), map[string]interface{}{"engine": "go", "plan": true}); err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	var plan map[string]any
+	if err := c.callLocal("agent.run", map[string]interface{}{"user_input": "/plan"}, &plan); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(plan["content"].(string), "aktif") {
+		t.Fatalf("plan mode did not start active: %#v", plan)
+	}
+	var approved map[string]any
+	if err := c.callLocal("agent.run", map[string]interface{}{"user_input": "/approve"}, &approved); err != nil {
+		t.Fatal(err)
+	}
+	if c.localConfig.Autokeren.PlanMode || !strings.Contains(approved["content"].(string), "disetujui") {
+		t.Fatalf("approval did not unlock local plan mode: %#v", approved)
+	}
+}
+
 func TestLocalSessionSaveAndResume(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("AUTOKEREN_CONFIG_DIR", filepath.Join(root, "config"))

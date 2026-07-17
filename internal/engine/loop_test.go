@@ -67,6 +67,21 @@ func TestLoopDoesNotStopWhenContentAndToolCallsCoexist(t *testing.T) {
 	}
 }
 
+func TestLoopPlanModeBlocksToolDispatch(t *testing.T) {
+	registry := tool.NewRegistry().Register(echoTool{})
+	p := &contentAndToolProvider{}
+	loop := &Loop{Runner: Runner{Provider: p}, Tools: registry, MaxIterations: 3, PlanMode: true}
+	response, err := loop.Run(context.Background(), "ubah file", Events{})
+	if err != nil || response.Content != "Saya mulai dulu." || p.calls != 1 {
+		t.Fatalf("plan mode should return plan without dispatch: response=%#v err=%v calls=%d", response, err, p.calls)
+	}
+	for _, message := range loop.Context.Messages() {
+		if message.Role == "tool" {
+			t.Fatalf("plan mode dispatched a tool: %#v", message)
+		}
+	}
+}
+
 type emptyThenContentProvider struct{ calls int }
 
 func (p *emptyThenContentProvider) Complete(_ context.Context, _ model.Request, _ provider.ChunkHandler) (model.Response, error) {

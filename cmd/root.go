@@ -73,6 +73,9 @@ var rootCmd = &cobra.Command{
 			if modelOverride != "" {
 				cfg.Cloudflare.PrimaryModel = modelOverride
 			}
+			if planMode {
+				cfg.Autokeren.PlanMode = true
+			}
 			if prompt == "" {
 				fmt.Println("[red]Error: Task/Prompt kosong.[/red]")
 				os.Exit(1)
