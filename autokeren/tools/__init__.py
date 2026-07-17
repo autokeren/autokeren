@@ -23,6 +23,7 @@ from autokeren.tools.collaborate import CollaborateTool
 from autokeren.tools.web import FetchURLTool
 from autokeren.tools.cf_verify import CfVerifyTool
 from autokeren.tools.fddm import FDDMTool
+from autokeren.tools.proof import ProofTool
 
 __all__ = [
     "Tool",
@@ -63,4 +64,5 @@ __all__ = [
     "ResearchTool",
     "CfVerifyTool",
     "FDDMTool",
+    "ProofTool",
 ]

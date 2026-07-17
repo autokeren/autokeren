@@ -58,6 +58,7 @@ from autokeren.tools import (
     ToolRegistry,
     TmuxTool,
     WriteFileTool,
+    ProofTool,
 )
 from autokeren.ui import AK_THEME, AgentUI
 from autokeren.mcp import MCPClient, MCPTool
@@ -88,6 +89,7 @@ def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegist
     reg.register(TmuxTool(project_root))
     reg.register(TodoTool())
     reg.register(KanbanTool(project_root))
+    reg.register(ProofTool(project_root))
     reg.register(RememberTool(memory))
     reg.register(SpawnAgentTool(cfg, str(project_root), memory))
     reg.register(CheckAgentTool(cfg, str(project_root), memory))
@@ -242,6 +244,89 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
         if user_input == "/status":
             console.print_json(json.dumps(agent.status()))
             ui.show_context_status(agent.context_info())
+            continue
+        if user_input == "/proof" or user_input.startswith("/proof "):
+            cmd_args = user_input[7:].strip()
+            if not cmd_args:
+                console.print("[yellow]Penggunaan /proof:[/yellow]")
+                console.print("  /proof plan <title> | <kriteria 1> | <kriteria 2> ...")
+                console.print("  /proof list")
+                console.print("  /proof report <proof-id>")
+                console.print("  /proof record <proof-id> <nomor-kriteria> <status> | <evidence>")
+                continue
+                
+            parts = cmd_args.split(" ", 1)
+            action = parts[0].strip()
+            rest = parts[1].strip() if len(parts) > 1 else ""
+            
+            tool = agent.tools.get("proof")
+            if not tool:
+                console.print("[red]Tool 'proof' tidak terdaftar di registry.[/red]")
+                continue
+                
+            if action == "list":
+                res = tool.run(action="list")
+                if res.ok:
+                    console.print(res.output)
+                else:
+                    console.print(f"[red]Gagal list proof:[/red] {res.error}")
+            elif action == "report":
+                if not rest:
+                    console.print("[red]Format salah. Contoh: /proof report proof-xxxx[/red]")
+                    continue
+                res = tool.run(action="report", proof_id=rest)
+                if res.ok:
+                    console.print(res.output)
+                else:
+                    console.print(f"[red]Gagal report proof:[/red] {res.error}")
+            elif action == "plan":
+                if not rest:
+                    console.print("[red]Format salah. Contoh: /proof plan Judul Rilis | Kriteria 1 | Kriteria 2[/red]")
+                    continue
+                subparts = [p.strip() for p in rest.split("|")]
+                title = subparts[0]
+                criteria = subparts[1:]
+                if not title or not criteria:
+                    console.print("[red]Judul dan kriteria minimal 1 harus diisi.[/red]")
+                    continue
+                res = tool.run(action="plan", title=title, criteria=criteria)
+                if res.ok and isinstance(res.output, dict):
+                    console.print(f"[green]{res.output.get('message')}[/green]")
+                else:
+                    console.print(f"[red]Gagal membuat rencana bukti:[/red] {res.error}")
+            elif action == "record":
+                if not rest:
+                    console.print("[red]Format salah. Contoh: /proof record proof-xxxx 1 passed | tes passed[/red]")
+                    continue
+                evidence_parts = rest.split("|", 1)
+                left_side = evidence_parts[0].strip()
+                evidence = evidence_parts[1].strip() if len(evidence_parts) > 1 else ""
+                
+                left_tokens = left_side.split()
+                if len(left_tokens) < 3:
+                    console.print("[red]Format salah. Harus berisi: proof_id, nomor kriteria, dan status.[/red]")
+                    continue
+                proof_id = left_tokens[0]
+                try:
+                    criterion_num = int(left_tokens[1])
+                except ValueError:
+                    console.print("[red]Nomor kriteria harus berupa angka.[/red]")
+                    continue
+                status = left_tokens[2]
+                
+                res = tool.run(
+                    action="record",
+                    proof_id=proof_id,
+                    criterion_num=criterion_num,
+                    status=status,
+                    evidence=evidence,
+                )
+                if res.ok and isinstance(res.output, dict):
+                    console.print(f"[green]{res.output.get('message')}[/green]")
+                else:
+                    console.print(f"[red]Gagal merekam bukti:[/red] {res.error}")
+            else:
+                console.print(f"[red]Aksi /proof '{action}' tidak dikenal.[/red]")
             continue
         if user_input == "/compact":
             console.print("[dim]mengompak context…[/dim]")

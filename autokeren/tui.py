@@ -2210,6 +2210,90 @@ class AutokerenTUI(App):
                 input_pane = self.query_one("#input-pane", Input)
                 input_pane.disabled = True
                 self.run_worker(lambda: self._run_deploy(deploy_prompt), thread=True)
+        elif cmd == "/proof":
+            if not arg:
+                self.append_chat_message(
+                    "system",
+                    "[yellow]Penggunaan /proof:[/yellow]\n"
+                    "  /proof plan <title> | <kriteria 1> | <kriteria 2> ...\n"
+                    "  /proof list\n"
+                    "  /proof report <proof-id>\n"
+                    "  /proof record <proof-id> <nomor-kriteria> <status> | <evidence>"
+                )
+            else:
+                parts = arg.split(" ", 1)
+                action = parts[0].strip().lower()
+                rest = parts[1].strip() if len(parts) > 1 else ""
+                
+                tool = self.agent.tools.get("proof")
+                if not tool:
+                    self.append_chat_message("system", "[red]Tool 'proof' tidak terdaftar di registry.[/red]")
+                else:
+                    if action == "list":
+                        proof_res = tool.run(action="list")
+                        if proof_res.ok:
+                            self.append_chat_message("system", str(proof_res.output))
+                        else:
+                            self.append_chat_message("system", f"[red]Gagal list proof:[/red] {proof_res.error}")
+                    elif action == "report":
+                        if not rest:
+                            self.append_chat_message("system", "[red]Format salah. Contoh: /proof report proof-xxxx[/red]")
+                        else:
+                            proof_res = tool.run(action="report", proof_id=rest)
+                            if proof_res.ok:
+                                self.append_chat_message("system", str(proof_res.output))
+                            else:
+                                self.append_chat_message("system", f"[red]Gagal report proof:[/red] {proof_res.error}")
+                    elif action == "plan":
+                        if not rest:
+                            self.append_chat_message("system", "[red]Format salah. Contoh: /proof plan Judul Rilis | Kriteria 1 | ...[/red]")
+                        else:
+                            subparts = [p.strip() for p in rest.split("|")]
+                            title = subparts[0]
+                            criteria = subparts[1:]
+                            if not title or not criteria:
+                                self.append_chat_message("system", "[red]Judul dan kriteria minimal 1 harus diisi.[/red]")
+                            else:
+                                proof_res = tool.run(action="plan", title=title, criteria=criteria)
+                                if proof_res.ok and isinstance(proof_res.output, dict):
+                                    self.append_chat_message("system", f"[green]{proof_res.output.get('message')}[/green]")
+                                else:
+                                    self.append_chat_message("system", f"[red]Gagal membuat rencana bukti:[/red] {proof_res.error}")
+                    elif action == "record":
+                        if not rest:
+                            self.append_chat_message("system", "[red]Format salah. Contoh: /proof record proof-xxxx 1 passed | log bukti[/red]")
+                        else:
+                            evidence_parts = rest.split("|", 1)
+                            left_side = evidence_parts[0].strip()
+                            evidence = evidence_parts[1].strip() if len(evidence_parts) > 1 else ""
+                            
+                            left_tokens = left_side.split()
+                            if len(left_tokens) < 3:
+                                self.append_chat_message("system", "[red]Format salah. Harus berisi: proof_id, nomor kriteria, dan status.[/red]")
+                            else:
+                                proof_id = left_tokens[0]
+                                try:
+                                    criterion_num = int(left_tokens[1])
+                                    is_num = True
+                                except ValueError:
+                                    is_num = False
+                                if not is_num:
+                                    self.append_chat_message("system", "[red]Nomor kriteria harus berupa angka.[/red]")
+                                else:
+                                    status = left_tokens[2]
+                                    proof_res = tool.run(
+                                        action="record",
+                                        proof_id=proof_id,
+                                        criterion_num=criterion_num,
+                                        status=status,
+                                        evidence=evidence,
+                                    )
+                                    if proof_res.ok and isinstance(proof_res.output, dict):
+                                        self.append_chat_message("system", f"[green]{proof_res.output.get('message')}[/green]")
+                                    else:
+                                        self.append_chat_message("system", f"[red]Gagal merekam bukti:[/red] {proof_res.error}")
+                    else:
+                        self.append_chat_message("system", f"[red]Aksi /proof '{action}' tidak dikenal.[/red]")
         elif cmd == "/config":
             await self._handle_config_cmd(arg)
         elif cmd == "/local":

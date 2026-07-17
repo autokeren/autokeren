@@ -1,0 +1,26 @@
+{
+  "id": "proof-20260717T120000Z",
+  "title": "Validasi email pada Checkout endpoint",
+  "created_at": "2026-07-17T12:00:00+00:00",
+  "source_commit": "2452901c34a2e584f938aa82b3d3ee12bf40523a",
+  "criteria": [
+    {
+      "text": "Email tanpa karakter '@' harus diblokir dengan status 400",
+      "status": "passed",
+      "evidence": "python3 examples/proof-demo/test_app.py: Ran 2 tests in 0.032s. Status: OK",
+      "verified_at": "2026-07-17T12:01:00+00:00"
+    },
+    {
+      "text": "Email tanpa domain '.' harus diblokir dengan status 400",
+      "status": "passed",
+      "evidence": "python3 examples/proof-demo/test_app.py: Ran 2 tests in 0.032s. Status: OK",
+      "verified_at": "2026-07-17T12:01:30+00:00"
+    },
+    {
+      "text": "Tidak ada penemuan celah keamanan parah",
+      "status": "passed",
+      "evidence": "autokeren /security scan examples/proof-demo/app.py: Clean, no issues.",
+      "verified_at": "2026-07-17T12:02:00+00:00"
+    }
+  ]
+}
