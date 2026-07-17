@@ -2,11 +2,14 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/autokeren/autokeren/ghost"
+	"github.com/autokeren/autokeren/internal/config"
+	"github.com/autokeren/autokeren/internal/engine"
 	"github.com/autokeren/autokeren/ipc"
 	"github.com/autokeren/autokeren/ui"
 	tea "github.com/charmbracelet/bubbletea"
@@ -21,6 +24,7 @@ var (
 	useAgy         bool
 	planMode       bool
 	nonInteractive bool
+	engineMode     string
 	taskPrompt     string
 	resumeSession  string
 )
@@ -51,6 +55,28 @@ var rootCmd = &cobra.Command{
 			if err == nil {
 				projectRoot = absPath
 			}
+		}
+
+		if engineMode == "go" && (prompt != "" || nonInteractive) {
+			cfg, err := config.Load(configPath)
+			if err != nil {
+				fmt.Printf("Error memuat config Go: %v\n", err)
+				os.Exit(1)
+			}
+			if modelOverride != "" {
+				cfg.Cloudflare.PrimaryModel = modelOverride
+			}
+			if prompt == "" {
+				fmt.Println("[red]Error: Task/Prompt kosong.[/red]")
+				os.Exit(1)
+			}
+			_, err = engine.RunStandalone(context.Background(), cfg, projectRoot, prompt, func(chunk string) { fmt.Print(chunk) })
+			if err != nil {
+				fmt.Printf("\nError Go engine: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Println()
+			return
 		}
 
 		// 1. Inisialisasi IPC Callbacks (Default ke CLI biasa)
@@ -235,6 +261,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&useAgy, "agy", false, "Gunakan backend Google Antigravity")
 	rootCmd.Flags().BoolVar(&planMode, "plan", false, "Mulai dalam plan mode")
 	rootCmd.Flags().BoolVar(&nonInteractive, "non-interactive", false, "Jalankan single task tanpa REPL")
+	rootCmd.Flags().StringVar(&engineMode, "engine", "python", "Engine runtime: python atau go (go opt-in)")
 	rootCmd.Flags().StringVar(&taskPrompt, "task", "", "Deskripsi task untuk dijalankan")
 	rootCmd.Flags().StringVarP(&resumeSession, "resume", "r", "", "Resume sesi percakapan dari disk")
 }
