@@ -1,35 +1,47 @@
 package ghost
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
 type GhostAgentInfo struct {
-	ID        int       `json:"id"`
-	Task      string    `json:"task"`
-	Status    string    `json:"status"`
-	StartedAt time.Time `json:"started_at"`
-	LogFile   string    `json:"log_file"`
+	ID         int       `json:"id"`
+	Task       string    `json:"task"`
+	Status     string    `json:"status"`
+	StartedAt  time.Time `json:"started_at"`
+	FinishedAt time.Time `json:"finished_at,omitempty"`
+	ExitCode   int       `json:"exit_code"`
+	Error      string    `json:"error,omitempty"`
+	LogFile    string    `json:"log_file"`
 }
 
 func (info GhostAgentInfo) Runtime() float64 {
 	if info.Status == "running" {
 		return time.Since(info.StartedAt).Seconds()
 	}
-	return 0.0
+	if info.FinishedAt.IsZero() {
+		return 0
+	}
+	return info.FinishedAt.Sub(info.StartedAt).Seconds()
 }
 
 type GhostManager struct {
 	ProjectRoot string
 	MaxAgents   int
 	Prefix      string
-	agents      map[int]*GhostAgentInfo
-	nextID      int
+	Timeout     time.Duration
+
+	mu      sync.RWMutex
+	agents  map[int]*GhostAgentInfo
+	cancels map[int]context.CancelFunc
+	nextID  int
 }
 
 func NewGhostManager(projectRoot string) *GhostManager {
@@ -37,73 +49,92 @@ func NewGhostManager(projectRoot string) *GhostManager {
 		ProjectRoot: projectRoot,
 		MaxAgents:   3,
 		Prefix:      "ak-ghost",
+		Timeout:     30 * time.Minute,
 		agents:      make(map[int]*GhostAgentInfo),
+		cancels:     make(map[int]context.CancelFunc),
 		nextID:      1,
 	}
 }
 
 func (gm *GhostManager) Spawn(task string) (*GhostAgentInfo, error) {
-	if gm.activeCount() >= gm.MaxAgents {
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
+	if gm.activeCountLocked() >= gm.MaxAgents {
 		return nil, fmt.Errorf("maksimal %d ghost agent aktif", gm.MaxAgents)
 	}
 
-	agentID := gm.nextID
-	for {
-		sessionName := fmt.Sprintf("%s-%d", gm.Prefix, agentID)
-		if err := exec.Command("tmux", "has-session", "-t", sessionName).Run(); err != nil {
-			break
-		}
-		agentID++
-	}
-	gm.nextID = agentID + 1
-
-	sessionName := fmt.Sprintf("%s-%d", gm.Prefix, agentID)
-	logFile := filepath.Join(gm.ProjectRoot, fmt.Sprintf(".ak-ghost-%d.log", agentID))
-
-	info := &GhostAgentInfo{
-		ID:        agentID,
-		Task:      task,
-		Status:    "running",
-		StartedAt: time.Now(),
-		LogFile:   logFile,
-	}
-
-	// 1. Cek apakah tmux terpasang
-	_, err := exec.LookPath("tmux")
+	id := gm.nextID
+	gm.nextID++
+	logFile := filepath.Join(gm.ProjectRoot, fmt.Sprintf(".ak-ghost-%d.log", id))
+	log, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
-		return nil, fmt.Errorf("tmux tidak ditemukan di sistem. Harap pasang tmux terlebih dahulu")
+		return nil, fmt.Errorf("gagal membuka log ghost: %w", err)
 	}
 
-	// 2. Tulis metadata JSON
-	metaFile := filepath.Join(gm.ProjectRoot, fmt.Sprintf(".ak-ghost-%d.json", agentID))
-	metaContent := fmt.Sprintf(`{"id":%d,"task":%q,"started_at":%q}`, agentID, task, time.Now().UTC().Format(time.RFC3339))
-	_ = os.WriteFile(metaFile, []byte(metaContent), 0644)
-
-	// 3. Buat tmux session baru di background
-	cmdNew := exec.Command("tmux", "new-session", "-d", "-s", sessionName, "-c", gm.ProjectRoot)
-	if err := cmdNew.Run(); err != nil {
-		return nil, fmt.Errorf("gagal membuat tmux session: %v", err)
+	binary := os.Getenv("AUTOKEREN_GHOST_BIN")
+	if binary == "" {
+		for _, candidate := range []string{"./autokeren-cli", "./ak", "autokeren"} {
+			if candidate == "autokeren" {
+				binary = candidate
+				break
+			}
+			if _, statErr := os.Stat(filepath.Join(gm.ProjectRoot, candidate)); statErr == nil {
+				binary = candidate
+				break
+			}
+		}
 	}
 
-	// 4. Jalankan autokeren-cli (biner Go baru kita) untuk memproses task
-	// Gunakan full path biner jika berjalan di folder lokal, atau default global "autokeren"
-	binPath := "./autokeren-cli"
-	if _, err := os.Stat(binPath); os.IsNotExist(err) {
-		binPath = "autokeren"
+	ctx, cancel := context.WithTimeout(context.Background(), gm.Timeout)
+	cmd := exec.CommandContext(ctx, binary, "--non-interactive", "--task", task)
+	cmd.Dir = gm.ProjectRoot
+	cmd.Stdout = log
+	cmd.Stderr = log
+	if err := cmd.Start(); err != nil {
+		cancel()
+		_ = log.Close()
+		return nil, fmt.Errorf("gagal memulai ghost: %w", err)
 	}
 
-	cmdStr := fmt.Sprintf("%s --non-interactive --task %q 2>&1 | tee %s; exit", binPath, task, logFile)
-	cmdSend := exec.Command("tmux", "send-keys", "-t", sessionName, cmdStr, "Enter")
-	if err := cmdSend.Run(); err != nil {
-		gm.Kill(agentID)
-		return nil, fmt.Errorf("gagal mengirimkan perintah ke tmux: %v", err)
-	}
-
-	gm.agents[agentID] = info
+	info := &GhostAgentInfo{ID: id, Task: task, Status: "running", StartedAt: time.Now(), LogFile: logFile}
+	gm.agents[id] = info
+	gm.cancels[id] = cancel
+	gm.writeMetadataLocked(info)
+	go gm.wait(id, cmd, ctx, log)
 	return info, nil
 }
 
-func (gm *GhostManager) activeCount() int {
+func (gm *GhostManager) wait(id int, cmd *exec.Cmd, ctx context.Context, log *os.File) {
+	err := cmd.Wait()
+	_ = log.Close()
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
+	info, ok := gm.agents[id]
+	if !ok {
+		return
+	}
+	if info.Status == "killed" {
+		info.FinishedAt = time.Now()
+	} else if ctx.Err() == context.DeadlineExceeded {
+		info.Status = "timeout"
+		info.Error = ctx.Err().Error()
+		info.FinishedAt = time.Now()
+	} else if err != nil {
+		info.Status = "failed"
+		info.Error = err.Error()
+		info.FinishedAt = time.Now()
+	} else {
+		info.Status = "completed"
+		info.FinishedAt = time.Now()
+	}
+	if cmd.ProcessState != nil {
+		info.ExitCode = cmd.ProcessState.ExitCode()
+	}
+	delete(gm.cancels, id)
+	gm.writeMetadataLocked(info)
+}
+
+func (gm *GhostManager) activeCountLocked() int {
 	count := 0
 	for _, info := range gm.agents {
 		if info.Status == "running" {
@@ -114,83 +145,61 @@ func (gm *GhostManager) activeCount() int {
 }
 
 func (gm *GhostManager) CheckStatus(agentID int) string {
-	info, exists := gm.agents[agentID]
-	if !exists {
-		return "unknown"
+	gm.mu.RLock()
+	defer gm.mu.RUnlock()
+	if info, ok := gm.agents[agentID]; ok {
+		return info.Status
 	}
-
-	sessionName := fmt.Sprintf("%s-%d", gm.Prefix, agentID)
-	cmd := exec.Command("tmux", "has-session", "-t", sessionName)
-	err := cmd.Run()
-
-	// Jika tmux has-session mengembalikan error (exit code != 0), session tmux sudah mati
-	if err != nil {
-		info.Status = "completed"
-	}
-	return info.Status
+	return "unknown"
 }
 
 func (gm *GhostManager) Kill(agentID int) bool {
-	info, exists := gm.agents[agentID]
-	if !exists {
+	gm.mu.Lock()
+	info, ok := gm.agents[agentID]
+	cancel, hasCancel := gm.cancels[agentID]
+	if !ok || info.Status != "running" {
+		gm.mu.Unlock()
 		return false
 	}
-
-	sessionName := fmt.Sprintf("%s-%d", gm.Prefix, agentID)
-	cmd := exec.Command("tmux", "kill-session", "-t", sessionName)
-	_ = cmd.Run()
-
 	info.Status = "killed"
+	if hasCancel {
+		cancel()
+	}
+	gm.writeMetadataLocked(info)
+	gm.mu.Unlock()
 	return true
 }
 
 func (gm *GhostManager) List() []*GhostAgentInfo {
-	// Scan files .ak-ghost-*.json untuk deteksi session baru atau sisa restart
-	matches, _ := filepath.Glob(filepath.Join(gm.ProjectRoot, ".ak-ghost-*.json"))
-	for _, match := range matches {
-		var id int
-		_, err := fmt.Sscanf(filepath.Base(match), ".ak-ghost-%d.json", &id)
-		if err == nil {
-			if _, exists := gm.agents[id]; !exists {
-				data, err := os.ReadFile(match)
-				if err == nil {
-					var meta struct {
-						ID        int    `json:"id"`
-						Task      string `json:"task"`
-						StartedAt string `json:"started_at"`
-					}
-					if json.Unmarshal(data, &meta) == nil {
-						started, _ := time.Parse(time.RFC3339, meta.StartedAt)
-						gm.agents[id] = &GhostAgentInfo{
-							ID:        id,
-							Task:      meta.Task,
-							Status:    "running",
-							StartedAt: started,
-							LogFile:   filepath.Join(gm.ProjectRoot, fmt.Sprintf(".ak-ghost-%d.log", id)),
-						}
-					}
-				}
-			}
-		}
-	}
-
+	gm.mu.RLock()
+	defer gm.mu.RUnlock()
 	list := make([]*GhostAgentInfo, 0, len(gm.agents))
-	for _, a := range gm.agents {
-		gm.CheckStatus(a.ID)
-		list = append(list, a)
+	for _, info := range gm.agents {
+		copyInfo := *info
+		list = append(list, &copyInfo)
 	}
 	return list
 }
 
 func (gm *GhostManager) GetOutput(agentID int) string {
-	info, exists := gm.agents[agentID]
-	if !exists || info.LogFile == "" {
+	gm.mu.RLock()
+	info, ok := gm.agents[agentID]
+	gm.mu.RUnlock()
+	if !ok || info.LogFile == "" {
 		return ""
 	}
-
 	data, err := os.ReadFile(info.LogFile)
 	if err != nil {
 		return ""
 	}
 	return string(data)
+}
+
+func (gm *GhostManager) writeMetadataLocked(info *GhostAgentInfo) {
+	path := filepath.Join(gm.ProjectRoot, fmt.Sprintf(".ak-ghost-%d.json", info.ID))
+	data, err := json.Marshal(info)
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(path, data, 0o600)
 }
