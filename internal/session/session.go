@@ -15,6 +15,7 @@ type Data struct {
 	CreatedAt time.Time       `json:"created_at"`
 	UpdatedAt time.Time       `json:"updated_at"`
 	Messages  []model.Message `json:"messages"`
+	Usage     model.Usage     `json:"usage,omitempty"`
 }
 
 func New(id string, messages []model.Message) Data {

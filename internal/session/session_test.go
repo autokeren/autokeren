@@ -20,3 +20,27 @@ func TestSaveLoad(t *testing.T) {
 		t.Fatalf("unexpected %#v", got)
 	}
 }
+
+func TestManagerSaveLoadListAndPartialName(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("AUTOKEREN_CONFIG_DIR", filepath.Join(root, "config"))
+	manager, err := NewManager(filepath.Join(root, "project"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved, err := manager.Save("demo-session", []model.Message{{Role: "user", Content: "halo"}}, model.Usage{TotalTokens: 3}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := manager.Load("demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.ID != saved.ID || loaded.Name != "demo-session" || len(loaded.Messages) != 1 || loaded.Usage.TotalTokens != 3 {
+		t.Fatalf("unexpected loaded session: %#v", loaded)
+	}
+	items, err := manager.List()
+	if err != nil || len(items) != 1 || items[0].Name != "demo-session" {
+		t.Fatalf("unexpected list: %#v err=%v", items, err)
+	}
+}

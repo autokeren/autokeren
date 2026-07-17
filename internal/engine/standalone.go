@@ -14,8 +14,6 @@ import (
 	"github.com/autokeren/autokeren/internal/tool"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -61,17 +59,20 @@ func RunStandaloneEvents(ctx context.Context, cfg config.Config, root, prompt st
 		timeout = 120 * time.Second
 	}
 	store := contextstore.New(cfg.Autokeren.ContextWindow, cfg.Autokeren.AutoCompact, cfg.Autokeren.AutoCompactThreshold)
-	sessionID := resume
-	if sessionID != "" {
-		path := filepath.Join(root, ".ak-sessions", sessionID+".json")
-		data, err := session.Load(path)
-		if err == nil {
-			store.Replace(data.Messages)
-		} else if !os.IsNotExist(err) {
-			return "", fmt.Errorf("load session %s: %w", sessionID, err)
+	sessions, err := session.NewManager(root)
+	if err != nil {
+		return "", err
+	}
+	sessionID := ""
+	sessionName := ""
+	if resume != "" && resume != "default" {
+		data, loadErr := sessions.Load(resume)
+		if loadErr != nil {
+			return "", fmt.Errorf("load session %s: %w", resume, loadErr)
 		}
-	} else {
-		sessionID = fmt.Sprintf("session-%d", time.Now().Unix())
+		sessionID = data.ID
+		sessionName = data.Name
+		store.Replace(data.Messages)
 	}
 	messages := store.Messages()
 	if len(messages) == 0 || messages[0].Role != "system" {
@@ -88,6 +89,31 @@ func RunStandaloneEvents(ctx context.Context, cfg config.Config, root, prompt st
 	if events.OnResponse != nil {
 		events.OnResponse(response)
 	}
-	_ = session.Save(filepath.Join(root, ".ak-sessions", sessionID+".json"), session.New(sessionID, store.Messages()))
+	if cfg.Autokeren.AutoSaveSession {
+		if sessionName == "" {
+			sessionName = automaticSessionName(prompt)
+		}
+		saved, saveErr := sessions.Save(sessionName, store.Messages(), response.Usage, sessionID)
+		if saveErr != nil {
+			return "", fmt.Errorf("auto-save session: %w", saveErr)
+		}
+		if events.OnSessionSaved != nil {
+			events.OnSessionSaved(saved.ID, saved.Name)
+		}
+	}
 	return response.Content, nil
+}
+
+func automaticSessionName(input string) string {
+	words := strings.FieldsFunc(strings.ToLower(input), func(r rune) bool {
+		return !(r >= 'a' && r <= 'z') && !(r >= '0' && r <= '9')
+	})
+	if len(words) > 3 {
+		words = words[:3]
+	}
+	slug := strings.Join(words, "-")
+	if slug == "" {
+		slug = "session"
+	}
+	return time.Now().Format("20060102-150405") + "-" + slug
 }

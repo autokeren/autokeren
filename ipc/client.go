@@ -3,6 +3,7 @@ package ipc
 import (
 	"bufio"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -71,6 +72,7 @@ type Client struct {
 	localConfigPath       string
 	localSession          string
 	localSessionName      string
+	localSessions         *sessionstore.Manager
 	localNeuronsUsed      int
 	localNeuronsRemaining int
 	localNeuronsQuota     int
@@ -204,8 +206,12 @@ func (c *Client) startLocal(projectRoot, configPath string) error {
 	c.localRoot = projectRoot
 	c.localConfig = cfg
 	c.localConfigPath = configPath
-	c.localSession = fmt.Sprintf("session-%d", time.Now().Unix())
+	c.localSession = "default"
 	c.localSessionName = "default"
+	c.localSessions, err = sessionstore.NewManager(projectRoot)
+	if err != nil {
+		return err
+	}
 	atomic.StoreInt32(&c.isClosed, 0)
 	return nil
 }
@@ -255,6 +261,13 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 				c.localNeuronsRemaining = response.Usage.NeuronsRemaining
 				c.localNeuronsQuota = response.Usage.NeuronsQuota
 			},
+			OnSessionSaved: func(id, name string) {
+				c.localSession = id
+				c.localSessionName = name
+				if c.callbacks != nil && c.callbacks.OnSessionSaved != nil {
+					c.callbacks.OnSessionSaved(id, name)
+				}
+			},
 		}
 		content, err := engine.RunStandaloneEvents(context.Background(), c.localConfig, c.localRoot, input, events, c.localSession)
 		if err != nil {
@@ -262,11 +275,6 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 				c.callbacks.OnError(err.Error())
 			}
 			return err
-		}
-		if err := c.autoSaveLocalSession(input); err != nil {
-			if c.callbacks != nil && c.callbacks.OnError != nil {
-				c.callbacks.OnError("auto-save session gagal: " + err.Error())
-			}
 		}
 		if c.callbacks != nil && c.callbacks.OnModelEnd != nil {
 			c.callbacks.OnModelEnd(content, c.localConfig.Cloudflare.PrimaryModel, c.localSession, c.localSessionName, nil)
@@ -299,7 +307,7 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		}
 		return nil
 	case "agent.reset":
-		c.localSession = fmt.Sprintf("session-%d", time.Now().Unix())
+		c.localSession = "default"
 		c.localSessionName = "default"
 		return nil
 	case "agent.compact", "agent.interrupt":
@@ -310,31 +318,19 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		if name == "" {
 			name = fmt.Sprintf("session-%d", time.Now().Unix())
 		}
-		if err := os.MkdirAll(filepath.Join(c.localRoot, ".ak-sessions"), 0o700); err != nil {
-			return err
-		}
-		src := c.sessionPath(c.localSession)
-		dst := c.sessionPath(name)
-		data, err := os.ReadFile(src)
-		if os.IsNotExist(err) {
-			if saveErr := sessionstore.Save(src, sessionstore.New(c.localSession, nil)); saveErr != nil {
-				return saveErr
-			}
-			data, err = os.ReadFile(src)
-		}
+		sessions, err := c.localSessionManager()
 		if err != nil {
 			return err
 		}
-		var sessionData sessionstore.Data
-		if err := json.Unmarshal(data, &sessionData); err != nil {
+		data, loadErr := sessions.Load(c.localSession)
+		if loadErr != nil && !errors.Is(loadErr, sql.ErrNoRows) {
+			return loadErr
+		}
+		saved, err := sessions.Save(name, data.Messages, data.Usage, "")
+		if err != nil {
 			return err
 		}
-		sessionData.ID = name
-		sessionData.Name = name
-		if err := sessionstore.Save(dst, sessionData); err != nil {
-			return err
-		}
-		c.localSession = name
+		c.localSession = saved.ID
 		c.localSessionName = name
 		if reply != nil {
 			return json.Unmarshal([]byte(fmt.Sprintf(`{"message":"Session '%s' disimpan.","session_id":%q,"session_name":%q,"name":%q}`, name, name, name, name)), reply)
@@ -346,42 +342,33 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		if identifier == "" {
 			return errors.New("session identifier kosong")
 		}
-		id, path, err := c.resolveSession(identifier)
+		sessions, err := c.localSessionManager()
 		if err != nil {
 			return err
 		}
-		c.localSession = id
-		c.localSessionName = identifier
+		data, err := sessions.Load(identifier)
+		if err != nil {
+			return fmt.Errorf("session %q tidak ditemukan", identifier)
+		}
+		c.localSession = data.ID
+		c.localSessionName = data.Name
 		if reply != nil {
-			data, loadErr := sessionstore.Load(path)
-			if loadErr == nil {
-				if data.Name != "" {
-					c.localSessionName = data.Name
-				}
-				raw, _ := json.Marshal(map[string]any{"message": "Session " + c.localSessionName + " berhasil di-resume.", "session_id": c.localSession, "session_name": c.localSessionName, "messages": data.Messages})
-				return json.Unmarshal(raw, reply)
-			}
+			raw, _ := json.Marshal(map[string]any{"message": "Session " + c.localSessionName + " berhasil di-resume.", "session_id": c.localSession, "session_name": c.localSessionName, "messages": data.Messages})
+			return json.Unmarshal(raw, reply)
 		}
 		return nil
 	case "agent.list_sessions":
-		entries, err := os.ReadDir(filepath.Join(c.localRoot, ".ak-sessions"))
-		if err != nil && !os.IsNotExist(err) {
+		sessions, err := c.localSessionManager()
+		if err != nil {
+			return err
+		}
+		entries, err := sessions.List()
+		if err != nil {
 			return err
 		}
 		items := make([]map[string]interface{}, 0)
 		for _, entry := range entries {
-			if filepath.Ext(entry.Name()) == ".json" {
-				id := entry.Name()[:len(entry.Name())-5]
-				data, loadErr := sessionstore.Load(c.sessionPath(id))
-				if loadErr != nil {
-					continue
-				}
-				name := data.Name
-				if name == "" {
-					name = id
-				}
-				items = append(items, map[string]interface{}{"id": id, "name": name, "created_at": data.CreatedAt.Format(time.RFC3339), "message_count": len(data.Messages)})
-			}
+			items = append(items, map[string]interface{}{"id": entry.ID, "name": entry.Name, "created_at": entry.Timestamp, "message_count": entry.Messages})
 		}
 		if reply != nil {
 			raw, _ := json.Marshal(map[string]interface{}{"sessions": items})
@@ -466,69 +453,26 @@ func (c *Client) localModels() []map[string]interface{} {
 	return models
 }
 
-func (c *Client) sessionPath(id string) string {
-	return filepath.Join(c.localRoot, ".ak-sessions", id+".json")
-}
-
-func (c *Client) autoSaveLocalSession(input string) error {
-	if !c.localConfig.Autokeren.AutoSaveSession {
-		return nil
+func (c *Client) localSessionManager() (*sessionstore.Manager, error) {
+	if c.localSessions != nil {
+		return c.localSessions, nil
 	}
-	path := c.sessionPath(c.localSession)
-	data, err := sessionstore.Load(path)
+	manager, err := sessionstore.NewManager(c.localRoot)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if c.localSessionName == "" || c.localSessionName == "default" {
-		words := strings.FieldsFunc(strings.ToLower(input), func(r rune) bool { return !(r >= 'a' && r <= 'z') && !(r >= '0' && r <= '9') })
-		if len(words) > 3 {
-			words = words[:3]
-		}
-		slug := strings.Join(words, "-")
-		if slug == "" {
-			slug = "session"
-		}
-		c.localSessionName = time.Now().Format("20060102-150405") + "-" + slug
-	}
-	data.ID = c.localSession
-	data.Name = c.localSessionName
-	if err := sessionstore.Save(path, data); err != nil {
-		return err
-	}
-	if c.callbacks != nil && c.callbacks.OnSessionSaved != nil {
-		c.callbacks.OnSessionSaved(c.localSession, c.localSessionName)
-	}
-	return nil
-}
-
-func (c *Client) resolveSession(identifier string) (string, string, error) {
-	direct := c.sessionPath(identifier)
-	if _, err := os.Stat(direct); err == nil {
-		return identifier, direct, nil
-	}
-	entries, err := os.ReadDir(filepath.Join(c.localRoot, ".ak-sessions"))
-	if err != nil {
-		return "", "", err
-	}
-	for _, entry := range entries {
-		if filepath.Ext(entry.Name()) != ".json" {
-			continue
-		}
-		id := strings.TrimSuffix(entry.Name(), ".json")
-		path := c.sessionPath(id)
-		data, loadErr := sessionstore.Load(path)
-		if loadErr == nil && data.Name == identifier {
-			return id, path, nil
-		}
-	}
-	return "", "", fmt.Errorf("session %q tidak ditemukan", identifier)
+	c.localSessions = manager
+	return manager, nil
 }
 
 func (c *Client) localContextInfo() map[string]any {
 	tokens := 0
-	if data, err := sessionstore.Load(c.sessionPath(c.localSession)); err == nil {
-		for _, message := range data.Messages {
-			tokens += len([]rune(message.Role+" "+message.Content+" "+message.Name))/4 + len(message.ToolCalls)*8
+	if sessions, err := c.localSessionManager(); err == nil && c.localSession != "default" {
+		data, loadErr := sessions.Load(c.localSession)
+		if loadErr == nil {
+			for _, message := range data.Messages {
+				tokens += len([]rune(message.Role+" "+message.Content+" "+message.Name))/4 + len(message.ToolCalls)*8
+			}
 		}
 	}
 	window := c.localConfig.Autokeren.ContextWindow
