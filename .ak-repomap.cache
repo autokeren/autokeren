@@ -50,10 +50,14 @@
       "symbols": []
     },
     "tests/test_daemon_observer.py": {
-      "mtime": 1783787390.95167,
-      "summary": "  def test_system_observer_files_and_logs()",
+      "mtime": 1784246474.0108938,
+      "summary": "  def test_system_observer_files_and_logs()\n  def test_system_observer_tmux(monkeypatch)",
       "symbols": [
-        "test_system_observer_files_and_logs"
+        "test_system_observer_files_and_logs",
+        "test_system_observer_tmux"
+      ],
+      "dependencies": [
+        "autokeren/daemon.py"
       ]
     },
     "tests/test_fddm.py": {
@@ -164,14 +168,18 @@
       ]
     },
     "tests/test_repo_map.py": {
-      "mtime": 1784211953.1946836,
-      "summary": "  def test_repo_map_python_parsing(tmp_path)\n  def test_repo_map_go_parsing(tmp_path)\n  def test_repo_map_js_ts_parsing(tmp_path)\n  def test_repo_map_full_run(tmp_path)\n  def test_repo_map_relevance_filtering(tmp_path)",
+      "mtime": 1784246384.1641386,
+      "summary": "  def test_repo_map_python_parsing(tmp_path)\n  def test_repo_map_go_parsing(tmp_path)\n  def test_repo_map_js_ts_parsing(tmp_path)\n  def test_repo_map_full_run(tmp_path)\n  def test_repo_map_relevance_filtering(tmp_path)\n  def test_repo_map_dependency_graphing(tmp_path)",
       "symbols": [
         "test_repo_map_python_parsing",
         "test_repo_map_go_parsing",
         "test_repo_map_js_ts_parsing",
         "test_repo_map_full_run",
-        "test_repo_map_relevance_filtering"
+        "test_repo_map_relevance_filtering",
+        "test_repo_map_dependency_graphing"
+      ],
+      "dependencies": [
+        "autokeren/tools/repo_map.py"
       ]
     },
     "tests/test_dynamic_loader.py": {
@@ -202,12 +210,19 @@
       ]
     },
     "tests/test_git_integration.py": {
-      "mtime": 1784212524.188229,
+      "mtime": 1784246434.610124,
       "summary": "  def test_git_auto_commit_tool(tmp_path)\n  def test_agent_git_micro_commit(tmp_path)\n  def test_agent_git_rollback(tmp_path)",
       "symbols": [
         "test_git_auto_commit_tool",
         "test_agent_git_micro_commit",
         "test_agent_git_rollback"
+      ],
+      "dependencies": [
+        "autokeren/agent.py",
+        "autokeren/config.py",
+        "autokeren/models/base.py",
+        "autokeren/tools/__init__.py",
+        "autokeren/tools/git.py"
       ]
     },
     "tests/test_memory_db.py": {
@@ -568,9 +583,10 @@
       "symbols": []
     },
     "CHANGELOG.md": {
-      "mtime": 1784212941.154996,
+      "mtime": 1784246498.7283766,
       "summary": "",
-      "symbols": []
+      "symbols": [],
+      "dependencies": []
     },
     "README.md": {
       "mtime": 1783867658.3466756,
@@ -710,150 +726,11 @@
       "summary": "",
       "symbols": []
     },
-    ".ak-checkpoints/session-default/2600.json": {
-      "mtime": 1784212463.2790043,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2605.json": {
-      "mtime": 1784212672.6472545,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2595.json": {
-      "mtime": 1784211947.188557,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2601.json": {
-      "mtime": 1784212505.684857,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2587.json": {
-      "mtime": 1784211295.9810646,
-      "summary": "",
-      "symbols": []
-    },
     ".ak-checkpoints/session-default/meta.json": {
-      "mtime": 1784214220.5160847,
+      "mtime": 1784215855.7282321,
       "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2593.json": {
-      "mtime": 1784211893.2444203,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2610.json": {
-      "mtime": 1784212894.4829981,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2585.json": {
-      "mtime": 1784211132.5767412,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2596.json": {
-      "mtime": 1784211980.6172614,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2599.json": {
-      "mtime": 1784212417.853091,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2584.json": {
-      "mtime": 1784211093.3599436,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2609.json": {
-      "mtime": 1784212841.4778645,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2588.json": {
-      "mtime": 1784211770.738839,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2603.json": {
-      "mtime": 1784212606.8538911,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2592.json": {
-      "mtime": 1784211880.9541614,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2598.json": {
-      "mtime": 1784212050.2627,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2594.json": {
-      "mtime": 1784211934.0652804,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2604.json": {
-      "mtime": 1784212636.931496,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2602.json": {
-      "mtime": 1784212548.7277224,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2606.json": {
-      "mtime": 1784212724.1333554,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2607.json": {
-      "mtime": 1784212756.9130564,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2611.json": {
-      "mtime": 1784213055.2283084,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2590.json": {
-      "mtime": 1784211830.211092,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2608.json": {
-      "mtime": 1784212797.0499146,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2589.json": {
-      "mtime": 1784211791.5952783,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2591.json": {
-      "mtime": 1784211850.2645147,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2586.json": {
-      "mtime": 1784211194.1109927,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2597.json": {
-      "mtime": 1784212018.5400605,
-      "summary": "",
-      "symbols": []
+      "symbols": [],
+      "dependencies": []
     },
     "ui/kanban.go": {
       "mtime": 1783817314.1844163,
@@ -866,7 +743,7 @@
       ]
     },
     "ui/layout.go": {
-      "mtime": 1784212941.0909946,
+      "mtime": 1784246498.688376,
       "summary": "  package ui\n  func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot, configPath string, opts map[string]interface{}) MainModel\n  func (m MainModel) Init() tea.Cmd\n  func spinnerTick() tea.Cmd\n  func (m MainModel) pollPeriodicCmd() tea.Cmd\n  func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd)\n  func (m MainModel) View() string\n  func jsonMarshalIndent(v interface{}) (string, error)\n  func (m *MainModel) handleGhostCommand(args string)\n  func (m MainModel) connectToAgentCmd() tea.Cmd\n  func (m MainModel) fetchModelsCmd() tea.Cmd\n  func (m MainModel) switchModelCmd(modelID string) tea.Cmd\n  func parseStatusReply(statusReply map[string]interface{}, projectRoot string) StatusUpdateMsg\n  func (m MainModel) getSelectedTask() (KanbanTask, bool)\n  func renderMcpAddDialog(nameInput, cmdInput textinput.Model, activeField int, width int) string",
       "symbols": [
         "ui",
@@ -884,6 +761,11 @@
         "parseStatusReply",
         "getSelectedTask",
         "renderMcpAddDialog"
+      ],
+      "dependencies": [
+        "ghost/manager.go",
+        "ipc/browser.go",
+        "ipc/client.go"
       ]
     },
     "ui/chat.go": {
@@ -901,7 +783,7 @@
       ]
     },
     "ui/sidebar.go": {
-      "mtime": 1784212941.101995,
+      "mtime": 1784246498.694376,
       "summary": "  package ui\n  func NewSidebarModel() SidebarModel\n  func (m SidebarModel) View() string\n  func truncate(s string, max int) string\n  func humanTokens(n int) string\n  func wrapText(s string, maxW int) string",
       "symbols": [
         "ui",
@@ -910,6 +792,9 @@
         "truncate",
         "humanTokens",
         "wrapText"
+      ],
+      "dependencies": [
+        "ghost/manager.go"
       ]
     },
     "ui/debate.go": {
@@ -1170,8 +1055,8 @@
       ]
     },
     "autokeren/agent.py": {
-      "mtime": 1784212164.4769964,
-      "summary": "  class Agent:\n    def __init__(self, cfg, tools, project_root, memory, sessions, role, model_id)\n    def _build_system_prompt(self, role)\n    def _ensure_genome_scanned(self)\n    def check_interrupt(self)\n    def _add_assistant_and_log(self, resp)\n    def run(self, user_input)\n    def _auto_save_session(self)\n    def _run_cf_verify_after_deploy(self, deploy_result)\n    def _generate_commit_message_from_diff(self, diff)\n    def _run_git_micro_commit(self, file_path)\n    def _run_git_auto_commit(self, summary)\n    def approve_plan(self)\n    def reset(self)\n    def save_session(self, name)\n    def _update_existing_session(self)\n    def resume_session(self, identifier)\n    def _clean_orphaned_tool_calls(messages)\n    def context_info(self)\n    def status_bar_info(self)\n    def should_compact(self)\n    def prune_context(self, keep_turns)\n    def compact(self)\n    def status(self)\n    def run_autonomous(self, goal, context)\n    def run_self_improvement(self, failed_tool_name, error_message, tool_args)",
+      "mtime": 1784246425.5579472,
+      "summary": "  class Agent:\n    def __init__(self, cfg, tools, project_root, memory, sessions, role, model_id)\n    def _build_system_prompt(self, role)\n    def _ensure_genome_scanned(self)\n    def check_interrupt(self)\n    def _add_assistant_and_log(self, resp)\n    def run(self, user_input)\n    def _auto_save_session(self)\n    def _run_cf_verify_after_deploy(self, deploy_result)\n    def _generate_commit_message_from_diff(self, diff)\n    def _create_green_tag(self)\n    def _rollback_to_latest_green_tag(self, error_message)\n    def _run_git_micro_commit(self, file_path)\n    def _run_git_auto_commit(self, summary)\n    def approve_plan(self)\n    def reset(self)\n    def save_session(self, name)\n    def _update_existing_session(self)\n    def resume_session(self, identifier)\n    def _clean_orphaned_tool_calls(messages)\n    def context_info(self)\n    def status_bar_info(self)\n    def should_compact(self)\n    def prune_context(self, keep_turns)\n    def compact(self)\n    def status(self)\n    def run_autonomous(self, goal, context)\n    def run_self_improvement(self, failed_tool_name, error_message, tool_args)",
       "symbols": [
         "Agent",
         "__init__",
@@ -1183,6 +1068,8 @@
         "_auto_save_session",
         "_run_cf_verify_after_deploy",
         "_generate_commit_message_from_diff",
+        "_create_green_tag",
+        "_rollback_to_latest_green_tag",
         "_run_git_micro_commit",
         "_run_git_auto_commit",
         "approve_plan",
@@ -1199,6 +1086,30 @@
         "status",
         "run_autonomous",
         "run_self_improvement"
+      ],
+      "dependencies": [
+        "autokeren/__init__.py",
+        "autokeren/autoplan/__init__.py",
+        "autokeren/checkpoints/__init__.py",
+        "autokeren/cli.py",
+        "autokeren/config.py",
+        "autokeren/context.py",
+        "autokeren/enforcer/__init__.py",
+        "autokeren/fddm_hook.py",
+        "autokeren/genome/__init__.py",
+        "autokeren/kanban/__init__.py",
+        "autokeren/loop/__init__.py",
+        "autokeren/loop/patterns.py",
+        "autokeren/memory.py",
+        "autokeren/models/base.py",
+        "autokeren/models/router.py",
+        "autokeren/prompts.py",
+        "autokeren/security_guard/__init__.py",
+        "autokeren/session.py",
+        "autokeren/tools/__init__.py",
+        "autokeren/tools/cf_verify.py",
+        "autokeren/tools/git.py",
+        "autokeren/tools/repo_map.py"
       ]
     },
     "autokeren/autoplan/executor.py": {
@@ -1573,13 +1484,14 @@
       ]
     },
     "autokeren/daemon.py": {
-      "mtime": 1783902468.103645,
-      "summary": "  class SystemObserver:\n    def __init__(self, project_root, daemon)\n    def _scan_files(self)\n    def watch_loop(self)\n    def _check_logs(self)\n    def _check_file_modifications(self)\n  class JSONRPCDaemon:\n    def __init__(self, port)\n    def send_notification(self, method, params)\n    def send_request(self, method, params)\n    def send_response(self, req_id, result, error)\n    def trigger_auto_diagnose(self, issue, context)\n    def handle_request(self, req)\n    def handle_agent_init(self, req_id, params)\n    def handle_agent_run(self, req_id, params)\n    def handle_agent_interrupt(self, req_id)\n    def handle_agent_compact(self, req_id)\n    def handle_agent_status(self, req_id)\n    def handle_agent_reset(self, req_id)\n    def handle_agent_switch_model(self, req_id, params)\n    def handle_agent_list_models(self, req_id)\n    def _get_kanban_db(self)\n    def handle_kanban_list(self, req_id)\n    def handle_kanban_add(self, req_id, params)\n    def handle_kanban_move(self, req_id, params)\n    def handle_kanban_delete(self, req_id, params)\n    def handle_agent_save_session(self, req_id, params)\n    def handle_agent_resume_session(self, req_id, params)\n    def handle_agent_list_sessions(self, req_id)\n    def run(self)",
+      "mtime": 1784246463.326685,
+      "summary": "  class SystemObserver:\n    def __init__(self, project_root, daemon)\n    def _scan_files(self)\n    def watch_loop(self)\n    def _check_tmux(self)\n    def _check_logs(self)\n    def _check_file_modifications(self)\n  class JSONRPCDaemon:\n    def __init__(self, port)\n    def send_notification(self, method, params)\n    def send_request(self, method, params)\n    def send_response(self, req_id, result, error)\n    def trigger_auto_diagnose(self, issue, context)\n    def handle_request(self, req)\n    def handle_agent_init(self, req_id, params)\n    def handle_agent_run(self, req_id, params)\n    def handle_agent_interrupt(self, req_id)\n    def handle_agent_compact(self, req_id)\n    def handle_agent_status(self, req_id)\n    def handle_agent_reset(self, req_id)\n    def handle_agent_switch_model(self, req_id, params)\n    def handle_agent_list_models(self, req_id)\n    def _get_kanban_db(self)\n    def handle_kanban_list(self, req_id)\n    def handle_kanban_add(self, req_id, params)\n    def handle_kanban_move(self, req_id, params)\n    def handle_kanban_delete(self, req_id, params)\n    def handle_agent_save_session(self, req_id, params)\n    def handle_agent_resume_session(self, req_id, params)\n    def handle_agent_list_sessions(self, req_id)\n    def run(self)",
       "symbols": [
         "SystemObserver",
         "__init__",
         "_scan_files",
         "watch_loop",
+        "_check_tmux",
         "_check_logs",
         "_check_file_modifications",
         "JSONRPCDaemon",
@@ -1606,6 +1518,19 @@
         "handle_agent_resume_session",
         "handle_agent_list_sessions",
         "run"
+      ],
+      "dependencies": [
+        "autokeren/agent.py",
+        "autokeren/cli.py",
+        "autokeren/commands.py",
+        "autokeren/config.py",
+        "autokeren/kanban/__init__.py",
+        "autokeren/memory.py",
+        "autokeren/models/aistudio.py",
+        "autokeren/models/antigravity.py",
+        "autokeren/models/cloudflare.py",
+        "autokeren/tools/__init__.py",
+        "autokeren/tools/tmux.py"
       ]
     },
     "autokeren/commands/__init__.py": {
@@ -1741,9 +1666,10 @@
       ]
     },
     "autokeren/__init__.py": {
-      "mtime": 1784212941.0549939,
+      "mtime": 1784246498.6833758,
       "summary": "",
-      "symbols": []
+      "symbols": [],
+      "dependencies": []
     },
     "autokeren/commands.py": {
       "mtime": 1784080750.2042599,
@@ -1871,8 +1797,8 @@
       ]
     },
     "autokeren/tools/repo_map.py": {
-      "mtime": 1784212033.3813605,
-      "summary": "  class RepoMapTool(Tool):\n    def __init__(self, project_root)\n    def run(self, max_files, query, **_)\n    def _cache_path(self)\n    def load_cache(self)\n    def save_cache(self, cache)\n    def update_index(self)\n    def get_relevant_map(self, query, max_files)\n    def _walk_files(self, root)\n    def _parse_file(self, filepath)\n    def _parse_python(self, content)\n    def _parse_go(self, content)\n    def _parse_js_ts(self, content)",
+      "mtime": 1784246407.1345873,
+      "summary": "  class RepoMapTool(Tool):\n    def __init__(self, project_root)\n    def run(self, max_files, query, **_)\n    def _cache_path(self)\n    def load_cache(self)\n    def save_cache(self, cache)\n    def update_index(self)\n    def get_relevant_map(self, query, max_files)\n    def _extract_dependencies(self, filepath, content)\n    def _walk_files(self, root)\n    def _parse_file(self, filepath)\n    def _parse_python(self, content)\n    def _parse_go(self, content)\n    def _parse_js_ts(self, content)",
       "symbols": [
         "RepoMapTool",
         "__init__",
@@ -1882,11 +1808,15 @@
         "save_cache",
         "update_index",
         "get_relevant_map",
+        "_extract_dependencies",
         "_walk_files",
         "_parse_file",
         "_parse_python",
         "_parse_go",
         "_parse_js_ts"
+      ],
+      "dependencies": [
+        "autokeren/tools/base.py"
       ]
     },
     "autokeren/tools/__init__.py": {
@@ -2639,6 +2569,174 @@
       "mtime": 1784213965.9878306,
       "summary": "",
       "symbols": []
+    },
+    ".ak-checkpoints/session-default/2643.json": {
+      "mtime": 1784214941.760728,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2640.json": {
+      "mtime": 1784214792.4647062,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2656.json": {
+      "mtime": 1784215570.3024495,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2635.json": {
+      "mtime": 1784214655.731937,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2637.json": {
+      "mtime": 1784214717.4311876,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2658.json": {
+      "mtime": 1784215658.6322372,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2661.json": {
+      "mtime": 1784215855.727232,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2650.json": {
+      "mtime": 1784215288.5747473,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2639.json": {
+      "mtime": 1784214771.4792814,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2647.json": {
+      "mtime": 1784215097.749885,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2636.json": {
+      "mtime": 1784214699.0588157,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2660.json": {
+      "mtime": 1784215817.6594598,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2651.json": {
+      "mtime": 1784215448.5039845,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2654.json": {
+      "mtime": 1784215547.7179923,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2657.json": {
+      "mtime": 1784215588.4328165,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2655.json": {
+      "mtime": 1784215551.6310716,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2634.json": {
+      "mtime": 1784214634.6765096,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2648.json": {
+      "mtime": 1784215117.2802804,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2641.json": {
+      "mtime": 1784214847.8308268,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2653.json": {
+      "mtime": 1784215544.5239277,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2659.json": {
+      "mtime": 1784215811.345332,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2646.json": {
+      "mtime": 1784215050.6189313,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2649.json": {
+      "mtime": 1784215125.8924549,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2638.json": {
+      "mtime": 1784214745.1317482,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2644.json": {
+      "mtime": 1784214984.1235855,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2645.json": {
+      "mtime": 1784215023.6373851,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2642.json": {
+      "mtime": 1784214871.7603111,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2652.json": {
+      "mtime": 1784215539.495826,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
     }
   }
 }

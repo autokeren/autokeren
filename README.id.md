@@ -129,6 +129,15 @@ Kelola task list Anda secara visual langsung di terminal. Papan Kanban interakti
 ### 5. Live Multi-Agent Debate View (`Ctrl+D`)
 Pantau hasil diskusi, koordinasi, dan log pengerjaan tugas dari beberapa Ghost Agent yang berjalan di background secara real-time. Cukup tekan **`Ctrl+D`** untuk beralih ke panel debat.
 
+### 6. AST Dependency Graphing (Poka-Yoke Input)
+Secara rekursif mem-parse deklarasi impor berkas Python, Go, dan JS/TS untuk membangun graf dependensi lokal. Menyuplai agen dengan signature berkas terkait untuk mencegah error kompilasi dan keluar konteks.
+
+### 7. CAPA Tag-Based Rollback (Corrective/Preventive Actions)
+Membuat tag checkpoint Git (`ak-green-`) pasca micro-commit sukses, dan secara otomatis melakukan rollback kembali ke state hijau terverifikasi terakhir saat loop-breaker mendeteksi loop error beruntun, serta menyuntikkan riwayat konteks peringatan untuk mencegah kegagalan berulang.
+
+### 8. Active Tmux Log Sniffing (SPC Monitoring)
+Memantau pseudo-terminal tmux secara asinkron dari daemon untuk melacak traceback error, panic, atau server crash, dan secara otonom memicu sub-agent di latar belakang untuk melakukan penambalan mandiri.
+
 ## Cara Mulai
 
 ### 1. Dapatkan API Key (gratis)

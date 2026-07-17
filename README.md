@@ -128,6 +128,15 @@ Manage project task lists visually inside the terminal, synchronized with local 
 ### 5. Live Multi-Agent Debate View (`Ctrl+D`)
 Monitor discussions, coordination, and work logs of background Ghost Agents in real-time. Press **`Ctrl+D`** to toggle the debate view.
 
+### 6. AST Dependency Graphing (Poka-Yoke)
+Recursively parses imports in Python, Go, and JS/TS files to construct a local dependency graph. Feeds the agent with contextually relevant signatures, preventing compile errors.
+
+### 7. CAPA Tag-Based Rollback
+Creates tag checkpoints (`ak-green-`) after successful micro-commits, and automatically rolls back to the latest verified green state upon loop breaker failure, injecting warning history context to prevent error recursion.
+
+### 8. Active Tmux Log Sniffing
+Asynchronously checks tmux sessions for traceback errors, panics, and server crashes, automatically triggering background self-healing processes.
+
 ## Installation & Setup
 
 ### 1. Get a Free API Key
