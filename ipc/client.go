@@ -20,6 +20,7 @@ import (
 
 	"github.com/autokeren/autokeren/internal/config"
 	"github.com/autokeren/autokeren/internal/engine"
+	sessionstore "github.com/autokeren/autokeren/internal/session"
 	"github.com/autokeren/autokeren/internal/tool"
 )
 
@@ -62,12 +63,13 @@ type Client struct {
 	pendingLock sync.Mutex
 	nextID      int64
 
-	isClosed        int32
-	local           bool
-	localRoot       string
-	localConfig     config.Config
-	localConfigPath string
-	localSession    string
+	isClosed         int32
+	local            bool
+	localRoot        string
+	localConfig      config.Config
+	localConfigPath  string
+	localSession     string
+	localSessionName string
 }
 
 func NewClient(callbacks *IPCCallbacks) *Client {
@@ -198,7 +200,8 @@ func (c *Client) startLocal(projectRoot, configPath string) error {
 	c.localRoot = projectRoot
 	c.localConfig = cfg
 	c.localConfigPath = configPath
-	c.localSession = "tui"
+	c.localSession = fmt.Sprintf("session-%d", time.Now().Unix())
+	c.localSessionName = "default"
 	atomic.StoreInt32(&c.isClosed, 0)
 	return nil
 }
@@ -252,14 +255,14 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 			return err
 		}
 		if c.callbacks != nil && c.callbacks.OnModelEnd != nil {
-			c.callbacks.OnModelEnd(content, c.localConfig.Cloudflare.PrimaryModel, c.localSession, c.localSession, nil)
+			c.callbacks.OnModelEnd(content, c.localConfig.Cloudflare.PrimaryModel, c.localSession, c.localSessionName, nil)
 		}
 		if reply != nil {
 			return json.Unmarshal([]byte(fmt.Sprintf(`{"content":%q}`, content)), reply)
 		}
 		return nil
 	case "agent.status":
-		status := map[string]any{"running": false, "engine": "go", "model_id": c.localConfig.Cloudflare.PrimaryModel, "session_id": c.localSession}
+		status := map[string]any{"running": false, "engine": "go", "model_id": c.localConfig.Cloudflare.PrimaryModel, "model_name": c.localConfig.Cloudflare.PrimaryModel, "session_id": c.localSession, "session_name": c.localSessionName}
 		if data, err := os.ReadFile(filepath.Join(c.localRoot, ".autokeren", "kanban.json")); err == nil {
 			var tasks any
 			if json.Unmarshal(data, &tasks) == nil {
@@ -278,7 +281,8 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		}
 		return nil
 	case "agent.reset":
-		c.localSession = fmt.Sprintf("tui-%d", time.Now().Unix())
+		c.localSession = fmt.Sprintf("session-%d", time.Now().Unix())
+		c.localSessionName = "default"
 		return nil
 	case "agent.compact", "agent.interrupt":
 		return nil
@@ -286,7 +290,7 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		args, _ := params.(map[string]interface{})
 		name, _ := args["name"].(string)
 		if name == "" {
-			name = c.localSession
+			name = fmt.Sprintf("session-%d", time.Now().Unix())
 		}
 		if err := os.MkdirAll(filepath.Join(c.localRoot, ".ak-sessions"), 0o700); err != nil {
 			return err
@@ -294,6 +298,12 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		src := filepath.Join(c.localRoot, ".ak-sessions", c.localSession+".json")
 		dst := filepath.Join(c.localRoot, ".ak-sessions", name+".json")
 		data, err := os.ReadFile(src)
+		if os.IsNotExist(err) {
+			if saveErr := sessionstore.Save(src, sessionstore.New(c.localSession, nil)); saveErr != nil {
+				return saveErr
+			}
+			data, err = os.ReadFile(src)
+		}
 		if err != nil {
 			return err
 		}
@@ -301,7 +311,8 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 			return err
 		}
 		if reply != nil {
-			return json.Unmarshal([]byte(fmt.Sprintf(`{"session_id":%q,"session_name":%q}`, name, name)), reply)
+			c.localSessionName = name
+			return json.Unmarshal([]byte(fmt.Sprintf(`{"message":"Session '%s' disimpan.","session_id":%q,"session_name":%q,"name":%q}`, name, name, name, name)), reply)
 		}
 		return nil
 	case "agent.resume_session":
@@ -314,6 +325,17 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 			return err
 		}
 		c.localSession = identifier
+		c.localSessionName = identifier
+		if reply != nil {
+			data, loadErr := sessionstore.Load(filepath.Join(c.localRoot, ".ak-sessions", identifier+".json"))
+			if loadErr == nil {
+				if data.Name != "" {
+					c.localSessionName = data.Name
+				}
+				raw, _ := json.Marshal(map[string]any{"message": "Session " + identifier + " berhasil di-resume.", "session_id": identifier, "session_name": data.Name, "messages": data.Messages})
+				return json.Unmarshal(raw, reply)
+			}
+		}
 		return nil
 	case "agent.list_sessions":
 		entries, err := os.ReadDir(filepath.Join(c.localRoot, ".ak-sessions"))

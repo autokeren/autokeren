@@ -1787,6 +1787,12 @@ func parseStatusReply(statusReply map[string]interface{}, projectRoot string) St
 		}
 	}
 	modelName := "?"
+	if value, ok := statusReply["model_name"].(string); ok && value != "" {
+		modelName = value
+	}
+	if value, ok := statusReply["model_id"].(string); ok && value != "" && modelName == "?" {
+		modelName = value
+	}
 	if mStatus, ok := statusReply["model_status"].(map[string]interface{}); ok {
 		if active, ok := mStatus["models"].([]interface{}); ok && len(active) > 0 {
 			if primary, ok := active[0].(map[string]interface{}); ok {

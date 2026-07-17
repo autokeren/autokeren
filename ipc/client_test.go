@@ -1,8 +1,11 @@
 package ipc
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/autokeren/autokeren/internal/config"
@@ -17,5 +20,28 @@ func TestLocalModelsFetchesAndMarksActive(t *testing.T) {
 	models := c.localModels()
 	if len(models) != 2 || models[1]["active"] != true || models[1]["name"] != "glm-5.2" {
 		t.Fatalf("unexpected models: %#v", models)
+	}
+}
+
+func TestLocalSessionSaveAndResume(t *testing.T) {
+	root := t.TempDir()
+	c := &Client{localRoot: root, localSession: "session-test", localSessionName: "default"}
+	var saved map[string]any
+	if err := c.callLocal("agent.save_session", map[string]interface{}{"name": "demo"}, &saved); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".ak-sessions", "demo.json")); err != nil {
+		t.Fatal(err)
+	}
+	if saved["session_name"] != "demo" {
+		t.Fatalf("unexpected save response: %#v", saved)
+	}
+	var resumed map[string]any
+	if err := c.callLocal("agent.resume_session", map[string]interface{}{"identifier": "demo"}, &resumed); err != nil {
+		t.Fatal(err)
+	}
+	if resumed["session_id"] != "demo" {
+		raw, _ := json.Marshal(resumed)
+		t.Fatalf("unexpected resume response: %s", raw)
 	}
 }
