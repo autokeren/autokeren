@@ -60,11 +60,12 @@ type Client struct {
 	pendingLock sync.Mutex
 	nextID      int64
 
-	isClosed     int32
-	local        bool
-	localRoot    string
-	localConfig  config.Config
-	localSession string
+	isClosed        int32
+	local           bool
+	localRoot       string
+	localConfig     config.Config
+	localConfigPath string
+	localSession    string
 }
 
 func NewClient(callbacks *IPCCallbacks) *Client {
