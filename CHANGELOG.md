@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.73] - 2026-07-17
+
+### Changed
+- fix(proof): protect against path traversal, validate replay JSON schema, use atomic UTF-8 writes, and add HTTP integration tests
+
 ## [0.11.72] - 2026-07-17
 
 ### Changed
