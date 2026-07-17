@@ -920,12 +920,6 @@ def main() -> int:
                 "icon": "♊",
             },
             {
-                "id": "antigravity",
-                "name": "Google Antigravity",
-                "desc": "Gunakan Google Antigravity SDK Enterprise Backend",
-                "icon": "🪐",
-            },
-            {
                 "id": "local",
                 "name": "Local LLM",
                 "desc": "Hubungkan ke model lokal via Ollama atau LocalAI",
