@@ -275,6 +275,32 @@ func (gm *GhostManager) List() []*GhostAgentInfo {
 	return list
 }
 
+func (gm *GhostManager) ActiveList() []*GhostAgentInfo {
+	gm.mu.RLock()
+	defer gm.mu.RUnlock()
+	list := make([]*GhostAgentInfo, 0)
+	for _, info := range gm.agents {
+		if info.Status != "running" {
+			continue
+		}
+		copyInfo := *info
+		list = append(list, &copyInfo)
+	}
+	return list
+}
+
+func (gm *GhostManager) Refresh() {
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
+	for _, info := range gm.agents {
+		if info.Status == "running" && (info.PID <= 0 || !processAlive(info.PID) || !processIsAutokeren(info.PID)) {
+			info.Status = "completed"
+			info.FinishedAt = time.Now()
+			gm.writeMetadataLocked(info)
+		}
+	}
+}
+
 func (gm *GhostManager) GetOutput(agentID int) string {
 	gm.mu.RLock()
 	info, ok := gm.agents[agentID]

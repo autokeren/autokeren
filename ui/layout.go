@@ -285,7 +285,8 @@ func (m MainModel) pollPeriodicCmd() tea.Cmd {
 
 		var ghostAgents []*ghost.GhostAgentInfo
 		if m.GhostMgr != nil {
-			ghostAgents = m.GhostMgr.List()
+			m.GhostMgr.Refresh()
+			ghostAgents = m.GhostMgr.ActiveList()
 		}
 
 		return PeriodicTickMsg{
