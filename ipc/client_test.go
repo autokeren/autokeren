@@ -1,6 +1,7 @@
 package ipc
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -64,6 +65,72 @@ func TestGoPlanModeRequiresApprovalInLocalSession(t *testing.T) {
 	}
 	if c.localConfig.Autokeren.PlanMode || !strings.Contains(approved["content"].(string), "disetujui") {
 		t.Fatalf("approval did not unlock local plan mode: %#v", approved)
+	}
+}
+
+func TestGoRuntimeLocalProviderPersistsAndResumesSession(t *testing.T) {
+	var requests []map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/v1/chat/completions" {
+			http.NotFound(w, request)
+			return
+		}
+		var payload map[string]any
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		requests = append(requests, payload)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"model\":\"local-test\",\"choices\":[{\"delta\":{\"content\":\"siap\"}}]}\n\ndata: [DONE]\n\n"))
+	}))
+	defer server.Close()
+
+	root := t.TempDir()
+	configPath := filepath.Join(root, "config.yaml")
+	cfg := config.Defaults()
+	cfg.Auth.Mode = "local"
+	cfg.Auth.LocalEndpoint = server.URL
+	cfg.Cloudflare.PrimaryModel = "local-test"
+	cfg.Cloudflare.SecondaryModel = ""
+	if err := config.Save(configPath, cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	client := NewClient(nil)
+	if err := client.Start(root, configPath, map[string]interface{}{"engine": "go"}); err != nil {
+		t.Fatal(err)
+	}
+	var first map[string]any
+	if err := client.Call("agent.run", map[string]interface{}{"user_input": "halo"}, &first); err != nil {
+		t.Fatal(err)
+	}
+	if first["content"] != "siap" || first["session_id"] == "" {
+		t.Fatalf("unexpected first response: %#v", first)
+	}
+	sessionID, _ := first["session_id"].(string)
+	client.Close()
+
+	resumed := NewClient(nil)
+	if err := resumed.Start(root, configPath, map[string]interface{}{"engine": "go"}); err != nil {
+		t.Fatal(err)
+	}
+	defer resumed.Close()
+	var resumeReply map[string]any
+	if err := resumed.Call("agent.resume_session", map[string]interface{}{"identifier": sessionID}, &resumeReply); err != nil {
+		t.Fatal(err)
+	}
+	var second map[string]any
+	if err := resumed.Call("agent.run", map[string]interface{}{"user_input": "lanjut"}, &second); err != nil {
+		t.Fatal(err)
+	}
+	if second["content"] != "siap" || len(requests) != 2 {
+		t.Fatalf("unexpected second response=%#v requests=%d", second, len(requests))
+	}
+	messages, _ := requests[1]["messages"].([]any)
+	encoded, _ := json.Marshal(messages)
+	if !bytes.Contains(encoded, []byte("halo")) || !bytes.Contains(encoded, []byte("lanjut")) {
+		t.Fatalf("resumed request omitted history: %s", encoded)
 	}
 }
 
