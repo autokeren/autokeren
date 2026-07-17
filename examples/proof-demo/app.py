@@ -1,6 +1,5 @@
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
-import urllib.parse
 
 class CheckoutHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
