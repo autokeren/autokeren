@@ -68,7 +68,7 @@ func RunStandalone(ctx context.Context, cfg config.Config, root, prompt string, 
 	if len(messages) == 0 || messages[0].Role != "system" {
 		store.Replace(append([]model.Message{{Role: "system", Content: "Kamu adalah Autokeren, asisten coding CLI berbahasa Indonesia. Jangan mengaku sebagai Claude, ChatGPT, atau produk lain. Jika ditanya siapa kamu, jawab bahwa kamu adalah Autokeren. Bantu pengguna secara praktis dan jujur."}}, messages...))
 	}
-	loop := &Loop{Runner: Runner{Provider: provider.OpenAICompatible{Endpoint: endpoint, APIKey: cfg.Auth.APIKey, Client: &http.Client{Timeout: timeout}}}, Model: cfg.Cloudflare.PrimaryModel, Temperature: cfg.Cloudflare.Temperature, MaxTokens: cfg.Cloudflare.MaxTokens, Tools: registry, Context: store, MaxIterations: cfg.Autokeren.MaxIterations}
+	loop := &Loop{Runner: Runner{Provider: provider.OpenAICompatible{Endpoint: endpoint, APIKey: cfg.Auth.APIKey, Client: &http.Client{Timeout: timeout}}}, Model: config.ResolveModel(cfg.Cloudflare.PrimaryModel, cfg.Auth.Mode), Temperature: cfg.Cloudflare.Temperature, MaxTokens: cfg.Cloudflare.MaxTokens, Tools: registry, Context: store, MaxIterations: cfg.Autokeren.MaxIterations}
 	response, err := loop.Run(ctx, prompt, Events{OnChunk: onChunk, ConfirmPermission: func(name string, _ string, _ map[string]any) bool { return name != "run_shell" }})
 	if err != nil {
 		return "", err

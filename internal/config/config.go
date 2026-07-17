@@ -57,6 +57,26 @@ type Config struct {
 	MCPServers []MCPServer `yaml:"mcp_servers"`
 }
 
+var platformModelMap = map[string]string{
+	"@cf/moonshotai/kimi-k2.7-code":           "kimi-code",
+	"@cf/moonshotai/kimi-k2.6":                "kimi-2.6",
+	"@cf/zai-org/glm-5.2":                     "glm-5.2",
+	"@cf/zai-org/glm-4.7-flash":               "glm-flash",
+	"@cf/meta/llama-4-scout-17b-16e-instruct": "llama-4-scout",
+	"@cf/google/gemma-4-26b-a4b-it":           "gemma-4",
+	"@cf/nvidia/nemotron-3-120b-a12b":         "nemotron",
+}
+
+func ResolveModel(modelID, mode string) string {
+	if mode != "platform" || len(modelID) < 4 || modelID[:4] != "@cf/" {
+		return modelID
+	}
+	if alias, ok := platformModelMap[modelID]; ok {
+		return alias
+	}
+	return "kimi-2.6"
+}
+
 func Defaults() Config {
 	return Config{Auth: Auth{Mode: "platform", BaseURL: "https://api.developers.autokeren.com", LocalEndpoint: "http://localhost:11434"}, Cloudflare: Cloudflare{PrimaryModel: "kimi-code", SecondaryModel: "kimi-2.6", MaxTokens: 8192, Temperature: 0.3, Timeout: 120}, Retry: Retry{MaxRetries: 5, BaseDelay: 1, MaxDelay: 60, ExponentialBase: 2, Jitter: true, CircuitFailureThreshold: 5, CircuitOpenSeconds: 30}, Autokeren: Autokeren{MaxIterations: 50, ShellTimeout: 180, ContextWindow: 262144, AutoCompact: true, AutoCompactThreshold: 0.6}}
 }
