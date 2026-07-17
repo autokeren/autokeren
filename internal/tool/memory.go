@@ -2,10 +2,9 @@ package tool
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
+
+	"github.com/autokeren/autokeren/internal/memory"
 )
 
 type Remember struct{ Root string }
@@ -25,17 +24,7 @@ func (r Remember) Run(ctx context.Context, args map[string]any, _ Emitter) Resul
 	if strings.TrimSpace(section) == "" || strings.TrimSpace(note) == "" {
 		return Result{OK: false, Error: "section dan note wajib"}
 	}
-	dir := filepath.Join(r.Root, ".autokeren")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return Result{OK: false, Error: err.Error()}
-	}
-	path := filepath.Join(dir, "memory.md")
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
-	if err != nil {
-		return Result{OK: false, Error: err.Error()}
-	}
-	defer f.Close()
-	if _, err = f.WriteString(fmt.Sprintf("- [%s] %s\\n", section, note)); err != nil {
+	if err := memory.New(r.Root).Append(section, note); err != nil {
 		return Result{OK: false, Error: err.Error()}
 	}
 	return Result{OK: true, Output: "tersimpan di memory [" + section + "]"}

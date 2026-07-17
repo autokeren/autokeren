@@ -77,7 +77,7 @@ func (s *RouterState) breaker(modelID string, threshold int, openDuration time.D
 			return int(counts.ConsecutiveFailures) >= threshold
 		},
 		IsExcluded: func(err error) bool {
-			return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || isContextLimit(err)
+			return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || IsContextLimit(err)
 		},
 	})
 	s.breakers[modelID] = breaker
@@ -184,7 +184,7 @@ func (r *Router) Complete(ctx context.Context, request model.Request, onChunk Ch
 			return response, nil
 		}
 		lastErr = err
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || isContextLimit(err) || StreamStarted(err) {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || IsContextLimit(err) || StreamStarted(err) {
 			return model.Response{}, err
 		}
 		if index < len(r.targets)-1 {
@@ -229,7 +229,7 @@ func (r *Router) completeTarget(ctx context.Context, target Target, request mode
 }
 
 func (r *Router) shouldRetry(err error, attempt int) bool {
-	if attempt >= r.retry.MaxRetries || err == nil || StreamStarted(err) || isContextLimit(err) {
+	if attempt >= r.retry.MaxRetries || err == nil || StreamStarted(err) || IsContextLimit(err) {
 		return false
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -250,7 +250,7 @@ func (r *Router) shouldRetry(err error, attempt int) bool {
 	}
 }
 
-func isContextLimit(err error) bool {
+func IsContextLimit(err error) bool {
 	if err == nil {
 		return false
 	}

@@ -43,6 +43,8 @@ type Autokeren struct {
 	AutoCompactThreshold float64 `yaml:"auto_compact_threshold"`
 	CompactTailTurns     int     `yaml:"compact_tail_turns"`
 	AutoSaveSession      bool    `yaml:"auto_save_session"`
+	MemoryEnabled        bool    `yaml:"memory_enabled"`
+	MaxToolCalls         int     `yaml:"max_tool_calls"`
 	Language             string  `yaml:"language"`
 }
 type MCPServer struct {
@@ -80,7 +82,7 @@ func ResolveModel(modelID, mode string) string {
 }
 
 func Defaults() Config {
-	return Config{Auth: Auth{Mode: "platform", BaseURL: "https://api.developers.autokeren.com", LocalEndpoint: "http://localhost:11434"}, Cloudflare: Cloudflare{PrimaryModel: "kimi-code", SecondaryModel: "kimi-2.6", MaxTokens: 8192, Temperature: 0.3, Timeout: 120}, Retry: Retry{MaxRetries: 5, BaseDelay: 1, MaxDelay: 60, ExponentialBase: 2, Jitter: true, CircuitFailureThreshold: 5, CircuitOpenSeconds: 30}, Autokeren: Autokeren{MaxIterations: 50, ShellTimeout: 180, ContextWindow: 262144, AutoCompact: true, AutoCompactThreshold: 0.6, CompactTailTurns: 6, AutoSaveSession: true}}
+	return Config{Auth: Auth{Mode: "platform", BaseURL: "https://api.developers.autokeren.com", LocalEndpoint: "http://localhost:11434"}, Cloudflare: Cloudflare{PrimaryModel: "kimi-code", SecondaryModel: "kimi-2.6", MaxTokens: 8192, Temperature: 0.3, Timeout: 120}, Retry: Retry{MaxRetries: 5, BaseDelay: 1, MaxDelay: 60, ExponentialBase: 2, Jitter: true, CircuitFailureThreshold: 5, CircuitOpenSeconds: 30}, Autokeren: Autokeren{MaxIterations: 50, ShellTimeout: 180, ContextWindow: 262144, AutoCompact: true, AutoCompactThreshold: 0.6, CompactTailTurns: 6, AutoSaveSession: true, MemoryEnabled: true}}
 }
 
 func Load(path string) (Config, error) {

@@ -24,13 +24,14 @@ type Events struct {
 }
 
 type Loop struct {
-	Runner        Runner
-	Tools         *tool.Registry
-	Context       *contextstore.Store
-	MaxIterations int
-	Model         string
-	Temperature   float64
-	MaxTokens     int
+	Runner         Runner
+	Tools          *tool.Registry
+	Context        *contextstore.Store
+	RequestPrelude []model.Message
+	MaxIterations  int
+	Model          string
+	Temperature    float64
+	MaxTokens      int
 }
 
 func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.Response, error) {
@@ -49,14 +50,25 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 		limit = 50
 	}
 	var last model.Response
+	recoveredFromLimit := false
 	for iteration := 0; iteration < limit; iteration++ {
-		request := model.Request{Model: l.Model, Messages: l.Context.Messages(), Tools: definitions(l.Tools), Temperature: l.Temperature, MaxTokens: l.MaxTokens}
+		request := model.Request{Model: l.Model, Messages: mergeRequestMessages(l.Context.Messages(), l.RequestPrelude), Tools: definitions(l.Tools), Temperature: l.Temperature, MaxTokens: l.MaxTokens}
 		var onChunk provider.ChunkHandler
 		if events.OnChunk != nil {
 			onChunk = func(chunk string) error { events.OnChunk(chunk); return nil }
 		}
 		last, err := l.Runner.RunTurn(ctx, request, onChunk)
 		if err != nil {
+			if provider.IsContextLimit(err) && !recoveredFromLimit {
+				before, after, changed := l.Context.Compact()
+				if changed {
+					recoveredFromLimit = true
+					if events.OnRetry != nil {
+						events.OnRetry(0, 0, fmt.Sprintf("context penuh; compact otomatis %d → %d token lalu mencoba ulang", before, after))
+					}
+					continue
+				}
+			}
 			return model.Response{}, err
 		}
 		if len(last.ToolCalls) == 0 {
@@ -111,6 +123,21 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 		}
 	}
 	return last, fmt.Errorf("agent reached max iterations (%d)", limit)
+}
+
+func mergeRequestMessages(messages, prelude []model.Message) []model.Message {
+	if len(prelude) == 0 {
+		return messages
+	}
+	merged := make([]model.Message, 0, len(messages)+len(prelude))
+	if len(messages) > 0 && messages[0].Role == "system" {
+		merged = append(merged, messages[0])
+		merged = append(merged, prelude...)
+		merged = append(merged, messages[1:]...)
+		return merged
+	}
+	merged = append(merged, prelude...)
+	return append(merged, messages...)
 }
 
 func definitions(registry *tool.Registry) []model.ToolDefinition {

@@ -2,6 +2,7 @@ package context
 
 import (
 	"github.com/autokeren/autokeren/internal/model"
+	"strings"
 	"testing"
 )
 
@@ -28,6 +29,22 @@ func TestStoreManualCompactPreservesConfiguredTail(t *testing.T) {
 	_, _, changed := s.Compact()
 	messages := s.Messages()
 	if !changed || len(messages) != 4 || messages[2].Content != "recent question" || messages[3].Content != "recent response" {
+		t.Fatalf("unexpected compacted context: %#v", messages)
+	}
+}
+
+func TestStoreCompactKeepsStructuredSummary(t *testing.T) {
+	s := New(262144, false, 0.6)
+	s.SetCompactTail(1)
+	s.Replace([]model.Message{
+		{Role: "system", Content: "rules"},
+		{Role: "user", Content: "perbaiki router retry"},
+		{Role: "assistant", Content: "router diperbarui"},
+		{Role: "user", Content: "lanjut test"},
+	})
+	_, _, changed := s.Compact()
+	messages := s.Messages()
+	if !changed || len(messages) != 3 || !strings.Contains(messages[1].Content, "perbaiki router retry") || messages[2].Content != "lanjut test" {
 		t.Fatalf("unexpected compacted context: %#v", messages)
 	}
 }

@@ -8,19 +8,22 @@ import (
 	"github.com/autokeren/autokeren/internal/config"
 	contextstore "github.com/autokeren/autokeren/internal/context"
 	"github.com/autokeren/autokeren/internal/mcp"
+	"github.com/autokeren/autokeren/internal/memory"
 	"github.com/autokeren/autokeren/internal/model"
+	promptbuilder "github.com/autokeren/autokeren/internal/prompt"
 	"github.com/autokeren/autokeren/internal/provider"
 	"github.com/autokeren/autokeren/internal/session"
 	"github.com/autokeren/autokeren/internal/tool"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 )
 
 var sharedBrowser = browser.GetBrowserManager()
 
-const systemPrompt = "Kamu adalah Autokeren, asisten coding CLI berbahasa Indonesia. Jangan mengaku sebagai Claude, ChatGPT, atau produk lain. Jika ditanya siapa kamu, jawab bahwa kamu adalah Autokeren. Bantu pengguna secara praktis dan jujur."
+const fallbackSystemPrompt = "Kamu adalah Autokeren, asisten coding CLI berbahasa Indonesia. Jangan mengaku sebagai Claude, ChatGPT, atau produk lain. Jika ditanya siapa kamu, jawab bahwa kamu adalah Autokeren. Bantu pengguna secara praktis dan jujur."
 
 func RunStandalone(ctx context.Context, cfg config.Config, root, prompt string, onChunk func(string), resume string) (string, error) {
 	return RunStandaloneEvents(ctx, cfg, root, prompt, Events{OnChunk: onChunk}, resume)
@@ -81,7 +84,21 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 		sessionName = data.Name
 		store.Replace(data.Messages)
 	}
-	store.Replace(withCurrentSystemPrompt(store.Messages()))
+	memoryStore := memory.New(root)
+	systemPrompt := promptbuilder.Build(promptbuilder.Options{
+		ProjectRoot:  root,
+		ToolNames:    registryToolNames(registry),
+		PlanMode:     cfg.Autokeren.PlanMode,
+		MaxToolCalls: cfg.Autokeren.MaxToolCalls,
+		Language:     cfg.Autokeren.Language,
+	})
+	store.Replace(withSystemPrompt(store.Messages(), systemPrompt))
+	prelude := []model.Message{}
+	if cfg.Autokeren.MemoryEnabled {
+		if context := memoryStore.Context(prompt, 3); context != "" {
+			prelude = append(prelude, model.Message{Role: "system", Content: context})
+		}
+	}
 	baseProvider := provider.OpenAICompatible{Endpoint: endpoint, APIKey: cfg.Auth.APIKey, Client: &http.Client{Timeout: timeout}}
 	primaryModel := config.ResolveModel(cfg.Cloudflare.PrimaryModel, cfg.Auth.Mode)
 	secondaryModel := config.ResolveModel(cfg.Cloudflare.SecondaryModel, cfg.Auth.Mode)
@@ -109,7 +126,7 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 	if err != nil {
 		return "", err
 	}
-	loop := &Loop{Runner: Runner{Provider: router}, Model: primaryModel, Temperature: cfg.Cloudflare.Temperature, MaxTokens: cfg.Cloudflare.MaxTokens, Tools: registry, Context: store, MaxIterations: cfg.Autokeren.MaxIterations}
+	loop := &Loop{Runner: Runner{Provider: router}, Model: primaryModel, Temperature: cfg.Cloudflare.Temperature, MaxTokens: cfg.Cloudflare.MaxTokens, Tools: registry, Context: store, RequestPrelude: prelude, MaxIterations: cfg.Autokeren.MaxIterations}
 	if events.ConfirmPermission == nil {
 		events.ConfirmPermission = func(name string, _ string, _ map[string]any) bool { return name != "run_shell" }
 	}
@@ -150,10 +167,27 @@ func automaticSessionName(input string) string {
 }
 
 func withCurrentSystemPrompt(messages []model.Message) []model.Message {
+	return withSystemPrompt(messages, fallbackSystemPrompt)
+}
+
+func withSystemPrompt(messages []model.Message, systemPrompt string) []model.Message {
+	if strings.TrimSpace(systemPrompt) == "" {
+		systemPrompt = fallbackSystemPrompt
+	}
 	if len(messages) == 0 || messages[0].Role != "system" {
 		return append([]model.Message{{Role: "system", Content: systemPrompt}}, messages...)
 	}
 	updated := append([]model.Message(nil), messages...)
 	updated[0].Content = systemPrompt
 	return updated
+}
+
+func registryToolNames(registry *tool.Registry) []string {
+	definitions := registry.Definitions()
+	names := make([]string, 0, len(definitions))
+	for _, definition := range definitions {
+		names = append(names, definition.Name)
+	}
+	sort.Strings(names)
+	return names
 }

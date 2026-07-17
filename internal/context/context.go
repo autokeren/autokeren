@@ -7,6 +7,8 @@ import (
 	"github.com/autokeren/autokeren/internal/model"
 )
 
+const summaryRunes = 2400
+
 type Store struct {
 	mu          sync.RWMutex
 	messages    []model.Message
@@ -80,9 +82,49 @@ func (s *Store) compactNowLocked() bool {
 		return false
 	}
 	system := s.messages[0]
+	summary := summarize(s.messages[1:tailStart])
 	tail := append([]model.Message(nil), s.messages[tailStart:]...)
-	s.messages = append([]model.Message{system, {Role: "system", Content: "[context compacted] previous conversation summarized"}}, tail...)
+	s.messages = append([]model.Message{system, {Role: "system", Content: summary}}, tail...)
 	return true
+}
+
+func summarize(messages []model.Message) string {
+	var builder strings.Builder
+	builder.WriteString("Ringkasan context lama. Pertahankan keputusan, perubahan, error, dan hasil tool berikut sebagai referensi:\n")
+	for _, message := range messages {
+		content := strings.TrimSpace(message.Content)
+		if content == "" && len(message.ToolCalls) == 0 {
+			continue
+		}
+		if content == "" {
+			content = "tool calls: " + strings.Join(toolNames(message.ToolCalls), ", ")
+		}
+		line := "- " + message.Role + ": " + truncateRunes(content, 320) + "\n"
+		if len([]rune(builder.String()))+len([]rune(line)) > summaryRunes {
+			builder.WriteString("- Ringkasan dipotong agar context tetap aman.\n")
+			break
+		}
+		builder.WriteString(line)
+	}
+	return strings.TrimSpace(builder.String())
+}
+
+func toolNames(calls []model.ToolCall) []string {
+	names := make([]string, 0, len(calls))
+	for _, call := range calls {
+		if call.Function.Name != "" {
+			names = append(names, call.Function.Name)
+		}
+	}
+	return names
+}
+
+func truncateRunes(value string, max int) string {
+	runes := []rune(value)
+	if len(runes) <= max {
+		return value
+	}
+	return string(runes[:max]) + "…"
 }
 func estimate(messages []model.Message) int {
 	total := 0

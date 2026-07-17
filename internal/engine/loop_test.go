@@ -2,10 +2,14 @@ package engine
 
 import (
 	"context"
+	"errors"
+	contextstore "github.com/autokeren/autokeren/internal/context"
 	"github.com/autokeren/autokeren/internal/model"
 	"github.com/autokeren/autokeren/internal/provider"
 	"github.com/autokeren/autokeren/internal/tool"
+	"strings"
 	"testing"
+	"time"
 )
 
 type fakeProvider struct{ calls int }
@@ -101,7 +105,42 @@ func TestLoopRespectsCancellation(t *testing.T) {
 
 func TestWithCurrentSystemPromptReplacesLegacyPrompt(t *testing.T) {
 	messages := withCurrentSystemPrompt([]model.Message{{Role: "system", Content: "legacy"}, {Role: "user", Content: "halo"}})
-	if messages[0].Content != systemPrompt || messages[1].Content != "halo" {
+	if messages[0].Content != fallbackSystemPrompt || messages[1].Content != "halo" {
 		t.Fatalf("unexpected messages: %#v", messages)
+	}
+}
+
+type contextLimitThenSuccessProvider struct {
+	calls     int
+	compacted bool
+}
+
+func (p *contextLimitThenSuccessProvider) Complete(_ context.Context, request model.Request, _ provider.ChunkHandler) (model.Response, error) {
+	p.calls++
+	if p.calls == 1 {
+		return model.Response{}, &provider.Error{Status: 400, Cause: errors.New("provider code 8007 context length exceeded")}
+	}
+	for _, message := range request.Messages {
+		if message.Role == "system" && strings.Contains(message.Content, "Ringkasan context lama") {
+			p.compacted = true
+		}
+	}
+	return model.Response{Content: "pulih"}, nil
+}
+
+func TestLoopCompactsAndRetriesContextLimitOnce(t *testing.T) {
+	store := contextstore.New(262144, false, 0.6)
+	store.SetCompactTail(1)
+	store.Replace([]model.Message{
+		{Role: "system", Content: "rules"},
+		{Role: "user", Content: "old task"},
+		{Role: "assistant", Content: "old answer"},
+	})
+	p := &contextLimitThenSuccessProvider{}
+	retries := 0
+	loop := &Loop{Runner: Runner{Provider: p}, Context: store, MaxIterations: 3}
+	response, err := loop.Run(context.Background(), "current task", Events{OnRetry: func(int, time.Duration, string) { retries++ }})
+	if err != nil || response.Content != "pulih" || p.calls != 2 || !p.compacted || retries != 1 {
+		t.Fatalf("response=%#v err=%v calls=%d compacted=%t retries=%d", response, err, p.calls, p.compacted, retries)
 	}
 }
