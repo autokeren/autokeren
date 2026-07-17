@@ -120,6 +120,9 @@ func applyEnv(cfg *Config) {
 	if value := os.Getenv("GEMINI_API_KEY"); value != "" {
 		cfg.Auth.GeminiAPIKey = value
 	}
+	if value := os.Getenv("OPENAI_API_KEY"); value != "" {
+		cfg.Auth.OpenAIAPIKey = value
+	}
 }
 func firstEnv(keys ...string) string {
 	for _, key := range keys {

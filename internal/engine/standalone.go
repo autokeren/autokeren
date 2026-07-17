@@ -15,7 +15,6 @@ import (
 	"github.com/autokeren/autokeren/internal/session"
 	"github.com/autokeren/autokeren/internal/tool"
 	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -34,14 +33,6 @@ func RunStandaloneEvents(ctx context.Context, cfg config.Config, root, prompt st
 }
 
 func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, root, prompt string, events Events, resume string, routerState *provider.RouterState) (string, error) {
-	endpoint := cfg.Auth.BaseURL
-	if endpoint == "" {
-		return "", fmt.Errorf("auth base_url is empty")
-	}
-	endpoint = strings.TrimRight(endpoint, "/")
-	if parsed, err := url.Parse(endpoint); err == nil && parsed.Path == "" {
-		endpoint += "/v1/chat/completions"
-	}
 	ghostManager := ghost.NewGhostManager(root)
 	registry := tool.NewRegistry().Register(tool.ReadFile{Root: root}).Register(tool.WriteFile{Root: root}).Register(tool.PatchFile{Root: root}).Register(tool.ListFiles{Root: root}).Register(tool.SearchCode{Root: root}).Register(tool.GitStatus{Root: root}).Register(tool.GitDiff{Root: root}).Register(tool.GitLog{Root: root}).Register(tool.GitCommit{Root: root}).Register(tool.GitBranch{Root: root}).Register(tool.GitAutoCommit{Root: root}).Register(tool.NewTodoList(root)).Register(tool.NewKanban(root)).Register(tool.Proof{Root: root}).Register(tool.Remember{Root: root}).Register(tool.FetchURL{}).Register(tool.CFDeploy{Root: root}).Register(tool.CFBuild{Root: root}).Register(tool.CFVerify{Root: root, Browser: sharedBrowser}).Register(tool.FDDM{}).Register(tool.Genome{Root: root}).Register(tool.CreateProject{Config: cfg}).Register(tool.DeployProject{Config: cfg, Root: root}).Register(tool.ListProjects{Config: cfg}).Register(tool.RepoMap{Root: root}).Register(tool.CFKV{Config: cfg}).Register(tool.CFD1{Config: cfg}).Register(tool.Browser{Manager: sharedBrowser}).Register(tool.Research{}).Register(tool.Review{Root: root}).Register(tool.SecurityScan{Root: root}).Register(tool.Rewind{Root: root}).Register(tool.SpawnGhost{Manager: ghostManager}).Register(tool.Collaborate{Manager: ghostManager}).Register(tool.CheckGhost{Manager: ghostManager}).Register(tool.Shell{Root: root})
 	var mcpServers []*mcp.Server
@@ -99,14 +90,13 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 			prelude = append(prelude, model.Message{Role: "system", Content: context})
 		}
 	}
-	baseProvider := provider.OpenAICompatible{Endpoint: endpoint, APIKey: cfg.Auth.APIKey, Client: &http.Client{Timeout: timeout}}
-	primaryModel := config.ResolveModel(cfg.Cloudflare.PrimaryModel, cfg.Auth.Mode)
-	secondaryModel := config.ResolveModel(cfg.Cloudflare.SecondaryModel, cfg.Auth.Mode)
+	targets, err := provider.TargetsForConfig(cfg, &http.Client{Timeout: timeout})
+	if err != nil {
+		return "", err
+	}
+	primaryModel := targets[0].ModelID
 	router, err := provider.NewRouter(provider.RouterConfig{
-		Targets: []provider.Target{
-			{ModelID: primaryModel, Provider: baseProvider},
-			{ModelID: secondaryModel, Provider: baseProvider},
-		},
+		Targets: targets,
 		Retry: provider.RetryPolicy{
 			MaxRetries:      cfg.Retry.MaxRetries,
 			BaseDelay:       time.Duration(cfg.Retry.BaseDelay * float64(time.Second)),

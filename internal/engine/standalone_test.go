@@ -42,6 +42,7 @@ func TestRunStandaloneFallsBackToSecondaryModel(t *testing.T) {
 
 	cfg := config.Defaults()
 	cfg.Auth.BaseURL = server.URL
+	cfg.Auth.APIKey = "test-key"
 	cfg.Cloudflare.PrimaryModel = "primary"
 	cfg.Cloudflare.SecondaryModel = "secondary"
 	cfg.Retry.MaxRetries = 0
@@ -87,6 +88,7 @@ func TestRunStandaloneInjectsGuidanceAndRelevantMemory(t *testing.T) {
 
 	cfg := config.Defaults()
 	cfg.Auth.BaseURL = server.URL
+	cfg.Auth.APIKey = "test-key"
 	cfg.Retry.MaxRetries = 0
 	content, err := RunStandalone(t.Context(), cfg, root, "cek router", nil, "")
 	if err != nil || content != "siap" {

@@ -91,6 +91,8 @@ type Client struct {
 	localRouterState      *provider.RouterState
 }
 
+var providerModelCatalogEndpoint = provider.ModelCatalogForConfig
+
 func NewClient(callbacks *IPCCallbacks) *Client {
 	return &Client{
 		callbacks: callbacks,
@@ -501,27 +503,44 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 
 func (c *Client) localModels() []map[string]interface{} {
 	current := c.localConfig.Cloudflare.PrimaryModel
-	endpoint := strings.TrimRight(c.localConfig.Auth.BaseURL, "/") + "/v1/models"
-	request, err := http.NewRequest(http.MethodGet, endpoint, nil)
-	if err == nil {
-		if c.localConfig.Auth.APIKey != "" {
-			request.Header.Set("Authorization", "Bearer "+c.localConfig.Auth.APIKey)
-		}
-		if response, requestErr := (&http.Client{Timeout: 10 * time.Second}).Do(request); requestErr == nil {
-			defer response.Body.Close()
-			if response.StatusCode >= 200 && response.StatusCode < 300 {
-				data, _ := io.ReadAll(io.LimitReader(response.Body, 2<<20))
-				var envelope struct {
-					Data []map[string]interface{} `json:"data"`
+	if catalog, ok := providerModelCatalogEndpoint(c.localConfig); ok {
+		request, err := http.NewRequest(http.MethodGet, catalog.URL, nil)
+		if err == nil {
+			if catalog.APIKey != "" && catalog.HeaderName != "" {
+				value := catalog.APIKey
+				if catalog.HeaderName == "Authorization" {
+					value = "Bearer " + value
 				}
-				if json.Unmarshal(data, &envelope) == nil && len(envelope.Data) > 0 {
-					for _, model := range envelope.Data {
-						if _, ok := model["name"]; !ok {
-							model["name"] = model["id"]
-						}
-						model["active"] = fmt.Sprint(model["id"]) == current
+				request.Header.Set(catalog.HeaderName, value)
+			}
+			if response, requestErr := (&http.Client{Timeout: 10 * time.Second}).Do(request); requestErr == nil {
+				defer response.Body.Close()
+				if response.StatusCode >= 200 && response.StatusCode < 300 {
+					data, _ := io.ReadAll(io.LimitReader(response.Body, 2<<20))
+					var envelope struct {
+						Data   []map[string]interface{} `json:"data"`
+						Models []map[string]interface{} `json:"models"`
 					}
-					return envelope.Data
+					if json.Unmarshal(data, &envelope) == nil {
+						items := envelope.Data
+						if len(items) == 0 {
+							items = envelope.Models
+						}
+						if len(items) > 0 {
+							for _, model := range items {
+								if _, exists := model["id"]; !exists {
+									if name, ok := model["name"]; ok {
+										model["id"] = strings.TrimPrefix(fmt.Sprint(name), "models/")
+									}
+								}
+								if _, exists := model["name"]; !exists {
+									model["name"] = model["id"]
+								}
+								model["active"] = fmt.Sprint(model["id"]) == current
+							}
+							return items
+						}
+					}
 				}
 			}
 		}

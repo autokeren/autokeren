@@ -10,6 +10,7 @@ import (
 
 	"github.com/autokeren/autokeren/internal/config"
 	"github.com/autokeren/autokeren/internal/model"
+	"github.com/autokeren/autokeren/internal/provider"
 )
 
 func TestLocalModelsFetchesAndMarksActive(t *testing.T) {
@@ -20,6 +21,26 @@ func TestLocalModelsFetchesAndMarksActive(t *testing.T) {
 	c := &Client{localConfig: config.Config{Auth: config.Auth{BaseURL: server.URL}, Cloudflare: config.Cloudflare{PrimaryModel: "glm-5.2"}}}
 	models := c.localModels()
 	if len(models) != 2 || models[1]["active"] != true || models[1]["name"] != "glm-5.2" {
+		t.Fatalf("unexpected models: %#v", models)
+	}
+}
+
+func TestLocalModelsSupportsGeminiCatalogShape(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("x-goog-api-key") != "gemini-key" {
+			t.Fatalf("unexpected key header: %q", request.Header.Get("x-goog-api-key"))
+		}
+		_, _ = w.Write([]byte(`{"models":[{"name":"models/gemini-2.5-pro"}]}`))
+	}))
+	defer server.Close()
+	c := &Client{localConfig: config.Config{Auth: config.Auth{Mode: "aistudio", GeminiAPIKey: "gemini-key"}, Cloudflare: config.Cloudflare{PrimaryModel: "gemini-2.5-pro"}}}
+	original := providerModelCatalogEndpoint
+	providerModelCatalogEndpoint = func(config.Config) (provider.ModelCatalogRequest, bool) {
+		return provider.ModelCatalogRequest{URL: server.URL, HeaderName: "x-goog-api-key", APIKey: "gemini-key"}, true
+	}
+	t.Cleanup(func() { providerModelCatalogEndpoint = original })
+	models := c.localModels()
+	if len(models) != 1 || models[0]["id"] != "gemini-2.5-pro" || models[0]["active"] != true {
 		t.Fatalf("unexpected models: %#v", models)
 	}
 }
