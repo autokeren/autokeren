@@ -86,8 +86,9 @@ func (gm *GhostManager) Spawn(task string) (*GhostAgentInfo, error) {
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), gm.Timeout)
-	cmd := exec.CommandContext(ctx, binary, "--non-interactive", "--task", task)
+	cmd := exec.CommandContext(ctx, binary, "--engine", "go", "--non-interactive", "--task", task)
 	cmd.Dir = gm.ProjectRoot
+	configureProcessGroup(cmd)
 	cmd.Stdout = log
 	cmd.Stderr = log
 	if err := cmd.Start(); err != nil {
