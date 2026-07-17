@@ -214,6 +214,9 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
                 elif cfg.auth.mode == "aistudio":
                     from autokeren.models.aistudio import fetch_aistudio_models
                     all_models = fetch_aistudio_models(cfg)
+                elif cfg.auth.mode == "openai":
+                    from autokeren.models.openai import fetch_openai_models
+                    all_models = fetch_openai_models(cfg)
                 else:
                     from autokeren.models.cloudflare import fetch_available_models
                     all_models = fetch_available_models(cfg)
@@ -222,11 +225,11 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
                 current = agent.router.current_model_id()
                 for m in all_models:
                     m["active"] = m["id"] == current
-
+ 
                 idx = select_option(all_models, title="Pilih Model", console=console)
                 if idx is not None:
                     chosen = all_models[idx]["id"]
-                    if cfg.auth.mode in ("antigravity", "aistudio"):
+                    if cfg.auth.mode in ("antigravity", "aistudio", "openai"):
                         resolved = chosen
                     else:
                         from autokeren.models.cloudflare import resolve_model_id

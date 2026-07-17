@@ -583,15 +583,16 @@
       "symbols": []
     },
     "CHANGELOG.md": {
-      "mtime": 1784246498.7283766,
+      "mtime": 1784247472.773404,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
     "README.md": {
-      "mtime": 1783867658.3466756,
+      "mtime": 1784247451.2379832,
       "summary": "",
-      "symbols": []
+      "symbols": [],
+      "dependencies": []
     },
     "ipc/client.go": {
       "mtime": 1783902240.6041286,
@@ -727,7 +728,7 @@
       "symbols": []
     },
     ".ak-checkpoints/session-default/meta.json": {
-      "mtime": 1784215855.7282321,
+      "mtime": 1784250130.1183527,
       "summary": "",
       "symbols": [],
       "dependencies": []
@@ -743,7 +744,7 @@
       ]
     },
     "ui/layout.go": {
-      "mtime": 1784246498.688376,
+      "mtime": 1784247472.7074025,
       "summary": "  package ui\n  func NewMainModel(client *ipc.Client, ghostMgr *ghost.GhostManager, projectRoot, configPath string, opts map[string]interface{}) MainModel\n  func (m MainModel) Init() tea.Cmd\n  func spinnerTick() tea.Cmd\n  func (m MainModel) pollPeriodicCmd() tea.Cmd\n  func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd)\n  func (m MainModel) View() string\n  func jsonMarshalIndent(v interface{}) (string, error)\n  func (m *MainModel) handleGhostCommand(args string)\n  func (m MainModel) connectToAgentCmd() tea.Cmd\n  func (m MainModel) fetchModelsCmd() tea.Cmd\n  func (m MainModel) switchModelCmd(modelID string) tea.Cmd\n  func parseStatusReply(statusReply map[string]interface{}, projectRoot string) StatusUpdateMsg\n  func (m MainModel) getSelectedTask() (KanbanTask, bool)\n  func renderMcpAddDialog(nameInput, cmdInput textinput.Model, activeField int, width int) string",
       "symbols": [
         "ui",
@@ -783,7 +784,7 @@
       ]
     },
     "ui/sidebar.go": {
-      "mtime": 1784246498.694376,
+      "mtime": 1784247472.721403,
       "summary": "  package ui\n  func NewSidebarModel() SidebarModel\n  func (m SidebarModel) View() string\n  func truncate(s string, max int) string\n  func humanTokens(n int) string\n  func wrapText(s string, maxW int) string",
       "symbols": [
         "ui",
@@ -851,9 +852,10 @@
       ]
     },
     "README.id.md": {
-      "mtime": 1783867663.0297744,
+      "mtime": 1784247453.894035,
       "summary": "",
-      "symbols": []
+      "symbols": [],
+      "dependencies": []
     },
     "worker-kopi-juara.js": {
       "mtime": 1783774128.0762525,
@@ -1666,7 +1668,7 @@
       ]
     },
     "autokeren/__init__.py": {
-      "mtime": 1784246498.6833758,
+      "mtime": 1784247472.6734018,
       "summary": "",
       "symbols": [],
       "dependencies": []
@@ -2460,280 +2462,326 @@
       "summary": "",
       "symbols": []
     },
-    ".ak-checkpoints/session-default/2621.json": {
-      "mtime": 1784213383.5169358,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2624.json": {
-      "mtime": 1784213593.6811786,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2613.json": {
-      "mtime": 1784213109.6224065,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2630.json": {
-      "mtime": 1784214146.5485578,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2627.json": {
-      "mtime": 1784213678.6048985,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2616.json": {
-      "mtime": 1784213170.0556266,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2631.json": {
-      "mtime": 1784214167.967,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2612.json": {
-      "mtime": 1784213086.1539328,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2628.json": {
-      "mtime": 1784213936.0952137,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2615.json": {
-      "mtime": 1784213143.2040846,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2617.json": {
-      "mtime": 1784213213.5835054,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2626.json": {
-      "mtime": 1784213656.8914545,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2614.json": {
-      "mtime": 1784213117.6255682,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2632.json": {
-      "mtime": 1784214199.8296576,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2620.json": {
-      "mtime": 1784213324.4487433,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2623.json": {
-      "mtime": 1784213572.547752,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2618.json": {
-      "mtime": 1784213234.8319342,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2625.json": {
-      "mtime": 1784213640.2891195,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2633.json": {
-      "mtime": 1784214220.5150847,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2619.json": {
-      "mtime": 1784213300.203254,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2622.json": {
-      "mtime": 1784213516.384618,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2629.json": {
-      "mtime": 1784213965.9878306,
-      "summary": "",
-      "symbols": []
-    },
-    ".ak-checkpoints/session-default/2643.json": {
-      "mtime": 1784214941.760728,
+    ".ak-ghost-8.json": {
+      "mtime": 1784250128.6603239,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2640.json": {
-      "mtime": 1784214792.4647062,
+    ".ak-ghost-10.json": {
+      "mtime": 1784250129.419339,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2656.json": {
-      "mtime": 1784215570.3024495,
+    ".ak-checkpoints/session-default/2731.json": {
+      "mtime": 1784248958.4034374,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2635.json": {
-      "mtime": 1784214655.731937,
+    ".ak-checkpoints/session-default/2725.json": {
+      "mtime": 1784248708.020544,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2637.json": {
-      "mtime": 1784214717.4311876,
+    ".ak-checkpoints/session-default/2746.json": {
+      "mtime": 1784250061.0199955,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2658.json": {
-      "mtime": 1784215658.6322372,
+    ".ak-checkpoints/session-default/2723.json": {
+      "mtime": 1784248708.0155442,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2661.json": {
-      "mtime": 1784215855.727232,
+    ".ak-checkpoints/session-default/2740.json": {
+      "mtime": 1784249472.9254887,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2650.json": {
-      "mtime": 1784215288.5747473,
+    ".ak-checkpoints/session-default/2718.json": {
+      "mtime": 1784248671.3018265,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2639.json": {
-      "mtime": 1784214771.4792814,
+    ".ak-checkpoints/session-default/2749.json": {
+      "mtime": 1784250091.6245966,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2647.json": {
-      "mtime": 1784215097.749885,
+    ".ak-checkpoints/session-default/2747.json": {
+      "mtime": 1784250088.4315338,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2636.json": {
-      "mtime": 1784214699.0588157,
+    ".ak-checkpoints/session-default/2753.json": {
+      "mtime": 1784250129.583342,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2660.json": {
-      "mtime": 1784215817.6594598,
+    ".ak-checkpoints/session-default/2745.json": {
+      "mtime": 1784249940.9336367,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2651.json": {
-      "mtime": 1784215448.5039845,
+    ".ak-checkpoints/session-default/2739.json": {
+      "mtime": 1784249455.432147,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2654.json": {
-      "mtime": 1784215547.7179923,
+    ".ak-checkpoints/session-default/2721.json": {
+      "mtime": 1784248681.3720233,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2657.json": {
-      "mtime": 1784215588.4328165,
+    ".ak-checkpoints/session-default/2737.json": {
+      "mtime": 1784249138.2919514,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2655.json": {
-      "mtime": 1784215551.6310716,
+    ".ak-checkpoints/session-default/2708.json": {
+      "mtime": 1784248315.6678748,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2634.json": {
-      "mtime": 1784214634.6765096,
+    ".ak-checkpoints/session-default/2742.json": {
+      "mtime": 1784249500.5910292,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2648.json": {
-      "mtime": 1784215117.2802804,
+    ".ak-checkpoints/session-default/2738.json": {
+      "mtime": 1784249146.4241104,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2641.json": {
-      "mtime": 1784214847.8308268,
+    ".ak-checkpoints/session-default/2709.json": {
+      "mtime": 1784248318.021921,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2653.json": {
-      "mtime": 1784215544.5239277,
+    ".ak-checkpoints/session-default/2735.json": {
+      "mtime": 1784249015.2225473,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2659.json": {
-      "mtime": 1784215811.345332,
+    ".ak-checkpoints/session-default/2719.json": {
+      "mtime": 1784248671.8108363,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2646.json": {
-      "mtime": 1784215050.6189313,
+    ".ak-checkpoints/session-default/2717.json": {
+      "mtime": 1784248671.1418233,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2649.json": {
-      "mtime": 1784215125.8924549,
+    ".ak-checkpoints/session-default/2748.json": {
+      "mtime": 1784250091.6235964,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2638.json": {
-      "mtime": 1784214745.1317482,
+    ".ak-checkpoints/session-default/2733.json": {
+      "mtime": 1784249015.215547,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2644.json": {
-      "mtime": 1784214984.1235855,
+    ".ak-checkpoints/session-default/2706.json": {
+      "mtime": 1784248247.729547,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2645.json": {
-      "mtime": 1784215023.6373851,
+    ".ak-checkpoints/session-default/2727.json": {
+      "mtime": 1784248710.4935925,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2642.json": {
-      "mtime": 1784214871.7603111,
+    ".ak-checkpoints/session-default/2730.json": {
+      "mtime": 1784248955.3303773,
       "summary": "",
       "symbols": [],
       "dependencies": []
     },
-    ".ak-checkpoints/session-default/2652.json": {
-      "mtime": 1784215539.495826,
+    ".ak-checkpoints/session-default/2734.json": {
+      "mtime": 1784249015.2195473,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2714.json": {
+      "mtime": 1784248600.629445,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2722.json": {
+      "mtime": 1784248702.7224407,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2715.json": {
+      "mtime": 1784248602.2404766,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2724.json": {
+      "mtime": 1784248708.0195441,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2716.json": {
+      "mtime": 1784248663.3706715,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2741.json": {
+      "mtime": 1784249482.253671,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2705.json": {
+      "mtime": 1784248247.7195468,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2726.json": {
+      "mtime": 1784248708.8515604,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2750.json": {
+      "mtime": 1784250101.8027964,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2751.json": {
+      "mtime": 1784250128.719325,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2710.json": {
+      "mtime": 1784248595.6613479,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2720.json": {
+      "mtime": 1784248677.7439523,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2744.json": {
+      "mtime": 1784249820.8442855,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2712.json": {
+      "mtime": 1784248595.672348,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2728.json": {
+      "mtime": 1784248945.6841888,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2752.json": {
+      "mtime": 1784250129.0953324,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2732.json": {
+      "mtime": 1784249015.2145472,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2713.json": {
+      "mtime": 1784248595.6863484,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2743.json": {
+      "mtime": 1784249683.1875963,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2711.json": {
+      "mtime": 1784248595.671348,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2707.json": {
+      "mtime": 1784248290.145376,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2736.json": {
+      "mtime": 1784249018.0446024,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2729.json": {
+      "mtime": 1784248946.4292033,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-ghost-9.json": {
+      "mtime": 1784250129.0433314,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-checkpoints/session-default/2754.json": {
+      "mtime": 1784250130.1173525,
+      "summary": "",
+      "symbols": [],
+      "dependencies": []
+    },
+    ".ak-ghost-11.json": {
+      "mtime": 1784250130.037351,
       "summary": "",
       "symbols": [],
       "dependencies": []

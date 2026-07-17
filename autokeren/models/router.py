@@ -57,6 +57,19 @@ class ModelRouter:
                     timeout=self.cfg.cloudflare.timeout,
                 )
                 self.models = [primary, secondary]
+            elif self.cfg.auth.mode == "openai":
+                from autokeren.models.openai import OpenAIModel
+                primary = OpenAIModel(
+                    model_id=self.cfg.cloudflare.primary_model,
+                    api_key=self.cfg.auth.openai_api_key,
+                    timeout=self.cfg.cloudflare.timeout,
+                )
+                secondary = OpenAIModel(
+                    model_id=self.cfg.cloudflare.secondary_model,
+                    api_key=self.cfg.auth.openai_api_key,
+                    timeout=self.cfg.cloudflare.timeout,
+                )
+                self.models = [primary, secondary]
             else:
                 base = CloudflareModel.from_config(self.cfg)
                 primary = base

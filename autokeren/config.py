@@ -15,10 +15,11 @@ def _config_path() -> Path:
 
 
 class AuthConfig(BaseModel):
-    mode: str = "platform"  # "platform" (default), "direct" (CF sendiri), "antigravity" (Google Antigravity), "aistudio" (Google AI Studio), atau "local" (Local LLM)
+    mode: str = "platform"  # "platform" (default), "direct" (CF sendiri), "antigravity" (Google Antigravity), "aistudio" (Google AI Studio), "local" (Local LLM), atau "openai" (OpenAI API)
     api_key: str = ""       # ak_live_... dari developers.autokeren.com
     base_url: str = "https://api.developers.autokeren.com"
     gemini_api_key: str = "" # API Key untuk Google AI Studio
+    openai_api_key: str = "" # API Key untuk OpenAI API
     local_endpoint: str = "http://localhost:11434" # Endpoint untuk Local LLM (Ollama/LocalAI)
 
 

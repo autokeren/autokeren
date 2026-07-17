@@ -1757,6 +1757,9 @@ class AutokerenTUI(App):
         elif self.cfg.auth.mode == "aistudio":
             from autokeren.models.aistudio import fetch_aistudio_models
             all_models = fetch_aistudio_models(self.cfg)
+        elif self.cfg.auth.mode == "openai":
+            from autokeren.models.openai import fetch_openai_models
+            all_models = fetch_openai_models(self.cfg)
         else:
             from autokeren.models.cloudflare import fetch_available_models
             all_models = fetch_available_models(self.cfg)
@@ -1764,7 +1767,7 @@ class AutokerenTUI(App):
 
         def on_select(chosen_id: str | None) -> None:
             if chosen_id:
-                if self.cfg.auth.mode in ("antigravity", "aistudio"):
+                if self.cfg.auth.mode in ("antigravity", "aistudio", "openai"):
                     resolved = chosen_id
                 else:
                     from autokeren.models.cloudflare import resolve_model_id

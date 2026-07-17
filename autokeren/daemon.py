@@ -589,6 +589,12 @@ class JSONRPCDaemon:
                     all_models = fetch_aistudio_models(cfg)
                 except Exception:
                     all_models = [{"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro"}, {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash"}]
+            elif cfg.auth.mode == "openai":
+                from autokeren.models.openai import fetch_openai_models
+                try:
+                    all_models = fetch_openai_models(cfg)
+                except Exception:
+                    all_models = [{"id": "gpt-5.6", "name": "GPT-5.6"}, {"id": "gpt-4o", "name": "GPT-4o"}]
             else:
                 from autokeren.models.cloudflare import fetch_available_models
                 try:
