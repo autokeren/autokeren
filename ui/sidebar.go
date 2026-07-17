@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/autokeren/autokeren/ghost"
@@ -33,12 +32,7 @@ type SidebarModel struct {
 }
 
 func NewSidebarModel() SidebarModel {
-	version := os.Getenv("AUTOKEREN_VERSION")
-	if version == "" {
-		version = "v0.11.80"
-	} else if !strings.HasPrefix(version, "v") {
-		version = "v" + version
-	}
+	version := "v0.11.80"
 	return SidebarModel{
 		ModelName:     "—",
 		ProjectName:   "—",

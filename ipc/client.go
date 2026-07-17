@@ -333,7 +333,7 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		c.localSession = saved.ID
 		c.localSessionName = name
 		if reply != nil {
-			return json.Unmarshal([]byte(fmt.Sprintf(`{"message":"Session '%s' disimpan.","session_id":%q,"session_name":%q,"name":%q}`, name, name, name, name)), reply)
+			return json.Unmarshal([]byte(fmt.Sprintf(`{"message":"Session '%s' disimpan.","session_id":%q,"session_name":%q,"name":%q}`, name, saved.ID, name, name)), reply)
 		}
 		return nil
 	case "agent.resume_session":
@@ -529,8 +529,16 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 				name += ".md"
 			}
 		}
-		data, err := sessionstore.Load(c.sessionPath(c.localSession))
-		if os.IsNotExist(err) {
+		if c.localSession == "default" {
+			output = "Belum ada percakapan untuk diekspor."
+			break
+		}
+		sessions, err := c.localSessionManager()
+		if err != nil {
+			return true, err
+		}
+		data, err := sessions.Load(c.localSession)
+		if errors.Is(err, sql.ErrNoRows) {
 			output = "Belum ada percakapan untuk diekspor."
 			break
 		}

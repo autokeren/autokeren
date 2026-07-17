@@ -3,7 +3,6 @@ package ui
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -414,18 +413,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.Sidebar.SessionName = sname
 				}
 				if rawMsgs, exists := reply["messages"].([]interface{}); exists {
-					newMsgs := []ChatMessage{}
-					for _, raw := range rawMsgs {
-						if mObj, ok := raw.(map[string]interface{}); ok {
-							role, _ := mObj["role"].(string)
-							content, _ := mObj["content"].(string)
-							newMsgs = append(newMsgs, ChatMessage{
-								Role:    role,
-								Content: content,
-							})
-						}
-					}
-					m.Chat.Messages = newMsgs
+					m.Chat.Messages = sessionChatMessages(rawMsgs)
 				}
 			}
 		case "sessions":
@@ -558,18 +546,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.Chat.AppendMessage("system", msg.ResumeMessage)
 		if rawMsgs, ok := msg.RawMessages.([]interface{}); ok {
-			newMsgs := []ChatMessage{}
-			for _, raw := range rawMsgs {
-				if mObj, ok := raw.(map[string]interface{}); ok {
-					role, _ := mObj["role"].(string)
-					content, _ := mObj["content"].(string)
-					newMsgs = append(newMsgs, ChatMessage{
-						Role:    role,
-						Content: content,
-					})
-				}
-			}
-			m.Chat.Messages = newMsgs
+			m.Chat.Messages = sessionChatMessages(rawMsgs)
 		}
 		m.Chat.UpdateViewportScroll(true)
 
@@ -1742,23 +1719,22 @@ func (m MainModel) connectToAgentCmd() tea.Cmd {
 			return ErrorMsg{Message: fmt.Sprintf("Gagal mengambil status awal agen: %v", err)}
 		}
 
-		parsedStatus := parseStatusReply(statusReply, m.ProjectRoot)
-
 		resumeSession, _ := m.InitOpts["resume_session"].(string)
 		if resumeSession != "" {
 			var resumeReply map[string]interface{}
 			params := map[string]interface{}{"identifier": resumeSession}
 			err = m.IPCClient.Call("agent.resume_session", params, &resumeReply)
 			if err == nil {
+				_ = m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply)
 				return StartupResumeMsg{
-					Status:        parsedStatus,
+					Status:        parseStatusReply(statusReply, m.ProjectRoot),
 					ResumeMessage: resumeReply["message"].(string),
 					RawMessages:   resumeReply["messages"],
 				}
 			}
 		}
 
-		return parsedStatus
+		return parseStatusReply(statusReply, m.ProjectRoot)
 	}
 }
 
@@ -1794,18 +1770,29 @@ func (m MainModel) switchModelCmd(modelID string) tea.Cmd {
 	}
 }
 
+func sessionChatMessages(rawMessages []interface{}) []ChatMessage {
+	messages := make([]ChatMessage, 0, len(rawMessages))
+	for _, raw := range rawMessages {
+		message, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		role, _ := message["role"].(string)
+		content, _ := message["content"].(string)
+		if (role == "user" || role == "assistant") && content != "" {
+			messages = append(messages, ChatMessage{Role: role, Content: content})
+		}
+	}
+	return messages
+}
+
 func parseStatusReply(statusReply map[string]interface{}, projectRoot string) StatusUpdateMsg {
 	version, _ := statusReply["version"].(string)
 	if version != "" && !strings.HasPrefix(version, "v") {
 		version = "v" + version
 	}
 	if version == "" {
-		version = os.Getenv("AUTOKEREN_VERSION")
-		if version == "" {
-			version = "v0.11.80" // fallback
-		} else if !strings.HasPrefix(version, "v") {
-			version = "v" + version
-		}
+		version = "v0.11.80"
 	}
 	modelName := "?"
 	if value, ok := statusReply["model_name"].(string); ok && value != "" {

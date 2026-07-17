@@ -44,7 +44,7 @@ func TestLocalSessionSaveAndResume(t *testing.T) {
 	if err := c.callLocal("agent.resume_session", map[string]interface{}{"identifier": "demo"}, &resumed); err != nil {
 		t.Fatal(err)
 	}
-	if resumed["session_id"] != "demo" {
+	if resumed["session_id"] != saved["session_id"] || resumed["session_name"] != "demo" {
 		raw, _ := json.Marshal(resumed)
 		t.Fatalf("unexpected resume response: %s", raw)
 	}
