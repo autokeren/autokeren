@@ -125,3 +125,21 @@ func firstEnv(keys ...string) string {
 	}
 	return ""
 }
+
+func Save(path string, cfg Config) error {
+	if path == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+		path = filepath.Join(home, ".config", "autokeren", "config.yaml")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Clean(path), data, 0o600)
+}

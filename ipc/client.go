@@ -194,6 +194,7 @@ func (c *Client) startLocal(projectRoot, configPath string) error {
 	c.local = true
 	c.localRoot = projectRoot
 	c.localConfig = cfg
+	c.localConfigPath = configPath
 	c.localSession = "tui"
 	atomic.StoreInt32(&c.isClosed, 0)
 	return nil
@@ -360,7 +361,17 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 			output = "Memory project kosong."
 		}
 	case "/mcp":
-		if len(c.localConfig.MCPServers) == 0 {
+		if len(parts) > 1 && parts[1] == "add" {
+			if len(parts) < 4 {
+				return true, errors.New("format: /mcp add <name> <command>")
+			}
+			server := config.MCPServer{Name: parts[2], Command: parts[3:], Enabled: true}
+			c.localConfig.MCPServers = append(c.localConfig.MCPServers, server)
+			if err := config.Save(c.localConfigPath, c.localConfig); err != nil {
+				return true, err
+			}
+			output = fmt.Sprintf("MCP server %s tersimpan.", server.Name)
+		} else if len(c.localConfig.MCPServers) == 0 {
 			output = "Belum ada MCP server."
 		} else {
 			for _, server := range c.localConfig.MCPServers {
