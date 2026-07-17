@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -205,6 +206,9 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		if input == "" {
 			return errors.New("user_input kosong")
 		}
+		if handled, err := c.localSlash(input, reply); handled {
+			return err
+		}
 		events := engine.Events{
 			OnChunk: func(text string) {
 				if c.callbacks != nil && c.callbacks.OnChunk != nil {
@@ -332,6 +336,65 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 	default:
 		return fmt.Errorf("method %s belum tersedia di Go TUI adapter", method)
 	}
+}
+
+func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
+	parts := strings.Fields(input)
+	if len(parts) == 0 || !strings.HasPrefix(parts[0], "/") {
+		return false, nil
+	}
+	var output string
+	switch parts[0] {
+	case "/status":
+		output = fmt.Sprintf("engine: go\nmodel: %s\nproject: %s", c.localConfig.Cloudflare.PrimaryModel, c.localRoot)
+	case "/config":
+		raw, _ := json.MarshalIndent(c.localConfig, "", "  ")
+		output = string(raw)
+	case "/memory":
+		data, err := os.ReadFile(filepath.Join(c.localRoot, ".autokeren", "memory.md"))
+		if err != nil && !os.IsNotExist(err) {
+			return true, err
+		}
+		output = string(data)
+		if output == "" {
+			output = "Memory project kosong."
+		}
+	case "/mcp":
+		if len(c.localConfig.MCPServers) == 0 {
+			output = "Belum ada MCP server."
+		} else {
+			for _, server := range c.localConfig.MCPServers {
+				output += fmt.Sprintf("- %s: %s\n", server.Name, strings.Join(server.Command, " "))
+			}
+		}
+	case "/proof":
+		action := "list"
+		if len(parts) > 1 {
+			action = parts[1]
+		}
+		args := map[string]any{"action": action}
+		if len(parts) > 2 {
+			args["proof_id"] = parts[2]
+		}
+		result := (tool.Proof{Root: c.localRoot}).Run(context.Background(), args, nil)
+		output = fmt.Sprint(result.Output)
+		if !result.OK {
+			output = result.Error
+		}
+	default:
+		return false, nil
+	}
+	if c.callbacks != nil && c.callbacks.OnChunk != nil {
+		c.callbacks.OnChunk(output)
+	}
+	if c.callbacks != nil && c.callbacks.OnModelEnd != nil {
+		c.callbacks.OnModelEnd(output, c.localConfig.Cloudflare.PrimaryModel, c.localSession, c.localSession, nil)
+	}
+	if reply != nil {
+		raw, _ := json.Marshal(map[string]any{"content": output, "ok": true})
+		_ = json.Unmarshal(raw, reply)
+	}
+	return true, nil
 }
 
 func (c *Client) send(msg *JSONRPCMessage) error {
