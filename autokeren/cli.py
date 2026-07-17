@@ -811,36 +811,181 @@ def main() -> int:
 
     if args.login:
         import httpx as _httpx
-        console.print("[bold]Login AutoKeren Platform[/bold]")
-        console.print("Buka [cyan]https://developers.autokeren.com/dashboard/keys[/cyan] buat API key.")
-        console.print("Format: [dim]ak_live_...[/dim]\n")
-        api_key = Prompt.ask("API key").strip()
-        if not api_key or not api_key.startswith("ak_"):
-            console.print("[red]API key tidak valid. Harus diawali 'ak_'[/red]")
-            return 1
-        console.print("[dim]Memvalidasi API key...[/dim]")
-        try:
-            r = _httpx.get(
-                "https://api.developers.autokeren.com/v1/usage",
-                headers={"Authorization": f"Bearer {api_key}"},
-                timeout=15,
-            )
-            if r.status_code == 200:
-                data = r.json()
-                console.print(f"[green]Login berhasil![/green] Tier: {data.get('tier', '?')}")
-                cfg = load_config(Path(args.config)) if args.config else ensure_config()
-                cfg.auth.mode = "platform"
-                cfg.auth.api_key = api_key
-                save_config(cfg)
-                console.print("[dim]Config saved.[/dim]")
-                return 0
-            else:
-                err = r.json().get("error", {}).get("message", "unknown error")
-                console.print(f"[red]Validasi gagal: {err}[/red]")
+        from autokeren.selector import select_option
+        from rich.panel import Panel
+        
+        providers = [
+            {
+                "id": "platform",
+                "name": "AutoKeren Platform",
+                "desc": "Akses Cloudflare Workers AI via developers.autokeren.com",
+                "icon": "🔮",
+            },
+            {
+                "id": "openai",
+                "name": "OpenAI API",
+                "desc": "Gunakan GPT-5.6 / GPT-4o dengan OpenAI API Key",
+                "icon": "🤖",
+            },
+            {
+                "id": "aistudio",
+                "name": "Google AI Studio",
+                "desc": "Gunakan Gemini 3.5 Pro/Flash secara langsung",
+                "icon": "♊",
+            },
+            {
+                "id": "antigravity",
+                "name": "Google Antigravity",
+                "desc": "Gunakan Google Antigravity SDK Enterprise Backend",
+                "icon": "🪐",
+            },
+            {
+                "id": "local",
+                "name": "Local LLM",
+                "desc": "Hubungkan ke model lokal via Ollama atau LocalAI",
+                "icon": "🖥️",
+            },
+        ]
+        
+        console.print("[bold cyan]🔑 AUTOKEREN LOGIN & CONFIGURATION WIZARD[/bold cyan]\n")
+        idx = select_option(providers, title="Pilih Provider/Mode Autentikasi:", console=console)
+        if idx is None:
+            console.print("[dim]Batal.[/dim]")
+            return 0
+            
+        provider_id = providers[idx]["id"]
+        cfg = load_config(Path(args.config)) if args.config else ensure_config()
+        
+        if provider_id == "platform":
+            console.print("\n[bold]Login AutoKeren Platform[/bold]")
+            console.print("Buka [cyan]https://developers.autokeren.com/dashboard/keys[/cyan] buat API key.")
+            console.print("Format: [dim]ak_live_...[/dim]\n")
+            api_key = Prompt.ask("API key").strip()
+            if not api_key or not api_key.startswith("ak_"):
+                console.print("[red]API key tidak valid. Harus diawali 'ak_'[/red]")
                 return 1
-        except Exception as e:
-            console.print(f"[red]Connection error: {e}[/red]")
-            return 1
+            console.print("[dim]Memvalidasi API key...[/dim]")
+            try:
+                r = _httpx.get(
+                    "https://api.developers.autokeren.com/v1/usage",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    timeout=15,
+                )
+                if r.status_code == 200:
+                    data = r.json()
+                    console.print(f"[green]Login berhasil![/green] Tier: {data.get('tier', '?')}")
+                    cfg.auth.mode = "platform"
+                    cfg.auth.api_key = api_key
+                else:
+                    err = r.json().get("error", {}).get("message", "unknown error")
+                    console.print(f"[red]Validasi gagal: {err}[/red]")
+                    return 1
+            except Exception as e:
+                console.print(f"[red]Connection error: {e}[/red]")
+                return 1
+                
+        elif provider_id == "openai":
+            console.print("\n[bold]🔑 SETUP OPENAI API[/bold]")
+            api_key = Prompt.ask("OpenAI API Key (sk-...)").strip()
+            if not api_key or not api_key.startswith("sk-"):
+                console.print("[red]API key tidak valid. Harus diawali 'sk-'[/red]")
+                return 1
+            console.print("[dim]Memvalidasi API key...[/dim]")
+            try:
+                r = _httpx.get(
+                    "https://api.openai.com/v1/models",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    timeout=15,
+                )
+                if r.status_code == 200:
+                    console.print("[green]Login berhasil! Kunci API OpenAI valid.[/green]")
+                    cfg.auth.mode = "openai"
+                    cfg.auth.openai_api_key = api_key
+                    
+                    from autokeren.models.openai import fetch_openai_models
+                    all_models = fetch_openai_models(cfg)
+                    console.print("")
+                    primary_idx = select_option(all_models, title="Pilih Model Utama (Primary Model):", console=console)
+                    if primary_idx is not None:
+                        cfg.cloudflare.primary_model = all_models[primary_idx]["id"]
+                        
+                    console.print("")
+                    secondary_idx = select_option(all_models, title="Pilih Model Cadangan (Secondary/Fallback Model):", console=console)
+                    if secondary_idx is not None:
+                        cfg.cloudflare.secondary_model = all_models[secondary_idx]["id"]
+                else:
+                    console.print(f"[red]Validasi gagal (Status {r.status_code}): {r.text}[/red]")
+                    return 1
+            except Exception as e:
+                console.print(f"[red]Connection error: {e}[/red]")
+                return 1
+                
+        elif provider_id == "aistudio":
+            console.print("\n[bold]🔑 SETUP GOOGLE AI STUDIO[/bold]")
+            api_key = Prompt.ask("Gemini API Key (AIzaSy...)").strip()
+            if not api_key:
+                console.print("[red]API key tidak boleh kosong.[/red]")
+                return 1
+            console.print("[dim]Memvalidasi API key...[/dim]")
+            try:
+                r = _httpx.get(
+                    f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}",
+                    timeout=15,
+                )
+                if r.status_code == 200:
+                    console.print("[green]Login berhasil! Kunci API Gemini valid.[/green]")
+                    cfg.auth.mode = "aistudio"
+                    cfg.auth.gemini_api_key = api_key
+                    
+                    from autokeren.models.aistudio import fetch_aistudio_models
+                    all_models = fetch_aistudio_models(cfg)
+                    console.print("")
+                    primary_idx = select_option(all_models, title="Pilih Model Utama (Primary Model):", console=console)
+                    if primary_idx is not None:
+                        cfg.cloudflare.primary_model = all_models[primary_idx]["id"]
+                        
+                    console.print("")
+                    secondary_idx = select_option(all_models, title="Pilih Model Cadangan (Secondary/Fallback Model):", console=console)
+                    if secondary_idx is not None:
+                        cfg.cloudflare.secondary_model = all_models[secondary_idx]["id"]
+                else:
+                    console.print(f"[red]Validasi gagal: {r.text}[/red]")
+                    return 1
+            except Exception as e:
+                console.print(f"[red]Connection error: {e}[/red]")
+                return 1
+                
+        elif provider_id == "antigravity":
+            from autokeren.models.google_auth import verify_or_login
+            if not verify_or_login(console):
+                return 1
+            cfg.auth.mode = "antigravity"
+            cfg.cloudflare.primary_model = "gemini-3.5-flash"
+            cfg.cloudflare.secondary_model = "gemini-3.5-pro"
+            
+        elif provider_id == "local":
+            console.print("\n[bold]🖥️ SETUP LOCAL LLM[/bold]")
+            endpoint = Prompt.ask("Masukkan Endpoint URL", default="http://localhost:11434").strip()
+            cfg.auth.mode = "local"
+            cfg.auth.local_endpoint = endpoint
+            
+            primary = Prompt.ask("Pilih Model Utama (Ollama ID)", default="qwen2.5-coder:7b").strip()
+            secondary = Prompt.ask("Pilih Model Cadangan (Ollama ID)", default="llama3-coder:8b").strip()
+            cfg.cloudflare.primary_model = primary
+            cfg.cloudflare.secondary_model = secondary
+            
+        config_path = save_config(cfg)
+        summary_text = (
+            f"🎉 [bold green]LOGIN BERHASIL & KONFIGURASI DISIMPAN[/bold green]\n\n"
+            f"  • [bold]Provider[/bold]      : {providers[idx]['name']}\n"
+            f"  • [bold]Mode[/bold]          : {provider_id}\n"
+            f"  • [bold]Model Utama[/bold]   : {cfg.cloudflare.primary_model}\n"
+            f"  • [bold]Model Backup[/bold]  : {cfg.cloudflare.secondary_model}\n"
+            f"  • [bold]Konfigurasi[/bold]   : [cyan]{config_path}[/cyan]\n\n"
+            f"Jalankan '[bold]autokeren[/bold]' untuk mulai koding!"
+        )
+        console.print(Panel(summary_text, border_style="green", expand=False))
+        return 0
 
     cfg = load_config(Path(args.config)) if args.config else ensure_config()
     if args.agy:
