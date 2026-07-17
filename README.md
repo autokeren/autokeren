@@ -15,6 +15,25 @@
 
 ---
 
+## Build Week 2026 Extension — Autokeren Proof
+
+Autokeren existed before OpenAI Build Week (began on 2026-07-04) and is distributed under the MIT license.
+**Autokeren Proof** was built during the submission period with Codex and GPT-5.6. It adds an evidence-led release workflow: acceptance criteria, recorded verification, and a SHIP/BLOCKED/NEEDS_HUMAN_REVIEW release verdict.
+
+### What existed before the hackathon
+
+- Agent loop, tool system, checkpoints/rewind, security scanning, review, and TUI.
+
+### What was built during the hackathon
+
+- **OpenAI Model Integration** ([openai.py](file:///data/media_backup/autokeren/autokeren/models/openai.py)): Native model client supporting GPT-5.6 and Codex completions, streaming, and tool calls.
+- **Interactive Login Wizard** ([cli.py](file:///data/media_backup/autokeren/autokeren/cli.py)): Interactive setup wizard to select providers (including OpenAI API) and configure models.
+- **Proof Tool** ([proof.py](file:///data/media_backup/autokeren/autokeren/tools/proof.py)): Native tool to plan, record, report, and list release evidence runs.
+- **`/proof` Slash Command** ([cli.py](file:///data/media_backup/autokeren/autokeren/cli.py), [tui.py](file:///data/media_backup/autokeren/autokeren/tui.py)): Interactive commands to execute proof tasks.
+- **Deterministic Demo App** ([app.py](file:///data/media_backup/autokeren/examples/proof-demo/app.py)): A mock checkout app showing defect validation and verification logs.
+
+---
+
 ## Key Features
 
 - **7 AI models** — kimi-code, kimi-2.6, glm-5.2, glm-flash, llama-4-scout, gemma-4, and nemotron with automatic fallback.

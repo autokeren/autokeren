@@ -16,6 +16,25 @@ autokeren adalah CLI agentic coding yang dirancang khusus untuk stack Cloudflare
 
 ---
 
+## Ekstensi Build Week 2026 — Autokeren Proof
+
+autokeren sudah ada sebelum OpenAI Build Week (dimulai sejak 2026-07-04) dan didistribusikan di bawah lisensi MIT.
+**Autokeren Proof** dibangun selama periode submisi menggunakan Codex dan GPT-5.6. Fitur ini menambahkan alur kerja rilis berbasis bukti: kriteria penerimaan, verifikasi terrekam, dan hasil keputusan SHIP/BLOCKED/NEEDS_HUMAN_REVIEW.
+
+### Fitur yang sudah ada sebelum hackathon
+
+- Agent loop, sistem tool, checkpoints/rewind, pemindaian keamanan, review kode, dan TUI.
+
+### Fitur yang dibangun selama hackathon
+
+- **Integrasi Model OpenAI** ([openai.py](file:///data/media_backup/autokeren/autokeren/models/openai.py)): Klien model native yang mendukung completions, streaming, dan tool calling untuk GPT-5.6 dan Codex.
+- **Wizard Login Interaktif** ([cli.py](file:///data/media_backup/autokeren/autokeren/cli.py)): Wizard setup interaktif untuk memilih provider (termasuk OpenAI API) dan mengonfigurasi model utama & cadangan.
+- **Proof Tool** ([proof.py](file:///data/media_backup/autokeren/autokeren/tools/proof.py)): Tool native untuk merencanakan (plan), merekam bukti (record), membuat laporan (report), dan melihat daftar (list) bukti rilis.
+- **Slash Command `/proof`** ([cli.py](file:///data/media_backup/autokeren/autokeren/cli.py), [tui.py](file:///data/media_backup/autokeren/autokeren/tui.py)): Perintah interaktif di terminal dan TUI untuk menjalankan tugas-tugas bukti rilis.
+- **Aplikasi Demo Deterministik** ([app.py](file:///data/media_backup/autokeren/examples/proof-demo/app.py)): Aplikasi endpoint checkout sederhana yang menunjukkan cacat validasi email dan log verifikasinya.
+
+---
+
 ## Fitur Utama
 
 - **7 model AI** — kimi-code, kimi-2.6, glm-5.2, glm-flash, llama-4-scout, gemma-4, nemotron dengan fallback otomatis.
