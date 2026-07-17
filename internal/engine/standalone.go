@@ -31,7 +31,7 @@ func RunStandaloneEvents(ctx context.Context, cfg config.Config, root, prompt st
 	if parsed, err := url.Parse(endpoint); err == nil && parsed.Path == "" {
 		endpoint += "/v1/chat/completions"
 	}
-	registry := tool.NewRegistry().Register(tool.ReadFile{Root: root}).Register(tool.ListFiles{Root: root}).Register(tool.Shell{Root: root})
+	registry := tool.NewRegistry().Register(tool.ReadFile{Root: root}).Register(tool.WriteFile{Root: root}).Register(tool.PatchFile{Root: root}).Register(tool.ListFiles{Root: root}).Register(tool.SearchCode{Root: root}).Register(tool.GitStatus{Root: root}).Register(tool.GitDiff{Root: root}).Register(tool.GitLog{Root: root}).Register(tool.GitCommit{Root: root}).Register(tool.NewTodoList(root)).Register(tool.NewKanban(root)).Register(tool.Shell{Root: root})
 	var mcpServers []*mcp.Server
 	for _, spec := range cfg.MCPServers {
 		if !spec.Enabled {
