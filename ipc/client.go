@@ -258,6 +258,77 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 	case "agent.reset":
 		c.localSession = fmt.Sprintf("tui-%d", time.Now().Unix())
 		return nil
+	case "agent.compact", "agent.interrupt":
+		return nil
+	case "agent.save_session":
+		args, _ := params.(map[string]interface{})
+		name, _ := args["name"].(string)
+		if name == "" {
+			name = c.localSession
+		}
+		if err := os.MkdirAll(filepath.Join(c.localRoot, ".ak-sessions"), 0o700); err != nil {
+			return err
+		}
+		src := filepath.Join(c.localRoot, ".ak-sessions", c.localSession+".json")
+		dst := filepath.Join(c.localRoot, ".ak-sessions", name+".json")
+		data, err := os.ReadFile(src)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(dst, data, 0o600); err != nil {
+			return err
+		}
+		if reply != nil {
+			return json.Unmarshal([]byte(fmt.Sprintf(`{"session_id":%q,"session_name":%q}`, name, name)), reply)
+		}
+		return nil
+	case "agent.resume_session":
+		args, _ := params.(map[string]interface{})
+		identifier, _ := args["identifier"].(string)
+		if identifier == "" {
+			return errors.New("session identifier kosong")
+		}
+		if _, err := os.Stat(filepath.Join(c.localRoot, ".ak-sessions", identifier+".json")); err != nil {
+			return err
+		}
+		c.localSession = identifier
+		return nil
+	case "agent.list_sessions":
+		entries, err := os.ReadDir(filepath.Join(c.localRoot, ".ak-sessions"))
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		items := make([]map[string]interface{}, 0)
+		for _, entry := range entries {
+			if filepath.Ext(entry.Name()) == ".json" {
+				id := entry.Name()[:len(entry.Name())-5]
+				items = append(items, map[string]interface{}{"id": id, "name": id})
+			}
+		}
+		if reply != nil {
+			raw, _ := json.Marshal(map[string]interface{}{"sessions": items})
+			return json.Unmarshal(raw, reply)
+		}
+		return nil
+	case "agent.list_models":
+		models := []map[string]interface{}{{"id": c.localConfig.Cloudflare.PrimaryModel, "name": c.localConfig.Cloudflare.PrimaryModel}}
+		if reply != nil {
+			raw, _ := json.Marshal(models)
+			return json.Unmarshal(raw, reply)
+		}
+		return nil
+	case "agent.switch_model":
+		args, _ := params.(map[string]interface{})
+		if modelID, ok := args["model_id"].(string); ok && modelID != "" {
+			c.localConfig.Cloudflare.PrimaryModel = modelID
+		}
+		return nil
+	case "kanban.add", "kanban.move", "kanban.delete":
+		if reply != nil {
+			raw, _ := json.Marshal(map[string]interface{}{"ok": true})
+			return json.Unmarshal(raw, reply)
+		}
+		return nil
 	default:
 		return fmt.Errorf("method %s belum tersedia di Go TUI adapter", method)
 	}
