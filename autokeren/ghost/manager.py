@@ -89,7 +89,7 @@ class GhostManager:
                 pass
 
     def spawn(self, task: str, role: str = "", model_id: str = "") -> GhostAgentInfo:
-        if len(self._agents) >= self.max_agents:
+        if self.active_count >= self.max_agents:
             raise RuntimeError(f"Maksimal {self.max_agents} ghost agent.")
 
         agent_id = self._next_id
@@ -134,7 +134,7 @@ class GhostManager:
                 args.extend(["--model", model_id])
             args.extend(["--task", task])
 
-            cmd = " ".join(shlex.quote(a) for a in args) + f" 2>&1 | tee {shlex.quote(log_file)}"
+            cmd = " ".join(shlex.quote(a) for a in args) + f" 2>&1 | tee {shlex.quote(log_file)}; exit"
             subprocess.run(
                 ["tmux", "send-keys", "-t", session_name, cmd, "Enter"],
                 check=True, capture_output=True,

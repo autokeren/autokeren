@@ -43,12 +43,19 @@ func NewGhostManager(projectRoot string) *GhostManager {
 }
 
 func (gm *GhostManager) Spawn(task string) (*GhostAgentInfo, error) {
-	if len(gm.agents) >= gm.MaxAgents {
+	if gm.activeCount() >= gm.MaxAgents {
 		return nil, fmt.Errorf("maksimal %d ghost agent aktif", gm.MaxAgents)
 	}
 
 	agentID := gm.nextID
-	gm.nextID++
+	for {
+		sessionName := fmt.Sprintf("%s-%d", gm.Prefix, agentID)
+		if err := exec.Command("tmux", "has-session", "-t", sessionName).Run(); err != nil {
+			break
+		}
+		agentID++
+	}
+	gm.nextID = agentID + 1
 
 	sessionName := fmt.Sprintf("%s-%d", gm.Prefix, agentID)
 	logFile := filepath.Join(gm.ProjectRoot, fmt.Sprintf(".ak-ghost-%d.log", agentID))
@@ -85,7 +92,7 @@ func (gm *GhostManager) Spawn(task string) (*GhostAgentInfo, error) {
 		binPath = "autokeren"
 	}
 
-	cmdStr := fmt.Sprintf("%s --non-interactive --task %q 2>&1 | tee %s", binPath, task, logFile)
+	cmdStr := fmt.Sprintf("%s --non-interactive --task %q 2>&1 | tee %s; exit", binPath, task, logFile)
 	cmdSend := exec.Command("tmux", "send-keys", "-t", sessionName, cmdStr, "Enter")
 	if err := cmdSend.Run(); err != nil {
 		gm.Kill(agentID)
@@ -94,6 +101,16 @@ func (gm *GhostManager) Spawn(task string) (*GhostAgentInfo, error) {
 
 	gm.agents[agentID] = info
 	return info, nil
+}
+
+func (gm *GhostManager) activeCount() int {
+	count := 0
+	for _, info := range gm.agents {
+		if info.Status == "running" {
+			count++
+		}
+	}
+	return count
 }
 
 func (gm *GhostManager) CheckStatus(agentID int) string {
