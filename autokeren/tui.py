@@ -14,6 +14,7 @@ from textual.widgets import Static, Input, OptionList, DirectoryTree
 from textual.screen import ModalScreen
 from textual.binding import Binding
 from textual.events import Resize
+from rich.console import Group, RenderableType
 from rich.markdown import Markdown
 from rich.text import Text
 
@@ -1048,7 +1049,7 @@ class ToolWidget(Static):
         self.output_lines.append(_clean_tool_output(line))
         self.refresh()
 
-    def render(self) -> Text:
+    def render(self) -> RenderableType:
         res = Text()
         label = _format_tool_call(self.tool_name, self.arguments)
 
@@ -1064,11 +1065,17 @@ class ToolWidget(Static):
             res.append(f"{self.tool_name} ", style="bold red")
             res.append(self.result_summary, style="red")
 
+        output_renderable: Markdown | Text | None = None
         if self.output_lines:
-            for line in self.output_lines:
-                res.append("\n")
-                res.append("  │ ", style="dim")
-                res.append(line)
+            output_text = "\n".join(self.output_lines)
+            has_markdown = any(
+                marker in output_text
+                for marker in ("**", "###", "| ", "```", "- ", "1. ")
+            )
+            if has_markdown:
+                output_renderable = Markdown(output_text)
+            else:
+                output_renderable = Text("\n".join(f"  │  {line}" for line in self.output_lines), style="white")
 
         # Render code snippet diff jika tool patch_file sukses
         if self.status == "success" and self.tool_name == "patch_file" and isinstance(self.output_payload, dict):
@@ -1125,6 +1132,8 @@ class ToolWidget(Static):
                     res.append("  │ ", style="dim")
                     res.append(f" {' ':4} │  ... (terpotong {remaining} baris lagi)", style="dim")
 
+        if output_renderable is not None:
+            return Group(res, output_renderable)
         return res
 
 
