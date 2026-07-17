@@ -52,11 +52,13 @@ func RunStandalone(ctx context.Context, cfg config.Config, root, prompt string, 
 	store := contextstore.New(cfg.Autokeren.ContextWindow, cfg.Autokeren.AutoCompact, cfg.Autokeren.AutoCompactThreshold)
 	sessionID := resume
 	if sessionID != "" {
-		data, err := session.Load(filepath.Join(root, ".ak-sessions", sessionID+".json"))
-		if err != nil {
+		path := filepath.Join(root, ".ak-sessions", sessionID+".json")
+		data, err := session.Load(path)
+		if err == nil {
+			store.Replace(data.Messages)
+		} else if !os.IsNotExist(err) {
 			return "", fmt.Errorf("load session %s: %w", sessionID, err)
 		}
-		store.Replace(data.Messages)
 	} else {
 		sessionID = fmt.Sprintf("session-%d", time.Now().Unix())
 	}
