@@ -9,10 +9,10 @@ class TestCheckoutValidation(unittest.TestCase):
         handler = MagicMock(spec=CheckoutHandler)
         handler.rfile = BytesIO(b'{"email": "invalid-email"}')
         handler.headers = {"Content-Length": "27"}
-        
+
         response_body = BytesIO()
         handler.wfile = response_body
-        
+
         # Mock status response methods
         handler.send_response = MagicMock()
         handler.send_header = MagicMock()
@@ -29,10 +29,10 @@ class TestCheckoutValidation(unittest.TestCase):
         handler = MagicMock(spec=CheckoutHandler)
         handler.rfile = BytesIO(b'{"email": "ajat@autokeren.com"}')
         handler.headers = {"Content-Length": "31"}
-        
+
         response_body = BytesIO()
         handler.wfile = response_body
-        
+
         handler.send_response = MagicMock()
         handler.send_header = MagicMock()
         handler.end_headers = MagicMock()

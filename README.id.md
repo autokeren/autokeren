@@ -14,24 +14,58 @@ autokeren adalah CLI agentic coding yang dirancang khusus untuk stack Cloudflare
 ![autokeren TUI Screenshot](docs/assets/autogen-ui-preview.jpg)
 
 
----
-
 ## Ekstensi Build Week 2026 — Autokeren Proof
 
 autokeren sudah ada sebelum OpenAI Build Week (dimulai sejak 2026-07-04) dan didistribusikan di bawah lisensi MIT.
 **Autokeren Proof** dibangun selama periode submisi menggunakan Codex dan GPT-5.6. Fitur ini menambahkan alur kerja rilis berbasis bukti: kriteria penerimaan, verifikasi terrekam, dan hasil keputusan SHIP/BLOCKED/NEEDS_HUMAN_REVIEW.
 
-### Fitur yang sudah ada sebelum hackathon
+### 🚀 Panduan Cepat untuk Juri (Tanpa Memerlukan API Key)
 
-- Agent loop, sistem tool, checkpoints/rewind, pemindaian keamanan, review kode, dan TUI.
+Juri dapat menguji sistem rendering acceptance criteria dan menjalankan pengujian lokal secara langsung tanpa konfigurasi API key eksternal:
 
-### Fitur yang dibangun selama hackathon
+1. **Install Autokeren & Clone Repositori**:
+   ```bash
+   pipx install autokeren
+   git clone https://github.com/autokeren/autokeren
+   cd autokeren
+   ```
+   *Platform yang didukung*: Linux, macOS (Intel & Apple Silicon), dan Windows (via PowerShell atau WSL). Membutuhkan Python 3.11+.
 
-- **Integrasi Model OpenAI** ([openai.py](autokeren/models/openai.py)): Klien model native yang mendukung completions, streaming, dan tool calling untuk GPT-5.6 dan Codex.
-- **Wizard Login Interaktif** ([cli.py](autokeren/cli.py)): Wizard setup interaktif untuk memilih provider (termasuk OpenAI API) dan mengonfigurasi model utama & cadangan.
-- **Proof Tool** ([proof.py](autokeren/tools/proof.py)): Tool native untuk merencanakan (plan), merekam bukti (record), membuat laporan (report), dan melihat daftar (list) bukti rilis.
-- **Slash Command `/proof`** ([cli.py](autokeren/cli.py), [tui.py](autokeren/tui.py)): Perintah interaktif di terminal dan TUI untuk menjalankan tugas-tugas bukti rilis.
-- **Aplikasi Demo Deterministik** ([app.py](examples/proof-demo/app.py)): Aplikasi endpoint checkout sederhana yang menunjukkan cacat validasi email dan log verifikasinya.
+2. **Jalankan Pengujian Verifikasi Lokal**:
+   Jalankan suite pengujian aplikasi demo (memverifikasi HTTP server lokal dengan request sukses dan gagal):
+   ```bash
+   python3 examples/proof-demo/test_app.py
+   ```
+
+3. **Replay Bukti Rilis (Proof Artifact)**:
+   Tampilkan visual Release Card untuk run demo di terminal Anda:
+   ```bash
+   autokeren --proof replay examples/proof-demo/proof-run.json
+   ```
+
+*(Catatan: Perintah replay memvisualisasikan dokumen bukti rilis yang telah tersimpan. Langkah ini tidak menjalankan pengujian secara dinamis.)*
+
+### 🛠️ Kontribusi Hackathon (Yang dibangun selama event)
+
+* **Integrasi Model OpenAI** ([openai.py](autokeren/models/openai.py)): Klien model native yang mendukung completions, streaming, dan tool calling untuk GPT-5.6 dan Codex.
+* **Wizard Login Interaktif** ([cli.py](autokeren/cli.py)): Wizard setup interaktif untuk memilih provider (termasuk OpenAI API) dan mengonfigurasi model utama & cadangan.
+* **Proof Tool** ([proof.py](autokeren/tools/proof.py)): Tool native untuk merencanakan (plan), merekam bukti (record), membuat laporan (report), dan melihat daftar (list) bukti rilis.
+* **Slash Command `/proof`** ([cli.py](autokeren/cli.py), [tui.py](autokeren/tui.py)): Perintah interaktif di terminal dan TUI untuk menjalankan tugas-tugas bukti rilis.
+* **Aplikasi Demo Deterministik** ([app.py](examples/proof-demo/app.py)): Aplikasi endpoint checkout sederhana yang menunjukkan cacat validasi email dan log verifikasinya.
+
+### 🧠 Transparansi Kolaborasi (Manusia vs. AI)
+
+* **Akselerasi Codex**: Codex mempercepat implementasi IPC socket lokal berbasis JSON-RPC 2.0 antara Go dan Python, serta parsing argumen CLI untuk bypass TUI.
+* **Kontribusi GPT-5.6**: GPT-5.6 menulis unit test komprehensif, validasi keamanan path traversal, dan mesin verifikasi skema JSON.
+* **Keputusan Arsitektur Manusia**:
+  * *Pilihan Komunikasi*: Menggunakan Local TCP Socket untuk JSON-RPC guna mengisolasi stdout Python dari print/warning pihak ketiga yang dapat merusak parsing TUI Go.
+  * *Desain Produk*: Alur status linier (PLAN -> RECORD -> REPORT -> REPLAY) pada Release Cards.
+  * *Keputusan Antigravity*: Menyembunyikan opsi Google Antigravity dari menu login wizard interaktif untuk kenyamanan pengguna publik, namun tetap mempertahankan fungsionalitas CLI (`--agy`) agar instalasi lama tidak mengalami regresi.
+
+### 🎥 Video Demo & Submisi Devpost
+
+* **Video Demo**: [Tonton Video Demo 3 Menit di YouTube](https://youtu.be/DEMO_VIDEO_PLACEHOLDER)
+* **Codex Session ID**: Jangan lupa menyalin Codex Session ID `/feedback` dari terminal Anda ke form submisi Devpost.
 
 ---
 

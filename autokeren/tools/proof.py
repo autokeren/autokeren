@@ -111,6 +111,34 @@ class ProofTool(Tool):
                     pass
             raise e
 
+    def _resolve_proof_path(self, proof_id: str | None) -> Path:
+        import re
+        if not proof_id or not re.match(r"^proof-[A-Za-z0-9T_-]+$", proof_id):
+            raise ValueError("ID proof tidak valid atau mengandung karakter berbahaya.")
+        file_path = (self.proofs_dir / f"{proof_id}.json").resolve()
+        try:
+            file_path.relative_to(self.proofs_dir.resolve())
+        except ValueError:
+            raise ValueError("ID proof tidak valid (deteksi path traversal).")
+        return file_path
+
+    def _validate_proof_schema(self, data: Any) -> str | None:
+        if not isinstance(data, dict):
+            return "File JSON proof harus berupa object/dictionary."
+        if "criteria" not in data or not isinstance(data["criteria"], list):
+            return "File JSON proof harus mengandung list 'criteria'."
+
+        valid_statuses_set = {"pending", "passed", "failed", "blocked", "manual_review"}
+        for i, c in enumerate(data["criteria"]):
+            if not isinstance(c, dict):
+                return f"Kriteria ke-{i+1} harus berupa object/dictionary."
+            if "text" not in c or not isinstance(c["text"], str):
+                return f"Kriteria ke-{i+1} harus mengandung key 'text' berupa string."
+            st = c.get("status", "pending")
+            if st not in valid_statuses_set:
+                return f"Kriteria ke-{i+1} memiliki status '{st}' yang tidak valid."
+        return None
+
     def run(
         self,
         action: str,
@@ -122,20 +150,12 @@ class ProofTool(Tool):
         evidence: str | None = None,
         **kwargs: Any,
     ) -> ToolResult:
-        import re
-
+        file_path = None
         if action in ("record", "report"):
-            if not proof_id or not re.match(r"^proof-[A-Za-z0-9T_-]+$", proof_id):
-                return ToolResult(
-                    error="ID proof tidak valid atau mengandung karakter berbahaya.",
-                    ok=False,
-                )
-            file_path = (self.proofs_dir / f"{proof_id}.json").resolve()
-            if not str(file_path).startswith(str(self.proofs_dir.resolve())):
-                return ToolResult(
-                    error="ID proof tidak valid (deteksi path traversal).",
-                    ok=False,
-                )
+            try:
+                file_path = self._resolve_proof_path(proof_id)
+            except ValueError as e:
+                return ToolResult(error=str(e), ok=False)
 
         if action == "plan":
             if not title or not criteria:
@@ -173,7 +193,7 @@ class ProofTool(Tool):
                     error=f"Status '{status}' tidak valid. Harus salah satu dari: {', '.join(valid_statuses)}.",
                     ok=False,
                 )
-            file_path = self.proofs_dir / f"{proof_id}.json"
+            assert file_path is not None
             if not file_path.exists():
                 return ToolResult(error=f"Rencana bukti dengan ID '{proof_id}' tidak ditemukan.", ok=False)
 
@@ -181,6 +201,10 @@ class ProofTool(Tool):
                 data = json.loads(file_path.read_text(encoding="utf-8"))
             except Exception as e:
                 return ToolResult(error=f"Gagal membaca file proof: {e}", ok=False)
+
+            err_msg = self._validate_proof_schema(data)
+            if err_msg:
+                return ToolResult(error=f"File proof malformed: {err_msg}", ok=False)
 
             items = data.get("criteria", [])
             idx = criterion_num - 1
@@ -204,7 +228,7 @@ class ProofTool(Tool):
         elif action == "report":
             if not proof_id:
                 return ToolResult(error="Aksi 'report' membutuhkan parameter 'proof_id'.", ok=False)
-            file_path = self.proofs_dir / f"{proof_id}.json"
+            assert file_path is not None
             if not file_path.exists():
                 return ToolResult(error=f"Rencana bukti dengan ID '{proof_id}' tidak ditemukan.", ok=False)
 
@@ -212,6 +236,10 @@ class ProofTool(Tool):
                 data = json.loads(file_path.read_text(encoding="utf-8"))
             except Exception as e:
                 return ToolResult(error=f"Gagal membaca file proof: {e}", ok=False)
+
+            err_msg = self._validate_proof_schema(data)
+            if err_msg:
+                return ToolResult(error=f"File proof malformed: {err_msg}", ok=False)
 
             items = data.get("criteria", [])
             verdict = self._get_verdict(items)
@@ -251,7 +279,8 @@ class ProofTool(Tool):
             for f in files:
                 try:
                     data = json.loads(f.read_text(encoding="utf-8"))
-                    proof_list.append(data)
+                    if self._validate_proof_schema(data) is None:
+                        proof_list.append(data)
                 except Exception:
                     pass
 
@@ -289,20 +318,9 @@ class ProofTool(Tool):
                 return ToolResult(error=f"Gagal membaca file JSON proof: {e}", ok=False)
 
             # JSON Schema Validation
-            if not isinstance(data, dict):
-                return ToolResult(error="File JSON proof harus berupa object/dictionary.", ok=False)
-            if "criteria" not in data or not isinstance(data["criteria"], list):
-                return ToolResult(error="File JSON proof harus mengandung list 'criteria'.", ok=False)
-
-            valid_statuses_set = {"pending", "passed", "failed", "blocked", "manual_review"}
-            for i, c in enumerate(data["criteria"]):
-                if not isinstance(c, dict):
-                    return ToolResult(error=f"Kriteria ke-{i+1} harus berupa object/dictionary.", ok=False)
-                if "text" not in c or not isinstance(c["text"], str):
-                    return ToolResult(error=f"Kriteria ke-{i+1} harus mengandung key 'text' berupa string.", ok=False)
-                st = c.get("status", "pending")
-                if st not in valid_statuses_set:
-                    return ToolResult(error=f"Kriteria ke-{i+1} memiliki status '{st}' yang tidak valid.", ok=False)
+            err_msg = self._validate_proof_schema(data)
+            if err_msg:
+                return ToolResult(error=err_msg, ok=False)
 
             items = data.get("criteria", [])
             verdict = self._get_verdict(items)

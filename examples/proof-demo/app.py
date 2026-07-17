@@ -5,7 +5,7 @@ class CheckoutHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         content_length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(content_length).decode("utf-8")
-        
+
         try:
             data = json.loads(body)
         except Exception:

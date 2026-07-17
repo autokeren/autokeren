@@ -1037,7 +1037,7 @@ class ToolWidget(Static):
     def render(self) -> Text:
         res = Text()
         label = _format_tool_call(self.tool_name, self.arguments)
-        
+
         if self.status == "running":
             res.append("  ⏺ ", style="bold cyan")
             res.append(label)
@@ -1049,7 +1049,7 @@ class ToolWidget(Static):
             res.append("  ✗ ", style="red")
             res.append(f"{self.tool_name} ", style="bold red")
             res.append(self.result_summary, style="red")
-            
+
         if self.output_lines:
             for line in self.output_lines:
                 res.append("\n")
@@ -1297,13 +1297,13 @@ class AutokerenTUI(App):
         """Mendeteksi bahasa sistem terminal secara otomatis."""
         import os
         import locale
-        
+
         # 1. Cek variabel lingkungan LANG
         lang_env = os.environ.get("LANG", "").lower()
         for code in LANGUAGES:
             if code in lang_env:
                 return code
-                
+
         # 2. Cek default locale OS
         try:
             sys_loc, _ = locale.getdefaultlocale()
@@ -1314,7 +1314,7 @@ class AutokerenTUI(App):
                         return code
         except Exception:
             pass
-            
+
         return "en"
 
     def compose(self) -> ComposeResult:
@@ -1434,7 +1434,7 @@ class AutokerenTUI(App):
             else:
                 extra = f"  [bold yellow]v{__version__}[/bold yellow]" if i == mid else ""
                 colored_lines.append(f"[bold white]{line_esc}[/bold white]{extra}")
-        
+
         welcome = (
             "\n".join(colored_lines) + "\n\n"
             + self.t("welcome_sub")
@@ -1794,7 +1794,7 @@ class AutokerenTUI(App):
                 except Exception:
                     pass
                 self.append_chat_message("system", f"Language changed to: [bold]{LANGUAGES[chosen_code]}[/bold]")
-                
+
                 # Update placeholder input
                 self.query_one("#input-pane", Input).placeholder = self.t("input_placeholder")
                 self.update_status()
@@ -1820,12 +1820,12 @@ class AutokerenTUI(App):
         self.agent.reset()
         self.allow_all = False
         self.allowed_tools.clear()
-        
+
         # Hapus widget chat
         chat_area = self.query_one("#chat-area")
         for child in list(chat_area.children):
             child.remove()
-            
+
         self.append_chat_message("system", self.t("reset_success"))
         self.update_status()
 
@@ -1976,7 +1976,7 @@ class AutokerenTUI(App):
                     except Exception:
                         pass
                     self.append_chat_message("system", f"Language changed to: [bold]{LANGUAGES[code]}[/bold]")
-                    
+
                     # Update placeholder input
                     self.query_one("#input-pane", Input).placeholder = self.t("input_placeholder")
                     self.update_status()
@@ -2224,7 +2224,7 @@ class AutokerenTUI(App):
                 parts = arg.split(" ", 1)
                 action = parts[0].strip().lower()
                 rest = parts[1].strip() if len(parts) > 1 else ""
-                
+
                 tool = self.agent.tools.get("proof")
                 if not tool:
                     self.append_chat_message("system", "[red]Tool 'proof' tidak terdaftar di registry.[/red]")
@@ -2266,7 +2266,7 @@ class AutokerenTUI(App):
                             evidence_parts = rest.split("|", 1)
                             left_side = evidence_parts[0].strip()
                             evidence = evidence_parts[1].strip() if len(evidence_parts) > 1 else ""
-                            
+
                             left_tokens = left_side.split()
                             if len(left_tokens) < 3:
                                 self.append_chat_message("system", "[red]Format salah. Harus berisi: proof_id, nomor kriteria, dan status.[/red]")
@@ -2527,7 +2527,7 @@ class AutokerenTUI(App):
             def _enable():
                 input_pane = self.query_one("#input-pane", Input)
                 input_pane.disabled = False
-                
+
                 input_pane.focus()
             _enable()
 
@@ -2554,7 +2554,7 @@ class AutokerenTUI(App):
             def _reset():
                 input_pane = self.query_one("#input-pane", Input)
                 input_pane.disabled = False
-                
+
                 input_pane.focus()
             self.call_from_thread(_reset)
 
@@ -2581,7 +2581,7 @@ class AutokerenTUI(App):
             def _reset():
                 input_pane = self.query_one("#input-pane", Input)
                 input_pane.disabled = False
-                
+
                 input_pane.focus()
             self.call_from_thread(_reset)
 
@@ -2597,7 +2597,7 @@ class AutokerenTUI(App):
             def _reset():
                 input_pane = self.query_one("#input-pane", Input)
                 input_pane.disabled = False
-                
+
                 input_pane.focus()
             self.call_from_thread(_reset)
 

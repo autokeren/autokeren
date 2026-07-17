@@ -33,10 +33,10 @@ class TestProofTool(unittest.TestCase):
         self.assertTrue(res.ok)
         assert res.output is not None
         proof_id = res.output["proof_id"]
-        
+
         file_path = self.project_root / ".autokeren" / "proofs" / f"{proof_id}.json"
         self.assertTrue(file_path.exists())
-        
+
         data = json.loads(file_path.read_text())
         self.assertEqual(data["id"], proof_id)
         self.assertEqual(data["title"], "Test Release")

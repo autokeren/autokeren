@@ -222,12 +222,12 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
                 else:
                     from autokeren.models.cloudflare import fetch_available_models
                     all_models = fetch_available_models(cfg)
-                
+
                 from autokeren.selector import select_option
                 current = agent.router.current_model_id()
                 for m in all_models:
                     m["active"] = m["id"] == current
- 
+
                 idx = select_option(all_models, title="Pilih Model", console=console)
                 if idx is not None:
                     chosen = all_models[idx]["id"]
@@ -254,16 +254,16 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
                 console.print("  /proof report <proof-id>")
                 console.print("  /proof record <proof-id> <nomor-kriteria> <status> | <evidence>")
                 continue
-                
+
             parts = cmd_args.split(" ", 1)
             action = parts[0].strip()
             rest = parts[1].strip() if len(parts) > 1 else ""
-            
+
             tool = agent.tools.get("proof")
             if not tool:
                 console.print("[red]Tool 'proof' tidak terdaftar di registry.[/red]")
                 continue
-                
+
             if action == "list":
                 res = tool.run(action="list")
                 if res.ok:
@@ -301,7 +301,7 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
                 evidence_parts = rest.split("|", 1)
                 left_side = evidence_parts[0].strip()
                 evidence = evidence_parts[1].strip() if len(evidence_parts) > 1 else ""
-                
+
                 left_tokens = left_side.split()
                 if len(left_tokens) < 3:
                     console.print("[red]Format salah. Harus berisi: proof_id, nomor kriteria, dan status.[/red]")
@@ -313,7 +313,7 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
                     console.print("[red]Nomor kriteria harus berupa angka.[/red]")
                     continue
                 status = left_tokens[2]
-                
+
                 res = tool.run(
                     action="record",
                     proof_id=proof_id,
@@ -764,7 +764,7 @@ def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
     package_dir = Path(__file__).parent
     os_name = platform.system().lower()
     arch = platform.machine().lower()
-    
+
     prebuilt_name = ""
     if os_name == "windows":
         if "amd64" in arch or "x86_64" in arch:
@@ -797,9 +797,9 @@ def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
                 ak_bin.unlink()
             except Exception:
                 pass
-        
+
         cache_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Jika biner prebuilt ada, salin ke cache_dir
         if prebuilt_path and prebuilt_path.exists():
             try:
@@ -851,7 +851,7 @@ def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
                 os.execvp(str(ak_bin), argv)
         except Exception:
             return False
-            
+
     return False
 
 
@@ -899,7 +899,7 @@ def main() -> int:
         import httpx as _httpx
         from autokeren.selector import select_option
         from rich.panel import Panel
-        
+
         providers = [
             {
                 "id": "platform",
@@ -926,16 +926,16 @@ def main() -> int:
                 "icon": "🖥️",
             },
         ]
-        
+
         console.print("[bold cyan]🔑 AUTOKEREN LOGIN & CONFIGURATION WIZARD[/bold cyan]\n")
         idx = select_option(providers, title="Pilih Provider/Mode Autentikasi:", console=console)
         if idx is None:
             console.print("[dim]Batal.[/dim]")
             return 0
-            
+
         provider_id = providers[idx]["id"]
         cfg = load_config(Path(args.config)) if args.config else ensure_config()
-        
+
         if provider_id == "platform":
             console.print("\n[bold]Login AutoKeren Platform[/bold]")
             console.print("Buka [cyan]https://developers.autokeren.com/dashboard/keys[/cyan] buat API key.")
@@ -963,7 +963,7 @@ def main() -> int:
             except Exception as e:
                 console.print(f"[red]Connection error: {e}[/red]")
                 return 1
-                
+
         elif provider_id == "openai":
             console.print("\n[bold]🔑 SETUP OPENAI API[/bold]")
             api_key = Prompt.ask("OpenAI API Key (sk-...)").strip()
@@ -981,14 +981,14 @@ def main() -> int:
                     console.print("[green]Login berhasil! Kunci API OpenAI valid.[/green]")
                     cfg.auth.mode = "openai"
                     cfg.auth.openai_api_key = api_key
-                    
+
                     from autokeren.models.openai import fetch_openai_models
                     all_models = fetch_openai_models(cfg)
                     console.print("")
                     primary_idx = select_option(all_models, title="Pilih Model Utama (Primary Model):", console=console)
                     if primary_idx is not None:
                         cfg.cloudflare.primary_model = all_models[primary_idx]["id"]
-                        
+
                     console.print("")
                     secondary_idx = select_option(all_models, title="Pilih Model Cadangan (Secondary/Fallback Model):", console=console)
                     if secondary_idx is not None:
@@ -999,7 +999,7 @@ def main() -> int:
             except Exception as e:
                 console.print(f"[red]Connection error: {e}[/red]")
                 return 1
-                
+
         elif provider_id == "aistudio":
             console.print("\n[bold]🔑 SETUP GOOGLE AI STUDIO[/bold]")
             api_key = Prompt.ask("Gemini API Key (AIzaSy...)").strip()
@@ -1016,14 +1016,14 @@ def main() -> int:
                     console.print("[green]Login berhasil! Kunci API Gemini valid.[/green]")
                     cfg.auth.mode = "aistudio"
                     cfg.auth.gemini_api_key = api_key
-                    
+
                     from autokeren.models.aistudio import fetch_aistudio_models
                     all_models = fetch_aistudio_models(cfg)
                     console.print("")
                     primary_idx = select_option(all_models, title="Pilih Model Utama (Primary Model):", console=console)
                     if primary_idx is not None:
                         cfg.cloudflare.primary_model = all_models[primary_idx]["id"]
-                        
+
                     console.print("")
                     secondary_idx = select_option(all_models, title="Pilih Model Cadangan (Secondary/Fallback Model):", console=console)
                     if secondary_idx is not None:
@@ -1034,7 +1034,7 @@ def main() -> int:
             except Exception as e:
                 console.print(f"[red]Connection error: {e}[/red]")
                 return 1
-                
+
         elif provider_id == "antigravity":
             from autokeren.models.google_auth import verify_or_login
             if not verify_or_login(console):
@@ -1042,18 +1042,18 @@ def main() -> int:
             cfg.auth.mode = "antigravity"
             cfg.cloudflare.primary_model = "gemini-3.5-flash"
             cfg.cloudflare.secondary_model = "gemini-3.5-pro"
-            
+
         elif provider_id == "local":
             console.print("\n[bold]🖥️ SETUP LOCAL LLM[/bold]")
             endpoint = Prompt.ask("Masukkan Endpoint URL", default="http://localhost:11434").strip()
             cfg.auth.mode = "local"
             cfg.auth.local_endpoint = endpoint
-            
+
             primary = Prompt.ask("Pilih Model Utama (Ollama ID)", default="qwen2.5-coder:7b").strip()
             secondary = Prompt.ask("Pilih Model Cadangan (Ollama ID)", default="llama3-coder:8b").strip()
             cfg.cloudflare.primary_model = primary
             cfg.cloudflare.secondary_model = secondary
-            
+
         config_path = save_config(cfg)
         summary_text = (
             f"🎉 [bold green]LOGIN BERHASIL & KONFIGURASI DISIMPAN[/bold green]\n\n"
@@ -1105,13 +1105,13 @@ def main() -> int:
     _try_run_go_tui(args, sys.argv)
     memory = MemoryManager(str(project_root))
     reg = build_registry(cfg, project_root, memory)
-    
+
     if args.proof:
         tool = reg.get("proof")
         if not tool:
             console.print("[red]Tool 'proof' tidak terdaftar.[/red]")
             return 1
-        
+
         action = args.proof[0]
         if action == "list":
             res = tool.run(action="list")
@@ -1169,7 +1169,7 @@ def main() -> int:
             evidence_parts = rest.split("|", 1)
             left_side = evidence_parts[0].strip()
             evidence = evidence_parts[1].strip() if len(evidence_parts) > 1 else ""
-            
+
             left_tokens = left_side.split()
             if len(left_tokens) < 3:
                 console.print("[red]Format salah. Harus berisi: proof_id, nomor kriteria, dan status.[/red]")
@@ -1181,7 +1181,7 @@ def main() -> int:
                 console.print("[red]Nomor kriteria harus berupa angka.[/red]")
                 return 1
             status = left_tokens[2]
-            
+
             res = tool.run(
                 action="record",
                 proof_id=proof_id,

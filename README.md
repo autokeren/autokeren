@@ -13,24 +13,58 @@
 
 ![autokeren TUI Screenshot](docs/assets/autogen-ui-preview.jpg)
 
----
-
 ## Build Week 2026 Extension — Autokeren Proof
 
 Autokeren existed before OpenAI Build Week (began on 2026-07-04) and is distributed under the MIT license.
 **Autokeren Proof** was built during the submission period with Codex and GPT-5.6. It adds an evidence-led release workflow: acceptance criteria, recorded verification, and a SHIP/BLOCKED/NEEDS_HUMAN_REVIEW release verdict.
 
-### What existed before the hackathon
+### 🚀 Quickstart for Judges (No API Key Required)
 
-- Agent loop, tool system, checkpoints/rewind, security scanning, review, and TUI.
+Judges can test the proof-rendering system and run the local verification suite without any external API keys or configuration:
 
-### What was built during the hackathon
+1. **Install Autokeren & Clone Repository**:
+   ```bash
+   pipx install autokeren
+   git clone https://github.com/autokeren/autokeren
+   cd autokeren
+   ```
+   *Supported platforms*: Linux, macOS (Intel & Apple Silicon), and Windows (via PowerShell or WSL). Requires Python 3.11+.
 
-- **OpenAI Model Integration** ([openai.py](autokeren/models/openai.py)): Native model client supporting GPT-5.6 and Codex completions, streaming, and tool calls.
-- **Interactive Login Wizard** ([cli.py](autokeren/cli.py)): Interactive setup wizard to select providers (including OpenAI API) and configure models.
-- **Proof Tool** ([proof.py](autokeren/tools/proof.py)): Native tool to plan, record, report, and list release evidence runs.
-- **`/proof` Slash Command** ([cli.py](autokeren/cli.py), [tui.py](autokeren/tui.py)): Interactive commands to execute proof tasks.
-- **Deterministic Demo App** ([app.py](examples/proof-demo/app.py)): A mock checkout app showing defect validation and verification logs.
+2. **Run Local Verification Checks**:
+   Execute the deterministic demo app suite (validates a local HTTP server with successful and bad requests):
+   ```bash
+   python3 examples/proof-demo/test_app.py
+   ```
+
+3. **Replay the Proof Artifact**:
+   Render the visual Release Card for the demo run in your terminal:
+   ```bash
+   autokeren --proof replay examples/proof-demo/proof-run.json
+   ```
+
+*(Note: The replay command displays a pre-recorded, verified proof run containing the test evidence. It does not run the tests dynamically itself.)*
+
+### 🛠️ Hackathon Contribution (What was built)
+
+* **OpenAI Model Integration** ([openai.py](autokeren/models/openai.py)): Native model client supporting GPT-5.6 and Codex completions, streaming, and tool calls.
+* **Interactive Login Wizard** ([cli.py](autokeren/cli.py)): Interactive setup wizard to select providers (including OpenAI API) and configure models.
+* **Proof Tool** ([proof.py](autokeren/tools/proof.py)): Native tool to plan, record, report, and list release evidence runs.
+* **`/proof` Slash Command** ([cli.py](autokeren/cli.py), [tui.py](autokeren/tui.py)): Interactive commands to execute proof tasks.
+* **Deterministic Demo App** ([app.py](examples/proof-demo/app.py)): A mock checkout app showing defect validation and verification logs.
+
+### 🧠 Collaboration Disclosure (Human vs. AI)
+
+* **Codex Acceleration**: Codex accelerated the development of Python-Go IPC bindings, JSON-RPC 2.0 message parsing, and the interactive argparse TUI bypass logic.
+* **GPT-5.6 Contribution**: GPT-5.6 generated comprehensive unit tests, security validations (path traversal checks), and the strict JSON schema verification engine.
+* **Human Decisions**:
+  * *Architectural Choice*: Moving the IPC channel to a local TCP socket rather than standard output (`stdout`) to avoid parser crashes caused by dependency prints/warnings.
+  * *Product Design*: The linear state transitions (PLAN -> RECORD -> REPORT -> REPLAY) for Release Cards.
+  * *Antigravity Decision*: The Google Antigravity option was hidden from the interactive wizard to keep the interface clean for public users, while preserving CLI flags (`--agy`) and configuration support so existing installations do not regress.
+
+### 🎥 Demo Video & Devpost Submission
+
+* **Demo Video**: [Watch the 3-minute video on YouTube](https://youtu.be/DEMO_VIDEO_PLACEHOLDER)
+* **Codex Session ID**: Remember to copy the `/feedback` Session ID from your terminal session and paste it directly into the Devpost form.
 
 ---
 
