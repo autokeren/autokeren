@@ -344,8 +344,19 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		}
 		return nil
 	case "kanban.add", "kanban.move", "kanban.delete":
+		args, _ := params.(map[string]interface{})
+		toolArgs := make(map[string]any, len(args)+1)
+		for key, value := range args {
+			toolArgs[key] = value
+		}
+		action := strings.TrimPrefix(method, "kanban.")
+		toolArgs["action"] = action
+		result := tool.NewKanban(c.localRoot).Run(context.Background(), toolArgs, nil)
+		if !result.OK {
+			return errors.New(result.Error)
+		}
 		if reply != nil {
-			raw, _ := json.Marshal(map[string]interface{}{"ok": true})
+			raw, _ := json.Marshal(map[string]interface{}{"ok": true, "tasks": result.Output})
 			return json.Unmarshal(raw, reply)
 		}
 		return nil
@@ -423,10 +434,35 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 			action = parts[1]
 		}
 		args := map[string]any{"action": action}
-		if len(parts) > 2 {
+		if action == "replay" && len(parts) > 2 {
+			args["proof_id"] = parts[2]
+		} else if len(parts) > 2 {
 			args["proof_id"] = parts[2]
 		}
+		if action == "plan" {
+			if len(parts) < 4 {
+				return true, errors.New("format: /proof plan <title> <criterion1>|<criterion2>")
+			}
+			args["title"] = parts[2]
+			criteria := strings.Split(strings.Join(parts[3:], " "), "|")
+			items := make([]any, 0, len(criteria))
+			for _, criterion := range criteria {
+				if value := strings.TrimSpace(criterion); value != "" {
+					items = append(items, value)
+				}
+			}
+			args["criteria"] = items
+		}
 		result := (tool.Proof{Root: c.localRoot}).Run(context.Background(), args, nil)
+		output = fmt.Sprint(result.Output)
+		if !result.OK {
+			output = result.Error
+		}
+	case "/research":
+		if len(parts) < 2 {
+			return true, errors.New("format: /research <query>")
+		}
+		result := (tool.Research{}).Run(context.Background(), map[string]any{"query": strings.Join(parts[1:], " ")}, nil)
 		output = fmt.Sprint(result.Output)
 		if !result.OK {
 			output = result.Error
