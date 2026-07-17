@@ -1,6 +1,6 @@
-# 📋 Todo List Pengembangan autokeren CLI (Arah Jenius)
+# 📋 Todo List Pengembangan Autokeren Proof (Build Week 2026 Extension)
 
-Dokumen ini berisi rencana pengembangan langkah demi langkah untuk tiga fitur utama: **Repo Map Dinamis**, **Git Auto-Commit & Rollback**, dan **Live Log Sniffing & Auto-Patching**. Dokumen ini dirancang agar siapa pun (termasuk AI agent lain) bisa melanjutkan tugas jika terjadi pergantian sesi.
+Dokumen ini berisi rencana pengembangan langkah demi langkah untuk mengimplementasikan **Autokeren Proof**: ekstensi alur kerja rilis berbasis bukti untuk OpenAI Build Week 2026.
 
 ---
 
@@ -8,65 +8,81 @@ Dokumen ini berisi rencana pengembangan langkah demi langkah untuk tiga fitur ut
 
 | Fitur | Status | File Utama Terkait |
 | :--- | :---: | :--- |
-| **1. Repo Map Dinamis** | ⏳ Rencana | `autokeren/tools/repo_map.py`, `autokeren/agent.py` |
-| **2. Git Auto-Commit & Rollback** | ⏳ Rencana | `autokeren/agent.py`, `autokeren/tools/git.py` |
-| **3. Live Log Sniffing & Auto-Patching** | ⏳ Rencana | `autokeren/tools/tmux.py`, `autokeren/ghost/manager.py` |
+| **1. Handoff Documentation** | ⏳ Rencana | `docs/BUILD_WEEK_2026_HANDOFF.md` |
+| **2. Native `ProofTool`** | ⏳ Rencana | `autokeren/tools/proof.py` |
+| **3. Slash Command `/proof`** | ⏳ Rencana | `autokeren/cli.py` |
+| **4. Unit Tests** | ⏳ Rencana | `tests/test_proof.py` |
+| **5. Demo Application & Replay** | ⏳ Rencana | `examples/proof-demo/` |
+| **6. README Update** | ⏳ Rencana | `README.md`, `README.id.md` |
 
 ---
 
 ## 🚀 Rencana Eksekusi Langkah-Demi-Langkah
 
-### 📌 FASE 1: Sistem Repo Map Dinamis & Relevan (Semantic Relevance Mapping)
-Tujuan: Menghemat token context window secara signifikan dengan mengirimkan peta codebase dinamis yang hanya berisi relasi kelas/fungsi yang relevan dengan tugas pengguna.
-
-- [ ] **Langkah 1.1: Pembuatan Cache Index AST Lokal**
-  - Buat mekanisme pemindaian cepat AST (`Abstract Syntax Tree`) seluruh file proyek saat program dimulai.
-  - Simpan hasil ekstraksi (nama file, relasi kelas, fungsi, signature) ke berkas cache lokal `.ak-repomap.cache` agar tidak memindai dari nol setiap kali berjalan.
-  
-- [ ] **Langkah 1.2: Algoritma Pencarian & Filter Relevansi (Relevance Filtering)**
-  - Di dalam `autokeren/tools/repo_map.py`, tambahkan fungsi untuk menyaring index repomap berdasarkan keyword tugas user (misal menggunakan pencarian kecocokan string/token kata kunci terbobot pada kelas & fungsi).
-  - Buat relasi dependensi sederhana (jika File A mengimpor File B, maka File B harus dimasukkan ke dalam peta Mini-Repo Map).
-
-- [ ] **Langkah 1.3: Integrasi Otomatis ke System Prompt**
-  - Modifikasi `_build_system_prompt()` di `autokeren/agent.py` agar secara otomatis menjalankan Repo Map Dinamis berdasarkan input pertama user dan menyelipkannya ke bagian atas system prompt.
+### 📌 FASE 1: Dokumentasi Handoff Publik
+- [ ] **Langkah 1.1: Copy Handoff Doc**
+  - Salin berkas `docs/private/BUILD_WEEK_2026_HANDOFF.md` ke folder publik `docs/BUILD_WEEK_2026_HANDOFF.md`.
+  - Daftarkan berkas ini di Git tracking.
 
 ---
 
-### 📌 FASE 2: Git Auto-Commit & Infinite Rollback (Self-Healing Checkpoints)
-Tujuan: Menjamin keamanan kode dengan membuat titik pemulihan (*checkpoint*) otomatis per file yang dimodifikasi, dan mengembalikan kode ke kondisi terakhir yang berfungsi jika AI merusaknya.
+### 📌 FASE 2: Native Proof Tool (`autokeren/tools/proof.py`)
+Tujuan: Membangun mekanisme pencatatan bukti (*evidence ledger*) yang menyimpan status verifikasi setiap kriteria penerimaan proyek.
 
-- [ ] **Langkah 2.1: Implementasi Atomic Micro-Commit**
-  - Modifikasi loop di `autokeren/agent.py` setelah tool `write_file` atau `patch_file` berhasil dieksekusi dan lolos pemeriksaan build/test.
-  - Jalankan `GitAutoCommitTool` secara asinkron untuk langsung melakukan commit file tersebut.
-  
-- [ ] **Langkah 2.2: AI-Generated Conventional Commit Messages**
-  - Buat helper di `autokeren/tools/git.py` yang meminta LLM lokal/cepat untuk merangkum ringkasan perbedaan (*diff*) menjadi pesan Conventional Commit pendek (misal: `fix(auth): handle empty email validation`).
+- [ ] **Langkah 2.1: Model Data JSON & Inisialisasi**
+  - Tentukan skema berkas JSON bukti di `.autokeren/proofs/<proof-id>.json`.
+  - Otomatis catat `source_commit` saat inisialisasi menggunakan Git SHA saat itu (`git rev-parse HEAD`).
+  - Status kriteria yang valid: `pending`, `passed`, `failed`, `blocked`, `manual_review`.
 
-- [ ] **Langkah 2.3: Mekanisme Auto-Rollback**
-  - Jika agen mendeteksi kesalahan beruntun (misalnya linter gagal, test rusak, atau loop-breaker mendeteksi kegagalan logis), jalankan perintah `git reset --hard HEAD~1` (atau kembali ke commit tag terakhir yang berstatus "hijau") secara otomatis untuk memulihkan keadaan proyek ke kondisi terbaik sebelumnya.
+- [ ] **Langkah 2.2: Logika Penilaian (Verdict Engine)**
+  - Terapkan logika penentuan keputusan:
+    - Jika ada kriteria `failed` atau `blocked` $\rightarrow$ `BLOCKED`.
+    - Jika tidak ada kegagalan tetapi ada `manual_review` $\rightarrow$ `NEEDS_HUMAN_REVIEW`.
+    - Jika semua kriteria berstatus `passed` $\rightarrow$ `SHIP`.
+    - Lainnya $\rightarrow$ `IN_PROGRESS`.
 
----
-
-### 📌 FASE 3: Live Log Sniffing & Auto-Patching (Supervised Self-Healing)
-Tujuan: Memungkinkan agen memantau server dev di background dan memperbaiki error runtime yang muncul secara instan tanpa mengganggu kenyamanan pengguna.
-
-- [ ] **Langkah 3.1: Log Sniffing di Sesi Tmux**
-  - Kembangkan `TmuxTool` di `autokeren/tools/tmux.py` agar mendukung fungsi pemantauan berkelanjutan (*logging stream buffer*).
-  - Tambahkan pustaka pendeteksi kata kunci error (seperti `TypeError`, `500 Internal Server Error`, `Exception`, `SyntaxError`) pada log output tmux.
-
-- [ ] **Langkah 3.2: Pemicu Sub-Agent Otonom**
-  - Jika log sniffer mendeteksi adanya error crash pada tmux session dev, kirim sinyal ke `autokeren/ghost/manager.py` untuk membangkitkan background sub-agent baru.
-  - Sub-agent dibekali tugas spesifik: *"Perbaiki error crash [salinan log error] pada file terkait."*
-
-- [ ] **Langkah 3.3: Verifikasi Patch & Pemulihan**
-  - Setelah sub-agent melakukan perbaikan kode secara otonom, ia memicu proses reload server di tmux, membaca ulang log, dan memastikan bahwa log error tersebut telah bersih.
-  - Tampilkan status di TUI utama: `"⚠️ Error runtime terdeteksi di server tmux & berhasil diperbaiki otomatis."`
+- [ ] **Langkah 2.3: Rich Formatting Report (Visual Presentation)**
+  - Gunakan `rich.table` dan `rich.panel` untuk merender kartu rilis yang sangat estetik dan berwarna (hijau untuk passed, merah untuk failed/blocked, kuning untuk manual_review).
 
 ---
 
-## 📈 Petunjuk Pengujian Pengembang
+### 📌 FASE 3: Slash Command & Registrasi TUI
+Tujuan: Mendaftarkan `ProofTool` ke registry global dan membuat parser command `/proof`.
 
-Setiap kali menyelesaikan satu fase, pastikan untuk memvalidasi:
-1. `ruff check .` dan `mypy autokeren` harus bebas dari peringatan/error.
-2. `pytest` harus tetap lulus 100% (230 test passed).
-3. Jalankan `./ak` untuk memastikan Bubble Tea TUI merender visual dengan normal tanpa lag.
+- [ ] **Langkah 3.1: Registrasi `ProofTool`**
+  - Daftarkan instansiasi `ProofTool(project_root)` di `build_registry()` dalam `autokeren/cli.py`.
+  - Ekspor `ProofTool` di `autokeren/tools/__init__.py`.
+
+- [ ] **Langkah 3.2: Parser Slash Command `/proof`**
+  - Tambahkan penanganan perintah `/proof` di loop interaktif `cli.py` dan `tui.py`:
+    - `/proof plan <title> | <criterion 1> | ...`
+    - `/proof record <proof-id> <criterion-num> <status> | <evidence>`
+    - `/proof list`
+    - `/proof report <proof-id>`
+
+---
+
+### 📌 FASE 4: Penulisan Unit Test (`tests/test_proof.py`)
+Tujuan: Memastikan fungsionalitas tool dan pembagian keputusan (verdict) berfungsi dengan benar tanpa bug regresi.
+
+- [ ] **Langkah 4.1: Implementasi Tes**
+  - Tes pembuatan rencana bukti (`plan`) baru dan penolakan argumen yang tidak lengkap.
+  - Tes penyimpanan berkas JSON di folder sementara.
+  - Tes logika verdict: semua passed $\rightarrow$ `SHIP`, ada failed $\rightarrow$ `BLOCKED`, ada manual_review $\rightarrow$ `NEEDS_HUMAN_REVIEW`.
+  - Tes integrasi registry.
+
+---
+
+### 📌 FASE 5: Pembuatan Aplikasi Demo (`examples/proof-demo/`)
+Tujuan: Menyediakan skenario nyata yang dapat dievaluasi oleh juri tanpa memerlukan API key OpenAI.
+
+- [ ] **Langkah 5.1: Contoh Kasus Defect & Fitur Validasi**
+  - Buat aplikasi web/API kecil dengan defect (misal: endpoint sign-up tanpa validasi email).
+  - Tulis test suite mini yang mendeteksi bug ini.
+  - Sediakan rekaman file bukti `.json` hasil replay agar juri bisa melihat log alur kerja rilis dari awal hingga `SHIP`.
+
+---
+
+### 📌 FASE 6: Pembaruan README & Dokumentasi Rilis
+- [ ] **Langkah 6.1: Menulis Bab Build Week**
+  - Perbarui `README.md` dan `README.id.md` dengan pengungkapan Build Week, daftar file yang dimodifikasi selama hackathon, dan cara menjalankan demo.
