@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/autokeren/autokeren/ghost"
+	"strings"
 )
 
 type SpawnGhost struct{ Manager *ghost.GhostManager }
@@ -44,7 +45,22 @@ func (c CheckGhost) Run(ctx context.Context, args map[string]any, _ Emitter) Res
 	default:
 	}
 	if v, ok := args["agent_id"].(float64); ok {
-		return Result{OK: true, Output: c.Manager.CheckStatus(int(v))}
+		id := int(v)
+		status := c.Manager.CheckStatus(id)
+		for _, info := range c.Manager.List() {
+			if info.ID == id {
+				return Result{OK: true, Output: fmt.Sprintf("agent #%d: %s\nruntime: %.1fs\nlog:\n%s", id, status, info.Runtime(), c.Manager.GetOutput(id))}
+			}
+		}
+		return Result{OK: true, Output: status}
 	}
-	return Result{OK: true, Output: c.Manager.List()}
+	items := c.Manager.List()
+	if len(items) == 0 {
+		return Result{OK: true, Output: "Tidak ada ghost agent."}
+	}
+	var lines []string
+	for _, info := range items {
+		lines = append(lines, fmt.Sprintf("#%d %s (%.1fs)", info.ID, info.Status, info.Runtime()))
+	}
+	return Result{OK: true, Output: strings.Join(lines, "\n")}
 }

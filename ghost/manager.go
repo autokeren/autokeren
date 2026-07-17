@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -18,6 +19,7 @@ type GhostAgentInfo struct {
 	StartedAt  time.Time `json:"started_at"`
 	FinishedAt time.Time `json:"finished_at,omitempty"`
 	ExitCode   int       `json:"exit_code"`
+	PID        int       `json:"pid,omitempty"`
 	Error      string    `json:"error,omitempty"`
 	LogFile    string    `json:"log_file"`
 }
@@ -46,7 +48,7 @@ type GhostManager struct {
 }
 
 func NewGhostManager(projectRoot string) *GhostManager {
-	return &GhostManager{
+	gm := &GhostManager{
 		ProjectRoot: projectRoot,
 		MaxAgents:   3,
 		Prefix:      "ak-ghost",
@@ -55,6 +57,35 @@ func NewGhostManager(projectRoot string) *GhostManager {
 		cancels:     make(map[int]context.CancelFunc),
 		procs:       make(map[int]*exec.Cmd),
 		nextID:      1,
+	}
+	gm.loadExisting()
+	return gm
+}
+
+func (gm *GhostManager) loadExisting() {
+	entries, err := os.ReadDir(gm.ProjectRoot)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if filepath.Ext(entry.Name()) != ".json" || !strings.HasPrefix(entry.Name(), ".ak-ghost-") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(gm.ProjectRoot, entry.Name()))
+		if err != nil {
+			continue
+		}
+		var info GhostAgentInfo
+		if json.Unmarshal(data, &info) != nil || info.ID == 0 {
+			continue
+		}
+		if info.Status == "running" && !processAlive(info.PID) {
+			info.Status = "completed"
+		}
+		gm.agents[info.ID] = &info
+		if info.ID >= gm.nextID {
+			gm.nextID = info.ID + 1
+		}
 	}
 }
 
@@ -99,7 +130,7 @@ func (gm *GhostManager) Spawn(task string) (*GhostAgentInfo, error) {
 		return nil, fmt.Errorf("gagal memulai ghost: %w", err)
 	}
 
-	info := &GhostAgentInfo{ID: id, Task: task, Status: "running", StartedAt: time.Now(), LogFile: logFile}
+	info := &GhostAgentInfo{ID: id, Task: task, Status: "running", StartedAt: time.Now(), LogFile: logFile, PID: cmd.Process.Pid}
 	gm.agents[id] = info
 	gm.cancels[id] = cancel
 	gm.procs[id] = cmd
@@ -172,6 +203,8 @@ func (gm *GhostManager) Kill(agentID int) bool {
 	}
 	if cmd, ok := gm.procs[agentID]; ok {
 		terminateProcessGroup(cmd)
+	} else if info.PID > 0 {
+		terminatePID(info.PID)
 	}
 	gm.writeMetadataLocked(info)
 	gm.mu.Unlock()
@@ -199,6 +232,9 @@ func (gm *GhostManager) GetOutput(agentID int) string {
 	data, err := os.ReadFile(info.LogFile)
 	if err != nil {
 		return ""
+	}
+	if len(data) > 50000 {
+		data = data[len(data)-50000:]
 	}
 	return string(data)
 }

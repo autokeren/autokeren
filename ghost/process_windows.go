@@ -2,7 +2,27 @@
 
 package ghost
 
-import "os/exec"
+import (
+	"os"
+	"os/exec"
+)
+
+func processAlive(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	return process != nil
+}
+
+func terminatePID(pid int) {
+	if process, err := os.FindProcess(pid); err == nil {
+		_ = process.Kill()
+	}
+}
 
 func configureProcessGroup(_ *exec.Cmd) {}
 func terminateProcessGroup(cmd *exec.Cmd) {
