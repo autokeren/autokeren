@@ -82,6 +82,60 @@ func TestLoopPlanModeBlocksToolDispatch(t *testing.T) {
 	}
 }
 
+type backgroundSpawnTool struct{}
+
+func (backgroundSpawnTool) Definition() tool.Definition {
+	return tool.Definition{Name: "spawn_agent", Parameters: map[string]any{"type": "object"}}
+}
+func (backgroundSpawnTool) NeedsPermission(map[string]any) (bool, string) { return false, "" }
+func (backgroundSpawnTool) Run(context.Context, map[string]any, tool.Emitter) tool.Result {
+	return tool.Result{OK: true, Output: "ghost #7 started"}
+}
+
+type awaitAgentsTool struct{ calls int }
+
+func (a *awaitAgentsTool) Definition() tool.Definition {
+	return tool.Definition{Name: "await_agents", Parameters: map[string]any{"type": "object"}}
+}
+func (a *awaitAgentsTool) NeedsPermission(map[string]any) (bool, string) { return false, "" }
+func (a *awaitAgentsTool) Run(_ context.Context, args map[string]any, _ tool.Emitter) tool.Result {
+	a.calls++
+	ids, _ := args["agent_ids"].([]any)
+	if len(ids) != 1 || ids[0] != float64(7) {
+		return tool.Result{OK: false, Error: "worker ID salah"}
+	}
+	return tool.Result{OK: true, Output: `{"entries":[{"agent_id":7,"status":"completed","output":"worker selesai"}]}`}
+}
+
+type directorProvider struct {
+	calls       int
+	mailboxSeen bool
+}
+
+func (p *directorProvider) Complete(_ context.Context, request model.Request, _ provider.ChunkHandler) (model.Response, error) {
+	p.calls++
+	if p.calls == 1 {
+		return model.Response{ToolCalls: []model.ToolCall{{ID: "spawn", Type: "function", Function: model.ToolCallFunction{Name: "spawn_agent", Arguments: `{"task":"cek","background":true}`}}}}, nil
+	}
+	for _, message := range request.Messages {
+		if message.Role == "tool" && message.Name == "await_agents" && strings.Contains(message.Content, "worker selesai") {
+			p.mailboxSeen = true
+		}
+	}
+	return model.Response{Content: "director menerima hasil worker"}, nil
+}
+
+func TestLoopAutomaticallyReturnsBackgroundWorkerMailboxToDirector(t *testing.T) {
+	awaiting := &awaitAgentsTool{}
+	registry := tool.NewRegistry().Register(backgroundSpawnTool{}).Register(awaiting)
+	p := &directorProvider{}
+	loop := &Loop{Runner: Runner{Provider: p}, Tools: registry, MaxIterations: 3}
+	response, err := loop.Run(context.Background(), "delegasikan", Events{})
+	if err != nil || response.Content != "director menerima hasil worker" || awaiting.calls != 1 || !p.mailboxSeen {
+		t.Fatalf("response=%#v err=%v awaits=%d mailboxSeen=%t", response, err, awaiting.calls, p.mailboxSeen)
+	}
+}
+
 type emptyThenContentProvider struct{ calls int }
 
 func (p *emptyThenContentProvider) Complete(_ context.Context, _ model.Request, _ provider.ChunkHandler) (model.Response, error) {

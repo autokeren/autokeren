@@ -92,6 +92,7 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 		// Preserve any streamed reasoning/content alongside tool calls, but always
 		// dispatch the calls before deciding that the turn is complete.
 		l.Context.Add(model.Message{Role: "assistant", Content: last.Content, ToolCalls: last.ToolCalls})
+		spawnedAgentIDs := make([]int, 0)
 		for _, call := range last.ToolCalls {
 			args := map[string]any{}
 			if call.Function.Arguments != "" {
@@ -129,9 +130,61 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 			}
 			content, _ := json.Marshal(result)
 			l.Context.Add(model.Message{Role: "tool", Name: call.Function.Name, ToolCallID: call.ID, Content: string(content)})
+			if call.Function.Name == "spawn_agent" && isBackgroundSpawn(args) && result.OK {
+				if id, ok := spawnedAgentID(result.Output); ok {
+					spawnedAgentIDs = append(spawnedAgentIDs, id)
+				}
+			}
+		}
+		if len(spawnedAgentIDs) > 0 {
+			if awaiting, ok := l.Tools.Get("await_agents"); ok {
+				awaitArgs := map[string]any{"agent_ids": agentIDArguments(spawnedAgentIDs)}
+				if events.OnToolStart != nil {
+					events.OnToolStart("await_agents", awaitArgs)
+				}
+				result := awaiting.Run(ctx, awaitArgs, func(line string) {
+					if events.OnToolOutput != nil {
+						events.OnToolOutput("await_agents", line)
+					}
+				})
+				if events.OnToolEnd != nil {
+					events.OnToolEnd("await_agents", result)
+				}
+				content, _ := json.Marshal(result)
+				l.Context.Add(model.Message{Role: "tool", Name: "await_agents", ToolCallID: fmt.Sprintf("director-await-%d", iteration), Content: string(content)})
+			}
 		}
 	}
 	return last, fmt.Errorf("agent reached max iterations (%d)", limit)
+}
+
+func isBackgroundSpawn(args map[string]any) bool {
+	background, _ := args["background"].(bool)
+	return background
+}
+
+func spawnedAgentID(output any) (int, bool) {
+	var id int
+	if count, _ := fmt.Sscanf(fmt.Sprint(output), "ghost #%d started", &id); count == 1 && id > 0 {
+		return id, true
+	}
+	return 0, false
+}
+
+func agentIDArguments(ids []int) []any {
+	arguments := make([]any, 0, len(ids))
+	seen := map[int]struct{}{}
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		arguments = append(arguments, float64(id))
+	}
+	return arguments
 }
 
 func mergeRequestMessages(messages, prelude []model.Message) []model.Message {

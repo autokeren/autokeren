@@ -15,6 +15,7 @@ import (
 type GhostAgentInfo struct {
 	ID         int       `json:"id"`
 	Task       string    `json:"task"`
+	Role       string    `json:"role,omitempty"`
 	Status     string    `json:"status"`
 	StartedAt  time.Time `json:"started_at"`
 	FinishedAt time.Time `json:"finished_at,omitempty"`
@@ -144,7 +145,7 @@ func (gm *GhostManager) SpawnWithOptions(options SpawnOptions) (*GhostAgentInfo,
 		return nil, fmt.Errorf("gagal memulai ghost: %w", err)
 	}
 
-	info := &GhostAgentInfo{ID: id, Task: task, Status: "running", StartedAt: time.Now(), LogFile: logFile, PID: cmd.Process.Pid}
+	info := &GhostAgentInfo{ID: id, Task: task, Role: options.Role, Status: "running", StartedAt: time.Now(), LogFile: logFile, PID: cmd.Process.Pid}
 	gm.agents[id] = info
 	gm.cancels[id] = cancel
 	gm.procs[id] = cmd

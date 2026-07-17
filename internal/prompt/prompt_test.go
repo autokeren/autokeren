@@ -13,7 +13,7 @@ func TestBuildIncludesProjectGuidanceAndPlanRule(t *testing.T) {
 		t.Fatal(err)
 	}
 	value := Build(Options{ProjectRoot: root, ToolNames: []string{"read_file", "write_file"}, PlanMode: true, MaxToolCalls: 7, Language: "Bahasa Indonesia"})
-	for _, expected := range []string{"Jalankan go test sebelum commit.", "Mode plan aktif", "maksimal 7", "read_file, write_file"} {
+	for _, expected := range []string{"Jalankan go test sebelum commit.", "Mode plan aktif", "maksimal 7", "read_file, write_file", "await_agents"} {
 		if !strings.Contains(value, expected) {
 			t.Fatalf("prompt missing %q: %s", expected, value)
 		}
