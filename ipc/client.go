@@ -257,8 +257,22 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		}
 		return nil
 	case "agent.status":
+		status := map[string]any{"running": false, "engine": "go", "model_id": c.localConfig.Cloudflare.PrimaryModel, "session_id": c.localSession}
+		if data, err := os.ReadFile(filepath.Join(c.localRoot, ".autokeren", "kanban.json")); err == nil {
+			var tasks any
+			if json.Unmarshal(data, &tasks) == nil {
+				status["kanban_tasks"] = tasks
+			}
+		}
+		if data, err := os.ReadFile(filepath.Join(c.localRoot, ".autokeren", "todos.json")); err == nil {
+			var todos any
+			if json.Unmarshal(data, &todos) == nil {
+				status["todos"] = todos
+			}
+		}
 		if reply != nil {
-			return json.Unmarshal([]byte(`{"running":false,"engine":"go"}`), reply)
+			raw, _ := json.Marshal(status)
+			return json.Unmarshal(raw, reply)
 		}
 		return nil
 	case "agent.reset":
