@@ -37,6 +37,10 @@ ENV/
 .DS_Store
 Thumbs.db
 
+# Compiled binaries
+/ak
+/ak.exe
+
 # Secrets / runtime config
 *.secret
 *.key
