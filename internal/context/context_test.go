@@ -14,3 +14,20 @@ func TestStoreCompacts(t *testing.T) {
 		t.Fatalf("expected compacted messages, got %d", len(s.Messages()))
 	}
 }
+
+func TestStoreManualCompactPreservesConfiguredTail(t *testing.T) {
+	s := New(262144, false, 0.6)
+	s.SetCompactTail(2)
+	s.Replace([]model.Message{
+		{Role: "system", Content: "rules"},
+		{Role: "user", Content: "old"},
+		{Role: "assistant", Content: "old response"},
+		{Role: "user", Content: "recent question"},
+		{Role: "assistant", Content: "recent response"},
+	})
+	_, _, changed := s.Compact()
+	messages := s.Messages()
+	if !changed || len(messages) != 4 || messages[2].Content != "recent question" || messages[3].Content != "recent response" {
+		t.Fatalf("unexpected compacted context: %#v", messages)
+	}
+}

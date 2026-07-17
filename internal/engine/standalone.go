@@ -20,6 +20,8 @@ import (
 
 var sharedBrowser = browser.GetBrowserManager()
 
+const systemPrompt = "Kamu adalah Autokeren, asisten coding CLI berbahasa Indonesia. Jangan mengaku sebagai Claude, ChatGPT, atau produk lain. Jika ditanya siapa kamu, jawab bahwa kamu adalah Autokeren. Bantu pengguna secara praktis dan jujur."
+
 func RunStandalone(ctx context.Context, cfg config.Config, root, prompt string, onChunk func(string), resume string) (string, error) {
 	return RunStandaloneEvents(ctx, cfg, root, prompt, Events{OnChunk: onChunk}, resume)
 }
@@ -59,6 +61,7 @@ func RunStandaloneEvents(ctx context.Context, cfg config.Config, root, prompt st
 		timeout = 120 * time.Second
 	}
 	store := contextstore.New(cfg.Autokeren.ContextWindow, cfg.Autokeren.AutoCompact, cfg.Autokeren.AutoCompactThreshold)
+	store.SetCompactTail(cfg.Autokeren.CompactTailTurns)
 	sessions, err := session.NewManager(root)
 	if err != nil {
 		return "", err
@@ -74,10 +77,7 @@ func RunStandaloneEvents(ctx context.Context, cfg config.Config, root, prompt st
 		sessionName = data.Name
 		store.Replace(data.Messages)
 	}
-	messages := store.Messages()
-	if len(messages) == 0 || messages[0].Role != "system" {
-		store.Replace(append([]model.Message{{Role: "system", Content: "Kamu adalah Autokeren, asisten coding CLI berbahasa Indonesia. Jangan mengaku sebagai Claude, ChatGPT, atau produk lain. Jika ditanya siapa kamu, jawab bahwa kamu adalah Autokeren. Bantu pengguna secara praktis dan jujur."}}, messages...))
-	}
+	store.Replace(withCurrentSystemPrompt(store.Messages()))
 	loop := &Loop{Runner: Runner{Provider: provider.OpenAICompatible{Endpoint: endpoint, APIKey: cfg.Auth.APIKey, Client: &http.Client{Timeout: timeout}}}, Model: config.ResolveModel(cfg.Cloudflare.PrimaryModel, cfg.Auth.Mode), Temperature: cfg.Cloudflare.Temperature, MaxTokens: cfg.Cloudflare.MaxTokens, Tools: registry, Context: store, MaxIterations: cfg.Autokeren.MaxIterations}
 	if events.ConfirmPermission == nil {
 		events.ConfirmPermission = func(name string, _ string, _ map[string]any) bool { return name != "run_shell" }
@@ -116,4 +116,13 @@ func automaticSessionName(input string) string {
 		slug = "session"
 	}
 	return time.Now().Format("20060102-150405") + "-" + slug
+}
+
+func withCurrentSystemPrompt(messages []model.Message) []model.Message {
+	if len(messages) == 0 || messages[0].Role != "system" {
+		return append([]model.Message{{Role: "system", Content: systemPrompt}}, messages...)
+	}
+	updated := append([]model.Message(nil), messages...)
+	updated[0].Content = systemPrompt
+	return updated
 }

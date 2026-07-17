@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/autokeren/autokeren/internal/config"
+	contextstore "github.com/autokeren/autokeren/internal/context"
 	"github.com/autokeren/autokeren/internal/engine"
 	"github.com/autokeren/autokeren/internal/model"
 	sessionstore "github.com/autokeren/autokeren/internal/session"
@@ -76,6 +77,8 @@ type Client struct {
 	localNeuronsUsed      int
 	localNeuronsRemaining int
 	localNeuronsQuota     int
+	localRunMu            sync.Mutex
+	localRunCancel        context.CancelFunc
 }
 
 func NewClient(callbacks *IPCCallbacks) *Client {
@@ -269,7 +272,15 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 				}
 			},
 		}
-		content, err := engine.RunStandaloneEvents(context.Background(), c.localConfig, c.localRoot, input, events, c.localSession)
+		runCtx, cancel := context.WithCancel(context.Background())
+		c.localRunMu.Lock()
+		c.localRunCancel = cancel
+		c.localRunMu.Unlock()
+		content, err := engine.RunStandaloneEvents(runCtx, c.localConfig, c.localRoot, input, events, c.localSession)
+		c.localRunMu.Lock()
+		c.localRunCancel = nil
+		c.localRunMu.Unlock()
+		cancel()
 		if err != nil {
 			if c.callbacks != nil && c.callbacks.OnError != nil {
 				c.callbacks.OnError(err.Error())
@@ -310,7 +321,47 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		c.localSession = "default"
 		c.localSessionName = "default"
 		return nil
-	case "agent.compact", "agent.interrupt":
+	case "agent.compact":
+		if c.localSession == "default" {
+			if reply != nil {
+				return json.Unmarshal([]byte(`{"message":"Context sudah cukup singkat, tidak perlu compact."}`), reply)
+			}
+			return nil
+		}
+		sessions, err := c.localSessionManager()
+		if err != nil {
+			return err
+		}
+		data, err := sessions.Load(c.localSession)
+		if err != nil {
+			return err
+		}
+		store := contextstore.New(c.localConfig.Autokeren.ContextWindow, false, c.localConfig.Autokeren.AutoCompactThreshold)
+		store.SetCompactTail(c.localConfig.Autokeren.CompactTailTurns)
+		store.Replace(data.Messages)
+		before, after, changed := store.Compact()
+		message := "Context sudah cukup singkat, tidak perlu compact."
+		if changed {
+			data.Messages = store.Messages()
+			saved, saveErr := sessions.Save(c.localSessionName, data.Messages, data.Usage, c.localSession)
+			if saveErr != nil {
+				return saveErr
+			}
+			c.localSession = saved.ID
+			message = fmt.Sprintf("Context di-compact: pesan lama diringkas. Token %d → %d (hemat %d).", before, after, before-after)
+		}
+		if reply != nil {
+			raw, _ := json.Marshal(map[string]any{"message": message})
+			return json.Unmarshal(raw, reply)
+		}
+		return nil
+	case "agent.interrupt":
+		c.localRunMu.Lock()
+		cancel := c.localRunCancel
+		c.localRunMu.Unlock()
+		if cancel != nil {
+			cancel()
+		}
 		return nil
 	case "agent.save_session":
 		args, _ := params.(map[string]interface{})

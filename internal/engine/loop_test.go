@@ -81,3 +81,27 @@ func TestLoopRetriesEmptyTerminalTurn(t *testing.T) {
 		t.Fatalf("empty turn ended session: response=%#v err=%v calls=%d", response, err, p.calls)
 	}
 }
+
+type waitingProvider struct{}
+
+func (waitingProvider) Complete(ctx context.Context, _ model.Request, _ provider.ChunkHandler) (model.Response, error) {
+	<-ctx.Done()
+	return model.Response{}, ctx.Err()
+}
+
+func TestLoopRespectsCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	loop := &Loop{Runner: Runner{Provider: waitingProvider{}}, MaxIterations: 1}
+	_, err := loop.Run(ctx, "hello", Events{})
+	if err == nil || err != context.Canceled {
+		t.Fatalf("expected cancellation, got %v", err)
+	}
+}
+
+func TestWithCurrentSystemPromptReplacesLegacyPrompt(t *testing.T) {
+	messages := withCurrentSystemPrompt([]model.Message{{Role: "system", Content: "legacy"}, {Role: "user", Content: "halo"}})
+	if messages[0].Content != systemPrompt || messages[1].Content != "halo" {
+		t.Fatalf("unexpected messages: %#v", messages)
+	}
+}
