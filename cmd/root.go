@@ -57,7 +57,7 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
-		if engineMode == "go" && (prompt != "" || nonInteractive) {
+		if (engineMode == "go" || engineMode == "auto") && (prompt != "" || nonInteractive) {
 			cfg, err := config.Load(configPath)
 			if err != nil {
 				fmt.Printf("Error memuat config Go: %v\n", err)
@@ -71,12 +71,15 @@ var rootCmd = &cobra.Command{
 				os.Exit(1)
 			}
 			_, err = engine.RunStandalone(context.Background(), cfg, projectRoot, prompt, func(chunk string) { fmt.Print(chunk) })
-			if err != nil {
+			if err == nil {
+				fmt.Println()
+				return
+			}
+			if engineMode == "go" {
 				fmt.Printf("\nError Go engine: %v\n", err)
 				os.Exit(1)
 			}
-			fmt.Println()
-			return
+			fmt.Printf("\nGo engine gagal (%v), fallback ke Python...\n", err)
 		}
 
 		// 1. Inisialisasi IPC Callbacks (Default ke CLI biasa)
@@ -261,7 +264,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&useAgy, "agy", false, "Gunakan backend Google Antigravity")
 	rootCmd.Flags().BoolVar(&planMode, "plan", false, "Mulai dalam plan mode")
 	rootCmd.Flags().BoolVar(&nonInteractive, "non-interactive", false, "Jalankan single task tanpa REPL")
-	rootCmd.Flags().StringVar(&engineMode, "engine", "python", "Engine runtime: python atau go (go opt-in)")
+	rootCmd.Flags().StringVar(&engineMode, "engine", "auto", "Engine runtime: auto, go, atau python")
 	rootCmd.Flags().StringVar(&taskPrompt, "task", "", "Deskripsi task untuk dijalankan")
 	rootCmd.Flags().StringVarP(&resumeSession, "resume", "r", "", "Resume sesi percakapan dari disk")
 }
