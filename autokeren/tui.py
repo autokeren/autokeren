@@ -1055,7 +1055,7 @@ class ToolWidget(Static):
 
         if self.status == "running":
             res.append("  ⏺ ", style="bold cyan")
-            res.append(label)
+            res.append_text(Text.from_markup(label))
         elif self.status == "success":
             res.append("  ✓ ", style="green")
             res.append(f"{self.tool_name} ", style="bold dim")
