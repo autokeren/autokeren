@@ -40,7 +40,7 @@ func (r Research) Run(ctx context.Context, args map[string]any, _ Emitter) Resul
 	if client == nil {
 		client = &http.Client{Timeout: 20 * time.Second}
 	}
-	type item struct{ Source, Title, URL string }
+	type item = researchItem
 	ch := make(chan item, max*2)
 	var wg sync.WaitGroup
 	for _, source := range sources {
@@ -80,7 +80,7 @@ func (r Research) Run(ctx context.Context, args map[string]any, _ Emitter) Resul
 	}
 	return Result{OK: true, Output: text}
 }
-func hnSearch(ctx context.Context, c *http.Client, q string, max int) []struct{ Source, Title, URL string } {
+func hnSearch(ctx context.Context, c *http.Client, q string, max int) []researchItem {
 	endpoint := "https://hn.algolia.com/api/v1/search?query=" + url.QueryEscape(q) + "&hitsPerPage=" + fmt.Sprint(max)
 	var data struct {
 		Hits []struct {
@@ -92,7 +92,7 @@ func hnSearch(ctx context.Context, c *http.Client, q string, max int) []struct{ 
 	if !getJSON(ctx, c, endpoint, &data) {
 		return nil
 	}
-	out := make([]struct{ Source, Title, URL string }, 0)
+	out := make([]researchItem, 0)
 	for _, h := range data.Hits {
 		title := h.Title
 		if title == "" {
@@ -106,7 +106,7 @@ func hnSearch(ctx context.Context, c *http.Client, q string, max int) []struct{ 
 	}
 	return out
 }
-func redditSearch(ctx context.Context, c *http.Client, q string, max int) []struct{ Source, Title, URL string } {
+func redditSearch(ctx context.Context, c *http.Client, q string, max int) []researchItem {
 	endpoint := "https://www.reddit.com/search.json?q=" + url.QueryEscape(q) + "&limit=" + fmt.Sprint(max)
 	var data struct {
 		Data struct {
@@ -118,7 +118,7 @@ func redditSearch(ctx context.Context, c *http.Client, q string, max int) []stru
 	if !getJSON(ctx, c, endpoint, &data) {
 		return nil
 	}
-	out := make([]struct{ Source, Title, URL string }, 0)
+	out := make([]researchItem, 0)
 	for _, h := range data.Data.Children {
 		out = append(out, struct{ Source, Title, URL string }{"reddit", h.Data.Title, h.Data.URL})
 	}
