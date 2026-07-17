@@ -65,13 +65,13 @@ func renderToolLine(content string, textWidth int) string {
 
 	var sb strings.Builder
 	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#4B5563"))
-	
+
 	// Tool width offset: kurangi 6 kolom untuk prefix indent
 	toolWidth := textWidth - 6
 	if toolWidth < 10 {
 		toolWidth = 10
 	}
-	
+
 	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Width(toolWidth)
 	pathStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9CA3AF")).Italic(true).Width(toolWidth)
 	okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#34D399")).Bold(true)
@@ -122,6 +122,66 @@ func renderToolLine(content string, textWidth int) string {
 	return sb.String()
 }
 
+func renderAssistantText(content string, textWidth int) string {
+	lines := strings.Split(content, "\n")
+	var sb strings.Builder
+	inCode := false
+	for _, raw := range lines {
+		line := strings.TrimRight(raw, " \t")
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "```") {
+			inCode = !inCode
+			continue
+		}
+		if inCode {
+			codeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#67E8F9")).Width(textWidth)
+			sb.WriteString(codeStyle.Render(line) + "\n")
+			continue
+		}
+		if strings.HasPrefix(trimmed, "#") {
+			heading := strings.TrimSpace(strings.TrimLeft(trimmed, "#"))
+			headingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#67E8F9")).Bold(true).Width(textWidth)
+			sb.WriteString(headingStyle.Render(heading) + "\n")
+			continue
+		}
+		if strings.HasPrefix(trimmed, "|---") || strings.HasPrefix(trimmed, "| ---") {
+			dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#475569")).Width(textWidth)
+			sb.WriteString(dimStyle.Render(trimmed) + "\n")
+			continue
+		}
+		sb.WriteString(renderAssistantInline(line, textWidth) + "\n")
+	}
+	return strings.TrimSuffix(sb.String(), "\n")
+}
+
+func renderAssistantInline(line string, textWidth int) string {
+	baseStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F8FAFC")).PaddingLeft(4).Width(textWidth)
+	boldStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
+	codeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#67E8F9"))
+	var out strings.Builder
+	for len(line) > 0 {
+		if strings.HasPrefix(line, "**") {
+			end := strings.Index(line[2:], "**")
+			if end >= 0 {
+				out.WriteString(boldStyle.Render(line[2 : end+2]))
+				line = line[end+4:]
+				continue
+			}
+		}
+		if strings.HasPrefix(line, "`") {
+			end := strings.Index(line[1:], "`")
+			if end >= 0 {
+				out.WriteString(codeStyle.Render(line[1 : end+1]))
+				line = line[end+2:]
+				continue
+			}
+		}
+		out.WriteByte(line[0])
+		line = line[1:]
+	}
+	return baseStyle.Render(out.String())
+}
+
 func (m *ChatModel) UpdateViewport() {
 	m.UpdateViewportScroll(false)
 }
@@ -157,11 +217,6 @@ func (m *ChatModel) UpdateViewportScroll(force bool) {
 	asstPrefixStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#34D399")).
 		Bold(true)
-	asstTextStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#F8FAFC")).
-		PaddingLeft(4).
-		Width(textWidth)
-
 	sysPrefixStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#6B7280"))
 	sysTextStyle := lipgloss.NewStyle().
@@ -185,7 +240,7 @@ func (m *ChatModel) UpdateViewportScroll(force bool) {
 
 		case "assistant":
 			sb.WriteString(asstPrefixStyle.Render("◆ ") + asstPrefixStyle.Foreground(lipgloss.Color("#6EE7B7")).Render("autokeren") + "\n")
-			sb.WriteString(asstTextStyle.Render(msg.Content) + "\n")
+			sb.WriteString(renderAssistantText(msg.Content, textWidth) + "\n")
 
 		case "system":
 			text := strings.TrimSpace(msg.Content)
