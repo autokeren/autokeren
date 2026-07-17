@@ -153,6 +153,9 @@ var rootCmd = &cobra.Command{
 		if resumeSession != "" {
 			opts["resume_session"] = resumeSession
 		}
+		if engineMode == "go" {
+			opts["engine"] = "go"
+		}
 
 		// 3. Eksekusi Non-Interactive Mode jika ada prompt/task
 		if prompt != "" || nonInteractive {

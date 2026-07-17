@@ -2,6 +2,7 @@ package ipc
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/autokeren/autokeren/internal/config"
+	"github.com/autokeren/autokeren/internal/engine"
+	"github.com/autokeren/autokeren/internal/tool"
 )
 
 // JSONRPCMessage mewakili request, response, atau notification JSON-RPC 2.0
@@ -54,7 +59,11 @@ type Client struct {
 	pendingLock sync.Mutex
 	nextID      int64
 
-	isClosed int32
+	isClosed     int32
+	local        bool
+	localRoot    string
+	localConfig  config.Config
+	localSession string
 }
 
 func NewClient(callbacks *IPCCallbacks) *Client {
@@ -66,6 +75,9 @@ func NewClient(callbacks *IPCCallbacks) *Client {
 }
 
 func (c *Client) Start(projectRoot string, configPath string, opts map[string]interface{}) error {
+	if opts != nil && opts["engine"] == "go" {
+		return c.startLocal(projectRoot, configPath)
+	}
 	if c.cmd != nil {
 		return errors.New("client sudah berjalan")
 	}
@@ -110,7 +122,7 @@ func (c *Client) Start(projectRoot string, configPath string, opts map[string]in
 	// 2. Jalankan subprocess Python daemon dengan melewatkan argumen port
 	c.cmd = exec.Command(pythonPath, "-m", "autokeren.daemon", "--port", strconv.Itoa(port))
 	c.cmd.Env = append(os.Environ(), "PYTHONPATH=.", "PYTHONUNBUFFERED=1")
-	
+
 	// Alihkan stdout & stderr daemon ke os.Stderr
 	// Ini memisahkan stdout/print() Python biasa agar tidak mencemari JSON-RPC
 	c.cmd.Stdout = os.Stderr
@@ -157,6 +169,11 @@ func (c *Client) Start(projectRoot string, configPath string, opts map[string]in
 }
 
 func (c *Client) Close() {
+	if c.local {
+		c.local = false
+		atomic.StoreInt32(&c.isClosed, 1)
+		return
+	}
 	if atomic.CompareAndSwapInt32(&c.isClosed, 0, 1) {
 		if c.conn != nil {
 			c.conn.Close()
@@ -165,6 +182,84 @@ func (c *Client) Close() {
 			c.cmd.Process.Kill()
 		}
 		GetBrowserManager().Close()
+	}
+}
+
+func (c *Client) startLocal(projectRoot, configPath string) error {
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return err
+	}
+	c.local = true
+	c.localRoot = projectRoot
+	c.localConfig = cfg
+	c.localSession = "tui"
+	atomic.StoreInt32(&c.isClosed, 0)
+	return nil
+}
+
+func (c *Client) callLocal(method string, params interface{}, reply interface{}) error {
+	switch method {
+	case "agent.run":
+		input, _ := params.(map[string]interface{})["user_input"].(string)
+		if input == "" {
+			return errors.New("user_input kosong")
+		}
+		events := engine.Events{
+			OnChunk: func(text string) {
+				if c.callbacks != nil && c.callbacks.OnChunk != nil {
+					c.callbacks.OnChunk(text)
+				}
+			},
+			OnToolStart: func(name string, args map[string]any) {
+				if c.callbacks != nil && c.callbacks.OnToolStart != nil {
+					c.callbacks.OnToolStart(name, args)
+				}
+			},
+			OnToolOutput: func(name, line string) {
+				if c.callbacks != nil && c.callbacks.OnToolOutput != nil {
+					c.callbacks.OnToolOutput(name, line)
+				}
+			},
+			OnToolEnd: func(name string, result tool.Result) {
+				if c.callbacks != nil && c.callbacks.OnToolEnd != nil {
+					raw, _ := json.Marshal(result)
+					var value map[string]interface{}
+					_ = json.Unmarshal(raw, &value)
+					c.callbacks.OnToolEnd(name, value)
+				}
+			},
+			ConfirmPermission: func(name, desc string, args map[string]any) bool {
+				if c.callbacks != nil && c.callbacks.ConfirmPermission != nil {
+					return c.callbacks.ConfirmPermission(name, desc, args)
+				}
+				return name != "run_shell"
+			},
+		}
+		content, err := engine.RunStandaloneEvents(context.Background(), c.localConfig, c.localRoot, input, events, c.localSession)
+		if err != nil {
+			if c.callbacks != nil && c.callbacks.OnError != nil {
+				c.callbacks.OnError(err.Error())
+			}
+			return err
+		}
+		if c.callbacks != nil && c.callbacks.OnModelEnd != nil {
+			c.callbacks.OnModelEnd(content, c.localConfig.Cloudflare.PrimaryModel, c.localSession, c.localSession, nil)
+		}
+		if reply != nil {
+			return json.Unmarshal([]byte(fmt.Sprintf(`{"content":%q}`, content)), reply)
+		}
+		return nil
+	case "agent.status":
+		if reply != nil {
+			return json.Unmarshal([]byte(`{"running":false,"engine":"go"}`), reply)
+		}
+		return nil
+	case "agent.reset":
+		c.localSession = fmt.Sprintf("tui-%d", time.Now().Unix())
+		return nil
+	default:
+		return fmt.Errorf("method %s belum tersedia di Go TUI adapter", method)
 	}
 }
 
@@ -187,6 +282,9 @@ func (c *Client) send(msg *JSONRPCMessage) error {
 }
 
 func (c *Client) Call(method string, params interface{}, reply interface{}) error {
+	if c.local {
+		return c.callLocal(method, params, reply)
+	}
 	id := atomic.AddInt64(&c.nextID, 1)
 
 	rawParams, err := json.Marshal(params)

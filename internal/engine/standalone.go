@@ -19,6 +19,10 @@ import (
 )
 
 func RunStandalone(ctx context.Context, cfg config.Config, root, prompt string, onChunk func(string), resume string) (string, error) {
+	return RunStandaloneEvents(ctx, cfg, root, prompt, Events{OnChunk: onChunk}, resume)
+}
+
+func RunStandaloneEvents(ctx context.Context, cfg config.Config, root, prompt string, events Events, resume string) (string, error) {
 	endpoint := cfg.Auth.BaseURL
 	if endpoint == "" {
 		return "", fmt.Errorf("auth base_url is empty")
@@ -69,7 +73,10 @@ func RunStandalone(ctx context.Context, cfg config.Config, root, prompt string, 
 		store.Replace(append([]model.Message{{Role: "system", Content: "Kamu adalah Autokeren, asisten coding CLI berbahasa Indonesia. Jangan mengaku sebagai Claude, ChatGPT, atau produk lain. Jika ditanya siapa kamu, jawab bahwa kamu adalah Autokeren. Bantu pengguna secara praktis dan jujur."}}, messages...))
 	}
 	loop := &Loop{Runner: Runner{Provider: provider.OpenAICompatible{Endpoint: endpoint, APIKey: cfg.Auth.APIKey, Client: &http.Client{Timeout: timeout}}}, Model: config.ResolveModel(cfg.Cloudflare.PrimaryModel, cfg.Auth.Mode), Temperature: cfg.Cloudflare.Temperature, MaxTokens: cfg.Cloudflare.MaxTokens, Tools: registry, Context: store, MaxIterations: cfg.Autokeren.MaxIterations}
-	response, err := loop.Run(ctx, prompt, Events{OnChunk: onChunk, ConfirmPermission: func(name string, _ string, _ map[string]any) bool { return name != "run_shell" }})
+	if events.ConfirmPermission == nil {
+		events.ConfirmPermission = func(name string, _ string, _ map[string]any) bool { return name != "run_shell" }
+	}
+	response, err := loop.Run(ctx, prompt, events)
 	if err != nil {
 		return "", err
 	}
