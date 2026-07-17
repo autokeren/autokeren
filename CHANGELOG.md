@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.71] - 2026-07-17
+
+### Changed
+- chore: untrack and ignore root ak binary
+
 ## [0.11.70] - 2026-07-17
 
 ### Changed
