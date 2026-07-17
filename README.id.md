@@ -65,7 +65,7 @@ Juri dapat menguji sistem rendering acceptance criteria dan menjalankan pengujia
 ### 🎥 Video Demo & Submisi Devpost
 
 * **Video Demo**: [Tonton Video Demo 3 Menit di YouTube](https://youtu.be/DEMO_VIDEO_PLACEHOLDER)
-* **Codex Session ID**: Jangan lupa menyalin Codex Session ID `/feedback` dari terminal Anda ke form submisi Devpost.
+* **Codex Session ID**: `019f6df7-0978-7b71-aaa1-8c9b152e5ead` (Tempelkan ID ini langsung ke formulir Devpost.)
 
 ---
 
