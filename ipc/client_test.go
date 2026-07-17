@@ -61,3 +61,15 @@ func TestAutoSaveUsesPythonCompatibleNameAndUpdatesSession(t *testing.T) {
 		t.Fatalf("auto-save did not name session: %#v err=%v", data, err)
 	}
 }
+
+func TestExportEmptySessionIsHelpful(t *testing.T) {
+	root := t.TempDir()
+	c := &Client{localRoot: root, localSession: "empty"}
+	var reply map[string]any
+	if err := c.callLocal("agent.run", map[string]interface{}{"user_input": "/export"}, &reply); err != nil {
+		t.Fatal(err)
+	}
+	if reply["content"] != "Belum ada percakapan untuk diekspor." {
+		t.Fatalf("unexpected export response: %#v", reply)
+	}
+}

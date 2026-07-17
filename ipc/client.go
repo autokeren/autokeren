@@ -453,7 +453,7 @@ func (c *Client) localModels() []map[string]interface{} {
 			}
 		}
 	}
-	ids := []string{"@cf/moonshotai/kimi-k2.7-code", "@cf/moonshotai/kimi-k2.6", "@cf/zai-org/glm-5.2", "@cf/zai-org/glm-4.7-flash", "@cf/meta/llama-4-scout-17b-16b-instruct", "@cf/google/gemma-4-26b-a4b-it", "kimi-code", "kimi-2.6", "glm-5.2", "gpt-5.6", "gpt-4o", "gemini-2.5-pro", "gemini-2.5-flash"}
+	ids := []string{"@cf/moonshotai/kimi-k2.7-code", "@cf/moonshotai/kimi-k2.6", "@cf/zai-org/glm-5.2", "@cf/zai-org/glm-4.7-flash", "@cf/meta/llama-4-scout-17b-16e-instruct", "@cf/google/gemma-4-26b-a4b-it", "kimi-code", "kimi-2.6", "glm-5.2", "gpt-5.6", "gpt-4o", "gemini-2.5-pro", "gemini-2.5-flash"}
 	models := make([]map[string]interface{}, 0, len(ids)+1)
 	seen := map[string]bool{}
 	for _, id := range append([]string{current}, ids...) {
@@ -586,6 +586,10 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 			}
 		}
 		data, err := sessionstore.Load(c.sessionPath(c.localSession))
+		if os.IsNotExist(err) {
+			output = "Belum ada percakapan untuk diekspor."
+			break
+		}
 		if err != nil {
 			return true, err
 		}
@@ -600,6 +604,10 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 				role = "User"
 			}
 			builder.WriteString("## " + role + "\n\n" + message.Content + "\n\n---\n\n")
+		}
+		if builder.Len() == len("# autokeren Chat Export\n\n") {
+			output = "Belum ada percakapan untuk diekspor."
+			break
 		}
 		if err := os.WriteFile(filepath.Join(c.localRoot, name), []byte(builder.String()), 0o600); err != nil {
 			return true, err
