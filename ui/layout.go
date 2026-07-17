@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1094,6 +1095,22 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.Chat.AppendMessage("system", "Approval mode: tool berisiko akan meminta izin.")
 				default:
 					m.Chat.AppendMessage("system", "Gunakan: /approval ask atau /approval all")
+				}
+				return m, nil
+			}
+
+			if val == "/permissions" {
+				if m.AllowAllTools {
+					m.Chat.AppendMessage("system", "Semua tool diizinkan untuk sesi ini.")
+				} else if len(m.AlwaysAllow) > 0 {
+					names := make([]string, 0, len(m.AlwaysAllow))
+					for name := range m.AlwaysAllow {
+						names = append(names, name)
+					}
+					sort.Strings(names)
+					m.Chat.AppendMessage("system", "Tool diizinkan: "+strings.Join(names, ", "))
+				} else {
+					m.Chat.AppendMessage("system", "Belum ada tool yang diizinkan. Tool berisiko akan meminta izin.")
 				}
 				return m, nil
 			}

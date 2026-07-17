@@ -724,7 +724,7 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 	var output string
 	switch parts[0] {
 	case "/help":
-		output = "Perintah: /help, /model, /lang, /permissions, /memory, /export, /mcp, /save, /resume, /sessions, /ghost, /research, /proof, /review, /security, /rewind, /config, /local, /approval, /reset, /q"
+		output = "Perintah: /help, /model, /lang, /permissions, /memory, /copy, /debug, /export, /mcp, /save, /resume, /sessions, /project, /tdd, /spec, /ghost, /research, /deploy, /proof, /review, /security, /rewind, /config, /local, /approval, /reset, /q"
 	case "/permissions":
 		output = "Tool berisiko akan meminta izin di TUI. Gunakan /approval all untuk mengizinkan semua tool selama sesi ini, atau /approval ask untuk kembali bertanya."
 	case "/debug":
