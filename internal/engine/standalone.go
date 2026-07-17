@@ -7,14 +7,16 @@ import (
 	contextstore "github.com/autokeren/autokeren/internal/context"
 	"github.com/autokeren/autokeren/internal/mcp"
 	"github.com/autokeren/autokeren/internal/provider"
+	"github.com/autokeren/autokeren/internal/session"
 	"github.com/autokeren/autokeren/internal/tool"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"time"
 )
 
-func RunStandalone(ctx context.Context, cfg config.Config, root, prompt string, onChunk func(string)) (string, error) {
+func RunStandalone(ctx context.Context, cfg config.Config, root, prompt string, onChunk func(string), resume string) (string, error) {
 	endpoint := cfg.Auth.BaseURL
 	if endpoint == "" {
 		return "", fmt.Errorf("auth base_url is empty")
@@ -47,10 +49,22 @@ func RunStandalone(ctx context.Context, cfg config.Config, root, prompt string, 
 	if timeout <= 0 {
 		timeout = 120 * time.Second
 	}
-	loop := &Loop{Runner: Runner{Provider: provider.OpenAICompatible{Endpoint: endpoint, APIKey: cfg.Auth.APIKey, Client: &http.Client{Timeout: timeout}}}, Model: cfg.Cloudflare.PrimaryModel, Temperature: cfg.Cloudflare.Temperature, MaxTokens: cfg.Cloudflare.MaxTokens, Tools: registry, Context: contextstore.New(cfg.Autokeren.ContextWindow, cfg.Autokeren.AutoCompact, cfg.Autokeren.AutoCompactThreshold), MaxIterations: cfg.Autokeren.MaxIterations}
+	store := contextstore.New(cfg.Autokeren.ContextWindow, cfg.Autokeren.AutoCompact, cfg.Autokeren.AutoCompactThreshold)
+	sessionID := resume
+	if sessionID != "" {
+		data, err := session.Load(filepath.Join(root, ".ak-sessions", sessionID+".json"))
+		if err != nil {
+			return "", fmt.Errorf("load session %s: %w", sessionID, err)
+		}
+		store.Replace(data.Messages)
+	} else {
+		sessionID = fmt.Sprintf("session-%d", time.Now().Unix())
+	}
+	loop := &Loop{Runner: Runner{Provider: provider.OpenAICompatible{Endpoint: endpoint, APIKey: cfg.Auth.APIKey, Client: &http.Client{Timeout: timeout}}}, Model: cfg.Cloudflare.PrimaryModel, Temperature: cfg.Cloudflare.Temperature, MaxTokens: cfg.Cloudflare.MaxTokens, Tools: registry, Context: store, MaxIterations: cfg.Autokeren.MaxIterations}
 	response, err := loop.Run(ctx, prompt, Events{OnChunk: onChunk, ConfirmPermission: func(name string, _ string, _ map[string]any) bool { return name != "run_shell" }})
 	if err != nil {
 		return "", err
 	}
+	_ = session.Save(filepath.Join(root, ".ak-sessions", sessionID+".json"), session.New(sessionID, store.Messages()))
 	return response.Content, nil
 }

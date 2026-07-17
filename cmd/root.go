@@ -70,7 +70,7 @@ var rootCmd = &cobra.Command{
 				fmt.Println("[red]Error: Task/Prompt kosong.[/red]")
 				os.Exit(1)
 			}
-			_, err = engine.RunStandalone(context.Background(), cfg, projectRoot, prompt, func(chunk string) { fmt.Print(chunk) })
+			_, err = engine.RunStandalone(context.Background(), cfg, projectRoot, prompt, func(chunk string) { fmt.Print(chunk) }, resumeSession)
 			if err == nil {
 				fmt.Println()
 				return
