@@ -1008,8 +1008,16 @@ class MessageWidget(Static):
             except Exception:
                 self.update(self.msg_content)
         else:
-            self.update(Markdown(self.msg_content or "..."))
+            self.update(_assistant_renderable(self.msg_content))
 
+
+def _assistant_renderable(content: str) -> Markdown | Text:
+    if not content:
+        return Markdown("...")
+    if content.count("`") % 2 or content.count("**") % 2:
+        clean = content.replace("**", "").replace("`", "")
+        return Text(clean)
+    return Markdown(content)
 
 
 class ToolWidget(Static):
