@@ -86,7 +86,12 @@ func (gm *GhostManager) loadExisting() {
 		if json.Unmarshal(data, &info) != nil || info.ID == 0 {
 			continue
 		}
-		if info.Status == "running" && !processAlive(info.PID) {
+		// Metadata produced by the legacy Python/tmux manager has no PID. It
+		// cannot prove a live Go process and must not reappear as an active ghost.
+		if info.PID == 0 {
+			continue
+		}
+		if info.Status == "running" && (!processAlive(info.PID) || !processIsAutokeren(info.PID)) {
 			info.Status = "completed"
 		}
 		gm.agents[info.ID] = &info

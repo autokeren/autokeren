@@ -18,6 +18,8 @@ func processAlive(pid int) bool {
 	return process != nil
 }
 
+func processIsAutokeren(pid int) bool { return pid > 0 }
+
 func terminatePID(pid int) {
 	if process, err := os.FindProcess(pid); err == nil {
 		_ = process.Kill()

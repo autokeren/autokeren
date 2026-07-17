@@ -3,8 +3,10 @@
 package ghost
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 )
 
@@ -17,6 +19,15 @@ func processAlive(pid int) bool {
 		return false
 	}
 	return process.Signal(syscall.Signal(0)) == nil
+}
+
+func processIsAutokeren(pid int) bool {
+	data, err := os.ReadFile("/proc/" + fmt.Sprint(pid) + "/cmdline")
+	if err != nil {
+		return false
+	}
+	cmdline := strings.ReplaceAll(string(data), "\x00", " ")
+	return strings.Contains(cmdline, "autokeren") && strings.Contains(cmdline, "--engine")
 }
 
 func terminatePID(pid int) {
