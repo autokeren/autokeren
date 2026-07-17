@@ -8,7 +8,6 @@ import (
 	"github.com/autokeren/autokeren/internal/config"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
