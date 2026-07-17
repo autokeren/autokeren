@@ -28,3 +28,22 @@ func TestRegistryRunUnknown(t *testing.T) {
 		t.Fatalf("unexpected result: %#v", result)
 	}
 }
+
+func TestWriteAndPatchFile(t *testing.T) {
+	root := t.TempDir()
+	writer := WriteFile{Root: root}
+	if result := writer.Run(context.Background(), map[string]any{"path": "x.txt", "content": "hello world"}, nil); !result.OK {
+		t.Fatal(result.Error)
+	}
+	patcher := PatchFile{Root: root}
+	if result := patcher.Run(context.Background(), map[string]any{"path": "x.txt", "old_string": "world", "new_string": "Go"}, nil); !result.OK {
+		t.Fatal(result.Error)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "x.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "hello Go" {
+		t.Fatalf("unexpected content: %s", data)
+	}
+}
