@@ -82,11 +82,6 @@ var rootCmd = &cobra.Command{
 			fmt.Printf("\nGo engine gagal (%v), fallback ke Python...\n", err)
 		}
 
-		if engineMode == "go" && prompt == "" && !nonInteractive {
-			runGoInteractive(projectRoot, configPath, modelOverride)
-			return
-		}
-
 		// 1. Inisialisasi IPC Callbacks (Default ke CLI biasa)
 		callbacks := &ipc.IPCCallbacks{
 			OnModelStart: func() {
@@ -252,37 +247,6 @@ func runInteractiveLoop(client *ipc.Client) {
 		err := client.Call("agent.run", runParams, &reply)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
-		}
-		fmt.Println()
-	}
-}
-
-func runGoInteractive(root, configPath, modelOverride string) {
-	cfg, err := config.Load(configPath)
-	if err != nil {
-		fmt.Printf("Error memuat config Go: %v\n", err)
-		return
-	}
-	if modelOverride != "" {
-		cfg.Cloudflare.PrimaryModel = modelOverride
-	}
-	fmt.Println("Go engine aktif. Ketik /q untuk keluar.")
-	scanner := bufio.NewScanner(os.Stdin)
-	for {
-		fmt.Print("\nkamu> ")
-		if !scanner.Scan() {
-			return
-		}
-		text := scanner.Text()
-		if text == "/q" || text == "/quit" {
-			return
-		}
-		if text == "" {
-			continue
-		}
-		_, err := engine.RunStandalone(context.Background(), cfg, root, text, func(chunk string) { fmt.Print(chunk) }, "interactive")
-		if err != nil {
-			fmt.Printf("\nError Go engine: %v\n", err)
 		}
 		fmt.Println()
 	}
