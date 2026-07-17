@@ -47,6 +47,13 @@ type GhostManager struct {
 	nextID  int
 }
 
+type SpawnOptions struct {
+	Task    string
+	Context string
+	Role    string
+	ModelID string
+}
+
 func NewGhostManager(projectRoot string) *GhostManager {
 	gm := &GhostManager{
 		ProjectRoot: projectRoot,
@@ -90,6 +97,17 @@ func (gm *GhostManager) loadExisting() {
 }
 
 func (gm *GhostManager) Spawn(task string) (*GhostAgentInfo, error) {
+	return gm.SpawnWithOptions(SpawnOptions{Task: task})
+}
+
+func (gm *GhostManager) SpawnWithOptions(options SpawnOptions) (*GhostAgentInfo, error) {
+	task := strings.TrimSpace(options.Task)
+	if options.Context != "" {
+		task = "Konteks:\n" + options.Context + "\n\nTask:\n" + task
+	}
+	if options.Role != "" {
+		task = "Peran: " + options.Role + "\n\n" + task
+	}
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
 	if gm.activeCountLocked() >= gm.MaxAgents {
@@ -104,22 +122,13 @@ func (gm *GhostManager) Spawn(task string) (*GhostAgentInfo, error) {
 		return nil, fmt.Errorf("gagal membuka log ghost: %w", err)
 	}
 
-	binary := os.Getenv("AUTOKEREN_GHOST_BIN")
-	if binary == "" {
-		for _, candidate := range []string{"./autokeren-cli", "./ak", "autokeren"} {
-			if candidate == "autokeren" {
-				binary = candidate
-				break
-			}
-			if _, statErr := os.Stat(filepath.Join(gm.ProjectRoot, candidate)); statErr == nil {
-				binary = candidate
-				break
-			}
-		}
-	}
-
+	binary := gm.binaryPath()
 	ctx, cancel := context.WithTimeout(context.Background(), gm.Timeout)
-	cmd := exec.CommandContext(ctx, binary, "--engine", "go", "--non-interactive", "--task", task)
+	args := []string{"--engine", "go", "--non-interactive", "--task", task}
+	if options.ModelID != "" {
+		args = append(args, "--model", options.ModelID)
+	}
+	cmd := exec.CommandContext(ctx, binary, args...)
 	cmd.Dir = gm.ProjectRoot
 	configureProcessGroup(cmd)
 	cmd.Stdout = log
@@ -137,6 +146,45 @@ func (gm *GhostManager) Spawn(task string) (*GhostAgentInfo, error) {
 	gm.writeMetadataLocked(info)
 	go gm.wait(id, cmd, ctx, log)
 	return info, nil
+}
+
+func (gm *GhostManager) SpawnSync(ctx context.Context, options SpawnOptions) (string, error) {
+	task := strings.TrimSpace(options.Task)
+	if options.Context != "" {
+		task = "Konteks:\n" + options.Context + "\n\nTask:\n" + task
+	}
+	if options.Role != "" {
+		task = "Peran: " + options.Role + "\n\n" + task
+	}
+	args := []string{"--engine", "go", "--non-interactive", "--task", task}
+	if options.ModelID != "" {
+		args = append(args, "--model", options.ModelID)
+	}
+	childCtx, cancel := context.WithTimeout(ctx, gm.Timeout)
+	defer cancel()
+	cmd := exec.CommandContext(childCtx, gm.binaryPath(), args...)
+	cmd.Dir = gm.ProjectRoot
+	configureProcessGroup(cmd)
+	out, err := cmd.CombinedOutput()
+	if childCtx.Err() != nil {
+		return string(out), childCtx.Err()
+	}
+	if err != nil {
+		return string(out), fmt.Errorf("ghost sync gagal: %w", err)
+	}
+	return string(out), nil
+}
+
+func (gm *GhostManager) binaryPath() string {
+	if binary := os.Getenv("AUTOKEREN_GHOST_BIN"); binary != "" {
+		return binary
+	}
+	for _, candidate := range []string{"./autokeren-cli", "./ak"} {
+		if _, err := os.Stat(filepath.Join(gm.ProjectRoot, candidate)); err == nil {
+			return candidate
+		}
+	}
+	return "autokeren"
 }
 
 func (gm *GhostManager) wait(id int, cmd *exec.Cmd, ctx context.Context, log *os.File) {

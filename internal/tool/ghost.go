@@ -10,7 +10,7 @@ import (
 type SpawnGhost struct{ Manager *ghost.GhostManager }
 
 func (s SpawnGhost) Definition() Definition {
-	return Definition{Name: "spawn_agent", Description: "Spawn a native Go background ghost agent.", RequiresPermission: true, Parameters: map[string]any{"type": "object", "properties": map[string]any{"task": map[string]any{"type": "string"}}, "required": []string{"task"}}}
+	return Definition{Name: "spawn_agent", Description: "Spawn a native Go sub-agent in background or synchronously.", RequiresPermission: true, Parameters: map[string]any{"type": "object", "properties": map[string]any{"task": map[string]any{"type": "string"}, "context": map[string]any{"type": "string"}, "role": map[string]any{"type": "string"}, "model_id": map[string]any{"type": "string"}, "background": map[string]any{"type": "boolean"}, "agent_name": map[string]any{"type": "string"}}, "required": []string{"task"}}}
 }
 func (s SpawnGhost) NeedsPermission(map[string]any) (bool, string) {
 	return true, "spawn native Go ghost agent"
@@ -25,7 +25,19 @@ func (s SpawnGhost) Run(ctx context.Context, args map[string]any, _ Emitter) Res
 	if task == "" {
 		return Result{OK: false, Error: "task wajib"}
 	}
-	info, err := s.Manager.Spawn(task)
+	options := ghost.SpawnOptions{Task: task}
+	options.Context, _ = args["context"].(string)
+	options.Role, _ = args["role"].(string)
+	options.ModelID, _ = args["model_id"].(string)
+	background, _ := args["background"].(bool)
+	if !background {
+		output, err := s.Manager.SpawnSync(ctx, options)
+		if err != nil {
+			return Result{OK: false, Output: output, Error: err.Error()}
+		}
+		return Result{OK: true, Output: output}
+	}
+	info, err := s.Manager.SpawnWithOptions(options)
 	if err != nil {
 		return Result{OK: false, Error: err.Error()}
 	}
