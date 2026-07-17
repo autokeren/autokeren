@@ -1,0 +1,125 @@
+package provider
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/autokeren/autokeren/internal/model"
+	"io"
+	"net/http"
+	"strings"
+)
+
+type OpenAICompatible struct {
+	Endpoint string
+	APIKey   string
+	Client   *http.Client
+}
+
+func (p OpenAICompatible) Complete(ctx context.Context, request model.Request, onChunk ChunkHandler) (model.Response, error) {
+	if p.Endpoint == "" {
+		return model.Response{}, fmt.Errorf("provider endpoint is empty")
+	}
+	if p.Client == nil {
+		p.Client = http.DefaultClient
+	}
+	request.Stream = true
+	body, err := json.Marshal(request)
+	if err != nil {
+		return model.Response{}, fmt.Errorf("marshal provider request: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.Endpoint, bytes.NewReader(body))
+	if err != nil {
+		return model.Response{}, fmt.Errorf("create provider request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if p.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+p.APIKey)
+	}
+	resp, err := p.Client.Do(req)
+	if err != nil {
+		return model.Response{}, fmt.Errorf("provider request: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return model.Response{}, fmt.Errorf("provider status %d: %s", resp.StatusCode, strings.TrimSpace(string(data)))
+	}
+	return parseSSE(resp.Body, onChunk)
+}
+
+type streamEvent struct {
+	Model   string `json:"model"`
+	Choices []struct {
+		Delta struct {
+			Content   string `json:"content"`
+			ToolCalls []struct {
+				Index    int    `json:"index"`
+				ID       string `json:"id"`
+				Type     string `json:"type"`
+				Function struct {
+					Name      string `json:"name"`
+					Arguments string `json:"arguments"`
+				} `json:"function"`
+			} `json:"tool_calls"`
+		} `json:"delta"`
+		FinishReason *string `json:"finish_reason"`
+	} `json:"choices"`
+	Usage model.Usage `json:"usage"`
+}
+
+func parseSSE(reader io.Reader, onChunk ChunkHandler) (model.Response, error) {
+	var result model.Response
+	var calls []model.ToolCall
+	scanner := bufio.NewScanner(reader)
+	scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if payload == "[DONE]" {
+			break
+		}
+		var event streamEvent
+		if err := json.Unmarshal([]byte(payload), &event); err != nil {
+			return model.Response{}, fmt.Errorf("decode provider event: %w", err)
+		}
+		result.Model = event.Model
+		result.Usage = event.Usage
+		for _, choice := range event.Choices {
+			if choice.FinishReason != nil {
+				result.FinishReason = *choice.FinishReason
+			}
+			if choice.Delta.Content != "" {
+				result.Content += choice.Delta.Content
+				if onChunk != nil {
+					if err := onChunk(choice.Delta.Content); err != nil {
+						return model.Response{}, err
+					}
+				}
+			}
+			for _, call := range choice.Delta.ToolCalls {
+				for len(calls) <= call.Index {
+					calls = append(calls, model.ToolCall{Type: "function"})
+				}
+				if call.ID != "" {
+					calls[call.Index].ID = call.ID
+				}
+				if call.Type != "" {
+					calls[call.Index].Type = call.Type
+				}
+				calls[call.Index].Function.Name += call.Function.Name
+				calls[call.Index].Function.Arguments += call.Function.Arguments
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return model.Response{}, fmt.Errorf("read provider stream: %w", err)
+	}
+	result.ToolCalls = calls
+	return result, nil
+}
