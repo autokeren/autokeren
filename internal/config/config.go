@@ -63,6 +63,11 @@ func Defaults() Config {
 
 func Load(path string) (Config, error) {
 	cfg := Defaults()
+	if path == "" {
+		if home, err := os.UserHomeDir(); err == nil {
+			path = filepath.Join(home, ".config", "autokeren", "config.yaml")
+		}
+	}
 	if path != "" {
 		data, err := os.ReadFile(filepath.Clean(path))
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
