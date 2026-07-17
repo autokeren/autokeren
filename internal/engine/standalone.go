@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/autokeren/autokeren/ghost"
+	"github.com/autokeren/autokeren/internal/browser"
 	"github.com/autokeren/autokeren/internal/config"
 	contextstore "github.com/autokeren/autokeren/internal/context"
 	"github.com/autokeren/autokeren/internal/mcp"
@@ -19,6 +20,8 @@ import (
 	"time"
 )
 
+var sharedBrowser = browser.NewManager()
+
 func RunStandalone(ctx context.Context, cfg config.Config, root, prompt string, onChunk func(string), resume string) (string, error) {
 	return RunStandaloneEvents(ctx, cfg, root, prompt, Events{OnChunk: onChunk}, resume)
 }
@@ -33,7 +36,7 @@ func RunStandaloneEvents(ctx context.Context, cfg config.Config, root, prompt st
 		endpoint += "/v1/chat/completions"
 	}
 	ghostManager := ghost.NewGhostManager(root)
-	registry := tool.NewRegistry().Register(tool.ReadFile{Root: root}).Register(tool.WriteFile{Root: root}).Register(tool.PatchFile{Root: root}).Register(tool.ListFiles{Root: root}).Register(tool.SearchCode{Root: root}).Register(tool.GitStatus{Root: root}).Register(tool.GitDiff{Root: root}).Register(tool.GitLog{Root: root}).Register(tool.GitCommit{Root: root}).Register(tool.NewTodoList(root)).Register(tool.NewKanban(root)).Register(tool.Proof{Root: root}).Register(tool.Remember{Root: root}).Register(tool.FetchURL{}).Register(tool.CFDeploy{Root: root}).Register(tool.CFBuild{Root: root}).Register(tool.CreateProject{Config: cfg}).Register(tool.DeployProject{Config: cfg, Root: root}).Register(tool.ListProjects{Config: cfg}).Register(tool.RepoMap{Root: root}).Register(tool.CFKV{Config: cfg}).Register(tool.CFD1{Config: cfg}).Register(tool.Review{Root: root}).Register(tool.SecurityScan{Root: root}).Register(tool.Rewind{Root: root}).Register(tool.SpawnGhost{Manager: ghostManager}).Register(tool.CheckGhost{Manager: ghostManager}).Register(tool.Shell{Root: root})
+	registry := tool.NewRegistry().Register(tool.ReadFile{Root: root}).Register(tool.WriteFile{Root: root}).Register(tool.PatchFile{Root: root}).Register(tool.ListFiles{Root: root}).Register(tool.SearchCode{Root: root}).Register(tool.GitStatus{Root: root}).Register(tool.GitDiff{Root: root}).Register(tool.GitLog{Root: root}).Register(tool.GitCommit{Root: root}).Register(tool.NewTodoList(root)).Register(tool.NewKanban(root)).Register(tool.Proof{Root: root}).Register(tool.Remember{Root: root}).Register(tool.FetchURL{}).Register(tool.CFDeploy{Root: root}).Register(tool.CFBuild{Root: root}).Register(tool.CreateProject{Config: cfg}).Register(tool.DeployProject{Config: cfg, Root: root}).Register(tool.ListProjects{Config: cfg}).Register(tool.RepoMap{Root: root}).Register(tool.CFKV{Config: cfg}).Register(tool.CFD1{Config: cfg}).Register(tool.Browser{Manager: sharedBrowser}).Register(tool.Review{Root: root}).Register(tool.SecurityScan{Root: root}).Register(tool.Rewind{Root: root}).Register(tool.SpawnGhost{Manager: ghostManager}).Register(tool.CheckGhost{Manager: ghostManager}).Register(tool.Shell{Root: root})
 	var mcpServers []*mcp.Server
 	for _, spec := range cfg.MCPServers {
 		if !spec.Enabled {
