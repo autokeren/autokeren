@@ -535,9 +535,13 @@ pipx upgrade autokeren
 
 ## Arsitektur Hybrid (Go + Python)
 
-`autokeren` menggunakan arsitektur hybrid berkinerja tinggi yang menggabungkan kecepatan driver antarmuka Go dengan fleksibilitas AI Core Python:
+`autokeren` memakai runtime Go-first bertahap dengan fallback Python untuk kompatibilitas:
 
-1.  **Frontend & TUI (Go):** 
+1.  **Runtime agent Go (default untuk mode task/CLI):**
+    Menangani streaming provider, loop multi-turn, tool inti, session, MCP stdio, dan proses ghost native. Bisa dipilih eksplisit dengan `--engine go`.
+2.  **Runtime kompatibilitas Python:**
+    Tetap tersedia lewat `--engine python` dan dipakai otomatis saat `--engine auto` gagal menjalankan jalur provider Go.
+3.  **Frontend & TUI (Go):** 
     Ditulis menggunakan framework **Bubble Tea** dan **Lip Gloss**. Mengelola visual terminal (Layout, File Explorer, Kanban Board, Debate View, input history) dan mengontrol subprocess browser Go-Rod untuk e2e testing.
 2.  **Core AI & Brain (Python):** 
     Menangani logika multi-turn agentic loop, multi-model fallback routing, static analysis (AST parsing), dan permission screening.

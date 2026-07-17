@@ -488,9 +488,13 @@ pipx upgrade autokeren
 
 ## Hybrid Go + Python Architecture
 
-`autokeren` utilizes a high-performance hybrid architecture that combines a fast Go interface driver with the flexibility of a Python AI Core:
+`autokeren` uses a staged Go-first runtime with Python compatibility fallback:
 
-1.  **Frontend & TUI (Go):**
+1.  **Go agent runtime (default for task/CLI mode):**
+    Handles the provider stream, multi-turn loop, core tools, sessions, MCP stdio, and native ghost processes. Select explicitly with `--engine go`.
+2.  **Python compatibility runtime:**
+    Remains available with `--engine python` and is used automatically when `--engine auto` cannot start the Go provider path.
+3.  **Frontend & TUI (Go):**
     Built using **Bubble Tea** and **Lip Gloss**. Manages layout, file explorer tree, input command history, Kanban board, debate panels, and controls the Go-Rod browser automation process.
 2.  **Core AI & Brain (Python):**
     Manages the multi-turn agentic loop, multi-model fallback router, static analysis (AST parsing), and security scanning.
