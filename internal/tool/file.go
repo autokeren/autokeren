@@ -2,10 +2,10 @@ package tool
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type ReadFile struct{ Root string }
@@ -79,4 +79,69 @@ func safePath(root, requested string) (string, error) {
 	return targetAbs, nil
 }
 
-func jsonOutput(value any) string { data, _ := json.Marshal(value); return string(data) }
+type WriteFile struct{ Root string }
+
+func (t WriteFile) Definition() Definition {
+	return Definition{Name: "write_file", Description: "Write UTF-8 content to a file inside project root.", RequiresPermission: true, Parameters: map[string]any{"type": "object", "properties": map[string]any{"path": map[string]any{"type": "string"}, "content": map[string]any{"type": "string"}}, "required": []string{"path", "content"}}}
+}
+func (t WriteFile) NeedsPermission(args map[string]any) (bool, string) {
+	path, _ := args["path"].(string)
+	return true, "Write file: " + path
+}
+func (t WriteFile) Run(ctx context.Context, args map[string]any, _ Emitter) Result {
+	select {
+	case <-ctx.Done():
+		return Result{OK: false, Error: ctx.Err().Error()}
+	default:
+	}
+	path, _ := args["path"].(string)
+	content, _ := args["content"].(string)
+	target, err := safePath(t.Root, path)
+	if err != nil {
+		return Result{OK: false, Error: err.Error()}
+	}
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return Result{OK: false, Error: err.Error()}
+	}
+	if err := os.WriteFile(target, []byte(content), 0o600); err != nil {
+		return Result{OK: false, Error: err.Error()}
+	}
+	return Result{OK: true, Output: fmt.Sprintf("wrote %d bytes", len(content))}
+}
+
+type PatchFile struct{ Root string }
+
+func (t PatchFile) Definition() Definition {
+	return Definition{Name: "patch_file", Description: "Replace one exact string in a file inside project root.", RequiresPermission: true, Parameters: map[string]any{"type": "object", "properties": map[string]any{"path": map[string]any{"type": "string"}, "old_string": map[string]any{"type": "string"}, "new_string": map[string]any{"type": "string"}}, "required": []string{"path", "old_string", "new_string"}}}
+}
+func (t PatchFile) NeedsPermission(args map[string]any) (bool, string) {
+	path, _ := args["path"].(string)
+	return true, "Patch file: " + path
+}
+func (t PatchFile) Run(ctx context.Context, args map[string]any, _ Emitter) Result {
+	select {
+	case <-ctx.Done():
+		return Result{OK: false, Error: ctx.Err().Error()}
+	default:
+	}
+	path, _ := args["path"].(string)
+	oldString, _ := args["old_string"].(string)
+	newString, _ := args["new_string"].(string)
+	target, err := safePath(t.Root, path)
+	if err != nil {
+		return Result{OK: false, Error: err.Error()}
+	}
+	data, err := os.ReadFile(target)
+	if err != nil {
+		return Result{OK: false, Error: err.Error()}
+	}
+	text := string(data)
+	count := strings.Count(text, oldString)
+	if count != 1 {
+		return Result{OK: false, Error: fmt.Sprintf("expected exactly one match, found %d", count)}
+	}
+	if err := os.WriteFile(target, []byte(strings.Replace(text, oldString, newString, 1)), 0o600); err != nil {
+		return Result{OK: false, Error: err.Error()}
+	}
+	return Result{OK: true, Output: "patched file"}
+}
