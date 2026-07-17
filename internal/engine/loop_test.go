@@ -62,3 +62,22 @@ func TestLoopDoesNotStopWhenContentAndToolCallsCoexist(t *testing.T) {
 		t.Fatalf("loop stopped before tool dispatch: response=%#v err=%v calls=%d", response, err, p.calls)
 	}
 }
+
+type emptyThenContentProvider struct{ calls int }
+
+func (p *emptyThenContentProvider) Complete(_ context.Context, _ model.Request, _ provider.ChunkHandler) (model.Response, error) {
+	p.calls++
+	if p.calls == 1 {
+		return model.Response{}, nil
+	}
+	return model.Response{Content: "pulih"}, nil
+}
+
+func TestLoopRetriesEmptyTerminalTurn(t *testing.T) {
+	p := &emptyThenContentProvider{}
+	loop := &Loop{Runner: Runner{Provider: p}, MaxIterations: 3}
+	response, err := loop.Run(context.Background(), "hello", Events{})
+	if err != nil || response.Content != "pulih" || p.calls != 2 {
+		t.Fatalf("empty turn ended session: response=%#v err=%v calls=%d", response, err, p.calls)
+	}
+}

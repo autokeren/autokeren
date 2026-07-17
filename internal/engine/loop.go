@@ -8,6 +8,7 @@ import (
 	"github.com/autokeren/autokeren/internal/model"
 	"github.com/autokeren/autokeren/internal/provider"
 	"github.com/autokeren/autokeren/internal/tool"
+	"strings"
 )
 
 type Events struct {
@@ -56,6 +57,11 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 		}
 		if len(last.ToolCalls) == 0 {
 			l.Context.Add(model.Message{Role: "assistant", Content: last.Content})
+			if strings.TrimSpace(last.Content) == "" {
+				// Providers can occasionally emit an empty terminal SSE turn. Give
+				// the model another turn instead of silently ending the session.
+				continue
+			}
 			return last, nil
 		}
 		// Preserve any streamed reasoning/content alongside tool calls, but always
