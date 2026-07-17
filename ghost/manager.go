@@ -41,6 +41,7 @@ type GhostManager struct {
 	mu      sync.RWMutex
 	agents  map[int]*GhostAgentInfo
 	cancels map[int]context.CancelFunc
+	procs   map[int]*exec.Cmd
 	nextID  int
 }
 
@@ -52,6 +53,7 @@ func NewGhostManager(projectRoot string) *GhostManager {
 		Timeout:     30 * time.Minute,
 		agents:      make(map[int]*GhostAgentInfo),
 		cancels:     make(map[int]context.CancelFunc),
+		procs:       make(map[int]*exec.Cmd),
 		nextID:      1,
 	}
 }
@@ -100,6 +102,7 @@ func (gm *GhostManager) Spawn(task string) (*GhostAgentInfo, error) {
 	info := &GhostAgentInfo{ID: id, Task: task, Status: "running", StartedAt: time.Now(), LogFile: logFile}
 	gm.agents[id] = info
 	gm.cancels[id] = cancel
+	gm.procs[id] = cmd
 	gm.writeMetadataLocked(info)
 	go gm.wait(id, cmd, ctx, log)
 	return info, nil
@@ -132,6 +135,7 @@ func (gm *GhostManager) wait(id int, cmd *exec.Cmd, ctx context.Context, log *os
 		info.ExitCode = cmd.ProcessState.ExitCode()
 	}
 	delete(gm.cancels, id)
+	delete(gm.procs, id)
 	gm.writeMetadataLocked(info)
 }
 
@@ -165,6 +169,9 @@ func (gm *GhostManager) Kill(agentID int) bool {
 	info.Status = "killed"
 	if hasCancel {
 		cancel()
+	}
+	if cmd, ok := gm.procs[agentID]; ok {
+		terminateProcessGroup(cmd)
 	}
 	gm.writeMetadataLocked(info)
 	gm.mu.Unlock()
