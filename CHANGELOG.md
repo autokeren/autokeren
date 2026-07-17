@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.74] - 2026-07-17
+
+### Changed
+- fix(polish): clean up trailing whitespaces, refactor path resolver with relative_to, dry schema validation, and expand build week README documentation
+
 ## [0.11.73] - 2026-07-17
 
 ### Changed
