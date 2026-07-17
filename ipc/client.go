@@ -20,10 +20,12 @@ import (
 	"time"
 
 	"github.com/atotto/clipboard"
+	"github.com/autokeren/autokeren/ghost"
 	"github.com/autokeren/autokeren/internal/config"
 	contextstore "github.com/autokeren/autokeren/internal/context"
 	"github.com/autokeren/autokeren/internal/engine"
 	"github.com/autokeren/autokeren/internal/model"
+	projectstore "github.com/autokeren/autokeren/internal/project"
 	sessionstore "github.com/autokeren/autokeren/internal/session"
 	"github.com/autokeren/autokeren/internal/tool"
 )
@@ -81,6 +83,8 @@ type Client struct {
 	localRunMu            sync.Mutex
 	localRunCancel        context.CancelFunc
 	localDebug            bool
+	localGhosts           *ghost.GhostManager
+	localProjects         *projectstore.Manager
 }
 
 func NewClient(callbacks *IPCCallbacks) *Client {
@@ -217,6 +221,8 @@ func (c *Client) startLocal(projectRoot, configPath string) error {
 	if err != nil {
 		return err
 	}
+	c.localGhosts = ghost.NewGhostManager(projectRoot)
+	c.localProjects = projectstore.NewManager()
 	atomic.StoreInt32(&c.isClosed, 0)
 	return nil
 }
@@ -572,6 +578,102 @@ func copyableSessionMessage(messages []model.Message, selector string) (string, 
 	return visible[index-1].Content, nil
 }
 
+func (c *Client) projectCommand(argument string) (string, error) {
+	if c.localProjects == nil {
+		c.localProjects = projectstore.NewManager()
+	}
+	if c.localGhosts == nil {
+		c.localGhosts = ghost.NewGhostManager(c.localRoot)
+	}
+	parts := strings.Fields(argument)
+	if len(parts) == 0 {
+		return "Perintah /project:\n  /project new <nama>\n  /project add <agent> <task>\n  /project run\n  /project status\n  /project output <agent>\n  /project list\n  /project switch <nama>", nil
+	}
+	subcommand := parts[0]
+	rest := strings.TrimSpace(strings.TrimPrefix(argument, subcommand))
+	switch subcommand {
+	case "new":
+		project, err := c.localProjects.New(rest)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Project %q dibuat. Tambah agent dengan /project add <nama> <task>.", project.Name), nil
+	case "add":
+		fields := strings.Fields(rest)
+		if len(fields) < 2 {
+			return "", errors.New("format: /project add <nama_agent> <task>")
+		}
+		worker, err := c.localProjects.AddWorker(fields[0], strings.TrimSpace(strings.TrimPrefix(rest, fields[0])))
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Agent %q ditambahkan. Task: %s", worker.Name, worker.Task), nil
+	case "run":
+		launched, err := c.localProjects.Run(c.localGhosts)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Menjalankan %d agent Go secara paralel. Pantau dengan /project status.", launched), nil
+	case "status":
+		c.localProjects.Refresh(c.localGhosts)
+		project := c.localProjects.Active()
+		if project == nil {
+			return "", errors.New("belum ada project aktif")
+		}
+		var builder strings.Builder
+		builder.WriteString("Project: " + project.Name + " — " + project.Summary())
+		for _, worker := range project.Workers {
+			builder.WriteString(fmt.Sprintf("\n- %s [%s] %s", worker.Name, worker.Status, worker.Task))
+		}
+		return builder.String(), nil
+	case "output":
+		if rest == "" {
+			return "", errors.New("format: /project output <nama_agent>")
+		}
+		c.localProjects.Refresh(c.localGhosts)
+		project := c.localProjects.Active()
+		if project == nil {
+			return "", errors.New("belum ada project aktif")
+		}
+		worker := project.Worker(rest)
+		if worker == nil {
+			return "", fmt.Errorf("agent %q tidak ditemukan", rest)
+		}
+		output := worker.Output
+		if output == "" {
+			output = worker.Error
+		}
+		if output == "" {
+			output = "(belum ada output)"
+		}
+		return fmt.Sprintf("Output agent %q:\n%s", worker.Name, output), nil
+	case "list":
+		projects := c.localProjects.List()
+		if len(projects) == 0 {
+			return "Belum ada project. Buat dengan /project new <nama>.", nil
+		}
+		active := c.localProjects.ActiveName()
+		var builder strings.Builder
+		builder.WriteString("Daftar project:")
+		for _, project := range projects {
+			marker := ""
+			if project.Name == active {
+				marker = " (aktif)"
+			}
+			builder.WriteString(fmt.Sprintf("\n- %s%s — %s", project.Name, marker, project.Summary()))
+		}
+		return builder.String(), nil
+	case "switch":
+		project, err := c.localProjects.Switch(rest)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Project aktif: %s", project.Name), nil
+	default:
+		return "", errors.New("sub-command project tidak dikenal")
+	}
+}
+
 func (c *Client) localContextInfo() map[string]any {
 	tokens := 0
 	if sessions, err := c.localSessionManager(); err == nil && c.localSession != "default" {
@@ -615,6 +717,12 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 			selector = parts[1]
 		}
 		message, err := c.copySessionMessage(selector)
+		if err != nil {
+			return true, err
+		}
+		output = message
+	case "/project":
+		message, err := c.projectCommand(strings.TrimSpace(strings.TrimPrefix(input, "/project")))
 		if err != nil {
 			return true, err
 		}

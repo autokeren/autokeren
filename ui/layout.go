@@ -118,6 +118,7 @@ var slashCommands = []SlashCommandInfo{
 	{Name: "/copy", Description: "Salin pesan terakhir atau pesan ke-N"},
 	{Name: "/debug", Description: "Aktifkan/nonaktifkan mode debug"},
 	{Name: "/memory", Description: "Tampilkan memory proyek"},
+	{Name: "/project", Description: "Kelola pekerjaan multi-agent"},
 	{Name: "/export", Description: "Ekspor percakapan ke Markdown"},
 	{Name: "/ghost", Description: "Kelola background agent"},
 	{Name: "/board", Description: "Buka/tutup papan Kanban proyek (Shortcut: Ctrl+K)"},

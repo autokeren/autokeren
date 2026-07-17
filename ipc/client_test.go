@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/autokeren/autokeren/internal/config"
@@ -72,5 +73,19 @@ func TestCopyableSessionMessage(t *testing.T) {
 	first, err := copyableSessionMessage(messages, "1")
 	if err != nil || first != "satu" {
 		t.Fatalf("unexpected selected message: %q err=%v", first, err)
+	}
+}
+
+func TestProjectCommandBuildsNativeProject(t *testing.T) {
+	c := &Client{localRoot: t.TempDir()}
+	if output, err := c.projectCommand("new demo"); err != nil || output == "" {
+		t.Fatalf("new project failed: %q err=%v", output, err)
+	}
+	if output, err := c.projectCommand("add reviewer periksa struktur proyek"); err != nil || output == "" {
+		t.Fatalf("add worker failed: %q err=%v", output, err)
+	}
+	output, err := c.projectCommand("status")
+	if err != nil || !strings.Contains(output, "reviewer [pending]") {
+		t.Fatalf("unexpected status: %q err=%v", output, err)
 	}
 }
