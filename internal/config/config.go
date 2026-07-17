@@ -43,11 +43,18 @@ type Autokeren struct {
 	AutoCompactThreshold float64 `yaml:"auto_compact_threshold"`
 	Language             string  `yaml:"language"`
 }
+type MCPServer struct {
+	Name    string            `yaml:"name"`
+	Command []string          `yaml:"command"`
+	Env     map[string]string `yaml:"env"`
+	Enabled bool              `yaml:"enabled"`
+}
 type Config struct {
-	Auth       Auth       `yaml:"auth"`
-	Cloudflare Cloudflare `yaml:"cloudflare"`
-	Retry      Retry      `yaml:"retry"`
-	Autokeren  Autokeren  `yaml:"autokeren"`
+	Auth       Auth        `yaml:"auth"`
+	Cloudflare Cloudflare  `yaml:"cloudflare"`
+	Retry      Retry       `yaml:"retry"`
+	Autokeren  Autokeren   `yaml:"autokeren"`
+	MCPServers []MCPServer `yaml:"mcp_servers"`
 }
 
 func Defaults() Config {
