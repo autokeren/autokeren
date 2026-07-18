@@ -17,7 +17,7 @@ import (
 	"github.com/autokeren/autokeren/internal/tool"
 )
 
-const fallbackVersion = "0.11.80"
+const fallbackVersion = "0.12.0"
 
 func runtimeVersion() string {
 	if version := strings.TrimSpace(getenv("AUTOKEREN_VERSION")); version != "" {
