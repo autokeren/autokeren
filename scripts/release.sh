@@ -66,7 +66,7 @@ echo "📦 Bump: $CURRENT → $NEW_VER"
 sed -i "s/__version__ = \"$CURRENT\"/__version__ = \"$NEW_VER\"/" autokeren/__init__.py
 sed -i "s/^version = \"$CURRENT\"/version = \"$NEW_VER\"/" pyproject.toml
 sed -i "s/version = \"v$CURRENT\"/version = \"v$NEW_VER\"/" ui/layout.go
-sed -i "s/version = \"v$CURRENT\"/version = \"v$NEW_VER\"/" ui/sidebar.go
+sed -i "s/version := \"v$CURRENT\"/version := \"v$NEW_VER\"/" ui/sidebar.go
 sed -i "s/const fallbackVersion = \"$CURRENT\"/const fallbackVersion = \"$NEW_VER\"/" cmd/bootstrap.go
 
 # Verifikasi
@@ -82,7 +82,7 @@ if ! grep -q "version = \"v$NEW_VER\"" ui/layout.go; then
   echo "❌ Gagal update ui/layout.go"
   exit 1
 fi
-if ! grep -q "version = \"v$NEW_VER\"" ui/sidebar.go; then
+if ! grep -q "version := \"v$NEW_VER\"" ui/sidebar.go; then
   echo "❌ Gagal update ui/sidebar.go"
   exit 1
 fi
