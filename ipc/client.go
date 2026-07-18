@@ -22,6 +22,7 @@ import (
 
 	"github.com/atotto/clipboard"
 	"github.com/autokeren/autokeren/ghost"
+	"github.com/autokeren/autokeren/internal/checkpoint"
 	"github.com/autokeren/autokeren/internal/config"
 	contextstore "github.com/autokeren/autokeren/internal/context"
 	"github.com/autokeren/autokeren/internal/engine"
@@ -1057,7 +1058,15 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 				steps = n
 			}
 		}
-		result := (tool.Rewind{Root: c.localRoot}).Run(context.Background(), map[string]any{"steps": float64(steps)}, nil)
+		var manager *checkpoint.Manager
+		if c.localConfig.Autokeren.TimeTravel.Enabled {
+			var checkpointErr error
+			manager, checkpointErr = checkpoint.New(c.localRoot, "default", c.localConfig.Autokeren.TimeTravel.MaxCheckpoints, c.localConfig.Autokeren.TimeTravel.AutoCheckpoint)
+			if checkpointErr != nil {
+				return true, fmt.Errorf("inisialisasi time-travel: %w", checkpointErr)
+			}
+		}
+		result := (tool.Rewind{Manager: manager}).Run(context.Background(), map[string]any{"steps": float64(steps)}, nil)
 		output = fmt.Sprint(result.Output)
 		if !result.OK {
 			output = result.Error

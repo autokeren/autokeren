@@ -6,6 +6,7 @@ import (
 	"os/exec"
 
 	"github.com/autokeren/autokeren/internal/runtimeenv"
+	"github.com/autokeren/autokeren/internal/safety"
 )
 
 type Shell struct {
@@ -24,6 +25,9 @@ func (t Shell) Run(ctx context.Context, args map[string]any, emit Emitter) Resul
 	command, _ := args["command"].(string)
 	if command == "" {
 		return Result{OK: false, Error: "command is required"}
+	}
+	if blocked, reason := safety.DangerousCommand(command); blocked && !t.AllowDangerous {
+		return Result{OK: false, Error: reason}
 	}
 	program, commandArgs := runtimeenv.Current().ShellInvocation(command)
 	cmd := exec.CommandContext(ctx, program, commandArgs...)

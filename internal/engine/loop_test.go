@@ -3,13 +3,17 @@ package engine
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/autokeren/autokeren/internal/checkpoint"
 	contextstore "github.com/autokeren/autokeren/internal/context"
 	"github.com/autokeren/autokeren/internal/model"
 	"github.com/autokeren/autokeren/internal/provider"
 	"github.com/autokeren/autokeren/internal/tool"
 	"strings"
-	"testing"
-	"time"
 )
 
 type fakeProvider struct{ calls int }
@@ -44,6 +48,37 @@ func TestLoopDispatchesToolAndContinues(t *testing.T) {
 	}
 	if response.Content != "finished" || p.calls != 2 {
 		t.Fatalf("unexpected response %#v calls=%d", response, p.calls)
+	}
+}
+
+type writeFileProvider struct{ calls int }
+
+func (p *writeFileProvider) Complete(_ context.Context, _ model.Request, _ provider.ChunkHandler) (model.Response, error) {
+	p.calls++
+	if p.calls == 1 {
+		return model.Response{ToolCalls: []model.ToolCall{{ID: "write", Type: "function", Function: model.ToolCallFunction{Name: "write_file", Arguments: `{"path":"created.txt","content":"checkpointed"}`}}}}, nil
+	}
+	return model.Response{Content: "selesai"}, nil
+}
+
+func TestLoopCheckpointsWriteAndRewindRestoresDisk(t *testing.T) {
+	root := t.TempDir()
+	manager, err := checkpoint.New(root, "default", 50, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loop := &Loop{Runner: Runner{Provider: &writeFileProvider{}}, Tools: tool.NewRegistry().Register(tool.WriteFile{Root: root}), MaxIterations: 3, Checkpoints: manager}
+	if _, err := loop.Run(context.Background(), "buat file", Events{}); err != nil {
+		t.Fatal(err)
+	}
+	if data, err := os.ReadFile(filepath.Join(root, "created.txt")); err != nil || string(data) != "checkpointed" || manager.Count() != 1 {
+		t.Fatalf("write/checkpoint gagal: data=%q err=%v checkpoints=%d", data, err, manager.Count())
+	}
+	if result := (tool.Rewind{Manager: manager}).Run(context.Background(), map[string]any{"steps": float64(1)}, nil); !result.OK {
+		t.Fatal(result.Error)
+	}
+	if _, err := os.Stat(filepath.Join(root, "created.txt")); !os.IsNotExist(err) {
+		t.Fatalf("rewind loop tidak memulihkan disk: %v", err)
 	}
 }
 

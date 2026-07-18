@@ -6,6 +6,7 @@ import (
 	"github.com/autokeren/autokeren/ghost"
 	"github.com/autokeren/autokeren/internal/agentresult"
 	"github.com/autokeren/autokeren/internal/browser"
+	"github.com/autokeren/autokeren/internal/checkpoint"
 	"github.com/autokeren/autokeren/internal/config"
 	contextstore "github.com/autokeren/autokeren/internal/context"
 	"github.com/autokeren/autokeren/internal/director"
@@ -15,6 +16,7 @@ import (
 	"github.com/autokeren/autokeren/internal/model"
 	promptbuilder "github.com/autokeren/autokeren/internal/prompt"
 	"github.com/autokeren/autokeren/internal/provider"
+	"github.com/autokeren/autokeren/internal/safety"
 	"github.com/autokeren/autokeren/internal/session"
 	"github.com/autokeren/autokeren/internal/tool"
 	"github.com/autokeren/autokeren/internal/workflow"
@@ -84,7 +86,16 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 	}
 	ghostManager := ghost.NewGhostManager(root)
 	coordinator := director.New(root, ghostManager)
-	registry := tool.NewRegistry().Register(tool.Environment{}).Register(tool.ReadFile{Root: root}).Register(tool.WriteFile{Root: root}).Register(tool.PatchFile{Root: root}).Register(tool.ListFiles{Root: root}).Register(tool.SearchCode{Root: root}).Register(tool.GitStatus{Root: root}).Register(tool.GitDiff{Root: root}).Register(tool.GitLog{Root: root}).Register(tool.GitCommit{Root: root}).Register(tool.GitBranch{Root: root}).Register(tool.GitAutoCommit{Root: root}).Register(tool.NewTodoList(root)).Register(tool.NewKanban(root)).Register(tool.Proof{Root: root}).Register(tool.Remember{Root: root}).Register(tool.FetchURL{}).Register(tool.CFDeploy{Root: root}).Register(tool.CFBuild{Root: root}).Register(tool.CFVerify{Root: root, Browser: sharedBrowser}).Register(tool.Genome{Root: root}).Register(tool.CreateProject{Config: cfg}).Register(tool.DeployProject{Config: cfg, Root: root}).Register(tool.ListProjects{Config: cfg}).Register(tool.RepoMap{Root: root}).Register(tool.CFKV{Config: cfg}).Register(tool.CFD1{Config: cfg}).Register(tool.Browser{Manager: sharedBrowser}).Register(tool.Research{}).Register(tool.Review{Root: root}).Register(tool.SecurityScan{Root: root}).Register(tool.Rewind{Root: root}).Register(tool.SpawnGhost{Manager: ghostManager}).Register(tool.AwaitAgents{Coordinator: coordinator}).Register(tool.Collaborate{Manager: ghostManager}).Register(tool.CheckGhost{Manager: ghostManager}).Register(tool.StopGhost{Manager: ghostManager}).Register(tool.Shell{Root: root})
+	var checkpoints *checkpoint.Manager
+	if cfg.Autokeren.TimeTravel.Enabled {
+		var checkpointErr error
+		checkpoints, checkpointErr = checkpoint.New(root, "default", cfg.Autokeren.TimeTravel.MaxCheckpoints, cfg.Autokeren.TimeTravel.AutoCheckpoint)
+		if checkpointErr != nil {
+			return "", fmt.Errorf("inisialisasi time-travel: %w", checkpointErr)
+		}
+	}
+	writeGuard := safety.NewGuard(root, safety.Policy{SecurityEnabled: cfg.Autokeren.VibeSecurity.Enabled, ScanOnWrite: cfg.Autokeren.VibeSecurity.ScanOnWrite, BlockOnCritical: cfg.Autokeren.VibeSecurity.BlockOnCritical, Checks: cfg.Autokeren.VibeSecurity.Checks, GuardianEnabled: cfg.Autokeren.ArchitectureGuardian.Enabled, BlockDuplicates: cfg.Autokeren.ArchitectureGuardian.BlockDuplicates, ScanInterval: cfg.Autokeren.ArchitectureGuardian.ScanInterval, EnforcementEnabled: cfg.Autokeren.LiveEnforcement.Enabled, RulesFile: cfg.Autokeren.LiveEnforcement.RulesFile, BlockOnRuleViolation: cfg.Autokeren.LiveEnforcement.BlockOnViolation})
+	registry := tool.NewRegistry().Register(tool.Environment{}).Register(tool.ReadFile{Root: root}).Register(tool.WriteFile{Root: root, Guard: writeGuard}).Register(tool.PatchFile{Root: root, Guard: writeGuard}).Register(tool.ListFiles{Root: root}).Register(tool.SearchCode{Root: root}).Register(tool.GitStatus{Root: root}).Register(tool.GitDiff{Root: root}).Register(tool.GitLog{Root: root}).Register(tool.GitCommit{Root: root}).Register(tool.GitBranch{Root: root}).Register(tool.GitAutoCommit{Root: root}).Register(tool.NewTodoList(root)).Register(tool.NewKanban(root)).Register(tool.Proof{Root: root}).Register(tool.Remember{Root: root}).Register(tool.FetchURL{}).Register(tool.CFDeploy{Root: root}).Register(tool.CFBuild{Root: root}).Register(tool.CFVerify{Root: root, Browser: sharedBrowser}).Register(tool.Genome{Root: root}).Register(tool.CreateProject{Config: cfg}).Register(tool.DeployProject{Config: cfg, Root: root}).Register(tool.ListProjects{Config: cfg}).Register(tool.RepoMap{Root: root}).Register(tool.CFKV{Config: cfg}).Register(tool.CFD1{Config: cfg}).Register(tool.Browser{Manager: sharedBrowser}).Register(tool.Research{}).Register(tool.Review{Root: root}).Register(tool.SecurityScan{Root: root}).Register(tool.Rewind{Manager: checkpoints}).Register(tool.SpawnGhost{Manager: ghostManager}).Register(tool.AwaitAgents{Coordinator: coordinator}).Register(tool.Collaborate{Manager: ghostManager}).Register(tool.CheckGhost{Manager: ghostManager}).Register(tool.StopGhost{Manager: ghostManager}).Register(tool.Shell{Root: root})
 	var fddmClient *fddm.Client
 	if cfg.Autokeren.FDDM.Enabled && strings.TrimSpace(cfg.Autokeren.FDDM.URL) != "" {
 		fddmClient = fddm.New(fddm.Config{URL: cfg.Autokeren.FDDM.URL, APIKey: cfg.Autokeren.FDDM.APIKey}, nil)
@@ -181,7 +192,7 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 	if err != nil {
 		return "", err
 	}
-	loop := &Loop{Runner: Runner{Provider: router}, Model: primaryModel, Temperature: cfg.Cloudflare.Temperature, MaxTokens: cfg.Cloudflare.MaxTokens, Tools: registry, Context: store, RequestPrelude: prelude, MaxIterations: cfg.Autokeren.MaxIterations, PlanMode: cfg.Autokeren.PlanMode}
+	loop := &Loop{Runner: Runner{Provider: router}, Model: primaryModel, Temperature: cfg.Cloudflare.Temperature, MaxTokens: cfg.Cloudflare.MaxTokens, Tools: registry, Context: store, RequestPrelude: prelude, MaxIterations: cfg.Autokeren.MaxIterations, PlanMode: cfg.Autokeren.PlanMode, Checkpoints: checkpoints}
 	if events.ConfirmPermission == nil {
 		events.ConfirmPermission = defaultPermission
 	}

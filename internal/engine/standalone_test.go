@@ -11,6 +11,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/autokeren/autokeren/internal/checkpoint"
 	"github.com/autokeren/autokeren/internal/config"
 	"github.com/autokeren/autokeren/internal/memory"
 	"github.com/autokeren/autokeren/internal/model"
@@ -63,6 +64,49 @@ func TestRunStandaloneFallsBackToSecondaryModel(t *testing.T) {
 	defer mu.Unlock()
 	if len(models) != 2 || models[0] != "primary" || models[1] != "secondary" {
 		t.Fatalf("models = %#v", models)
+	}
+}
+
+func TestRunStandaloneWritesCheckpointAndRewindsFile(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("AUTOKEREN_CONFIG_DIR", filepath.Join(root, "config"))
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "text/event-stream")
+		if calls == 1 {
+			_, _ = w.Write([]byte("data: {\"model\":\"test\",\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"write-1\",\"type\":\"function\",\"function\":{\"name\":\"write_file\",\"arguments\":\"{\\\"path\\\":\\\"checkpointed.txt\\\",\\\"content\\\":\\\"selamat\\\"}\"}}]}}]}\n\n"))
+			_, _ = w.Write([]byte("data: [DONE]\n\n"))
+			return
+		}
+		_, _ = w.Write([]byte("data: {\"model\":\"test\",\"choices\":[{\"delta\":{\"content\":\"berhasil\"},\"finish_reason\":\"stop\"}]}\n\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer server.Close()
+	cfg := config.Defaults()
+	cfg.Auth.BaseURL = server.URL
+	cfg.Auth.APIKey = "test-key"
+	cfg.Cloudflare.SecondaryModel = ""
+	cfg.Retry.MaxRetries = 0
+	content, err := RunStandalone(t.Context(), cfg, root, "buat file", nil, "")
+	if err != nil || content != "berhasil" || calls != 2 {
+		t.Fatalf("standalone write gagal: content=%q err=%v calls=%d", content, err, calls)
+	}
+	if data, err := os.ReadFile(filepath.Join(root, "checkpointed.txt")); err != nil || string(data) != "selamat" {
+		t.Fatalf("file belum ditulis: data=%q err=%v", data, err)
+	}
+	manager, err := checkpoint.New(root, "default", cfg.Autokeren.TimeTravel.MaxCheckpoints, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manager.Count() != 1 {
+		t.Fatalf("checkpoint tidak tersimpan: count=%d", manager.Count())
+	}
+	if _, err := manager.Rewind(1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "checkpointed.txt")); !os.IsNotExist(err) {
+		t.Fatalf("rewind standalone tidak memulihkan file: %v", err)
 	}
 }
 

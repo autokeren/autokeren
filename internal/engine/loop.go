@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/autokeren/autokeren/internal/checkpoint"
 	contextstore "github.com/autokeren/autokeren/internal/context"
 	"github.com/autokeren/autokeren/internal/model"
 	"github.com/autokeren/autokeren/internal/provider"
@@ -34,6 +35,7 @@ type Loop struct {
 	Temperature    float64
 	MaxTokens      int
 	PlanMode       bool
+	Checkpoints    *checkpoint.Manager
 }
 
 const maxContextRecoveryAttempts = 3
@@ -146,11 +148,25 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 			if events.OnToolStart != nil {
 				events.OnToolStart(call.Function.Name, args)
 			}
+			beforeCheckpoint := map[string]*string(nil)
+			if l.Checkpoints != nil && l.Checkpoints.Enabled() {
+				beforeCheckpoint = l.Checkpoints.Snapshot(call.Function.Name, args)
+			}
 			result := l.Tools.Run(ctx, call.Function.Name, args, func(line string) {
 				if events.OnToolOutput != nil {
 					events.OnToolOutput(call.Function.Name, line)
 				}
 			})
+			if l.Checkpoints != nil && l.Checkpoints.Enabled() {
+				checkpointResult := map[string]any{"ok": result.OK, "output": result.Output, "error": result.Error}
+				if _, checkpointErr := l.Checkpoints.Save(call.Function.Name, args, checkpointResult, result.OK, beforeCheckpoint); checkpointErr != nil {
+					warning := "checkpoint gagal disimpan: " + checkpointErr.Error()
+					if events.OnToolOutput != nil {
+						events.OnToolOutput("checkpoint", warning)
+					}
+					l.Context.Add(model.Message{Role: "system", Content: "⚠ " + warning})
+				}
+			}
 			if events.OnToolEnd != nil {
 				events.OnToolEnd(call.Function.Name, result)
 			}

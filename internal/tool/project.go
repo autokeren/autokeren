@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/autokeren/autokeren/internal/config"
+	"github.com/autokeren/autokeren/internal/safety"
 	"net/http"
 	"os"
 	"strings"
@@ -46,6 +47,9 @@ func (t DeployProject) Run(ctx context.Context, args map[string]any, _ Emitter) 
 		target, err := safePath(t.Root, path)
 		if err != nil {
 			return Result{OK: false, Error: err.Error()}
+		}
+		if blocked, reason := safety.ValidateRead(target); blocked {
+			return Result{OK: false, Error: reason}
 		}
 		data, err := os.ReadFile(target)
 		if err != nil {

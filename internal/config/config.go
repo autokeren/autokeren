@@ -36,23 +36,49 @@ type Retry struct {
 	CircuitOpenSeconds      int     `yaml:"circuit_open_seconds"`
 }
 type Autokeren struct {
-	PlanMode             bool    `yaml:"plan_mode"`
-	MaxIterations        int     `yaml:"max_iterations"`
-	ShellTimeout         int     `yaml:"shell_timeout"`
-	ContextWindow        int     `yaml:"context_window"`
-	AutoCompact          bool    `yaml:"auto_compact"`
-	AutoCompactThreshold float64 `yaml:"auto_compact_threshold"`
-	CompactTailTurns     int     `yaml:"compact_tail_turns"`
-	AutoSaveSession      bool    `yaml:"auto_save_session"`
-	MemoryEnabled        bool    `yaml:"memory_enabled"`
-	MaxToolCalls         int     `yaml:"max_tool_calls"`
-	Language             string  `yaml:"language"`
-	FDDM                 FDDM    `yaml:"fddm"`
+	PlanMode             bool                 `yaml:"plan_mode"`
+	MaxIterations        int                  `yaml:"max_iterations"`
+	ShellTimeout         int                  `yaml:"shell_timeout"`
+	ContextWindow        int                  `yaml:"context_window"`
+	AutoCompact          bool                 `yaml:"auto_compact"`
+	AutoCompactThreshold float64              `yaml:"auto_compact_threshold"`
+	CompactTailTurns     int                  `yaml:"compact_tail_turns"`
+	AutoSaveSession      bool                 `yaml:"auto_save_session"`
+	MemoryEnabled        bool                 `yaml:"memory_enabled"`
+	MaxToolCalls         int                  `yaml:"max_tool_calls"`
+	Language             string               `yaml:"language"`
+	FDDM                 FDDM                 `yaml:"fddm"`
+	TimeTravel           TimeTravel           `yaml:"time_travel"`
+	ArchitectureGuardian ArchitectureGuardian `yaml:"architecture_guardian"`
+	VibeSecurity         VibeSecurity         `yaml:"vibe_security"`
+	LiveEnforcement      LiveEnforcement      `yaml:"live_enforcement"`
 }
 type FDDM struct {
 	Enabled bool   `yaml:"enabled"`
 	URL     string `yaml:"url"`
 	APIKey  string `yaml:"api_key"`
+}
+type TimeTravel struct {
+	Enabled        bool `yaml:"enabled"`
+	MaxCheckpoints int  `yaml:"max_checkpoints"`
+	AutoCheckpoint bool `yaml:"auto_checkpoint"`
+}
+type ArchitectureGuardian struct {
+	Enabled         bool   `yaml:"enabled"`
+	GenomeFile      string `yaml:"genome_file"`
+	BlockDuplicates bool   `yaml:"block_duplicates"`
+	ScanInterval    int    `yaml:"scan_interval"`
+}
+type VibeSecurity struct {
+	Enabled         bool     `yaml:"enabled"`
+	ScanOnWrite     bool     `yaml:"scan_on_write"`
+	BlockOnCritical bool     `yaml:"block_on_critical"`
+	Checks          []string `yaml:"checks"`
+}
+type LiveEnforcement struct {
+	Enabled          bool   `yaml:"enabled"`
+	RulesFile        string `yaml:"rules_file"`
+	BlockOnViolation bool   `yaml:"block_on_violation"`
 }
 type MCPServer struct {
 	Name    string            `yaml:"name"`
@@ -89,7 +115,7 @@ func ResolveModel(modelID, mode string) string {
 }
 
 func Defaults() Config {
-	return Config{Auth: Auth{Mode: "platform", BaseURL: "https://api.developers.autokeren.com", LocalEndpoint: "http://localhost:11434"}, Cloudflare: Cloudflare{PrimaryModel: "kimi-code", SecondaryModel: "kimi-2.6", MaxTokens: 8192, Temperature: 0.3, Timeout: 120}, Retry: Retry{MaxRetries: 5, BaseDelay: 1, MaxDelay: 60, ExponentialBase: 2, Jitter: true, CircuitFailureThreshold: 5, CircuitOpenSeconds: 30}, Autokeren: Autokeren{MaxIterations: 50, ShellTimeout: 180, ContextWindow: 262144, AutoCompact: true, AutoCompactThreshold: 0.6, CompactTailTurns: 6, AutoSaveSession: true, MemoryEnabled: true}}
+	return Config{Auth: Auth{Mode: "platform", BaseURL: "https://api.developers.autokeren.com", LocalEndpoint: "http://localhost:11434"}, Cloudflare: Cloudflare{PrimaryModel: "kimi-code", SecondaryModel: "kimi-2.6", MaxTokens: 8192, Temperature: 0.3, Timeout: 120}, Retry: Retry{MaxRetries: 5, BaseDelay: 1, MaxDelay: 60, ExponentialBase: 2, Jitter: true, CircuitFailureThreshold: 5, CircuitOpenSeconds: 30}, Autokeren: Autokeren{MaxIterations: 50, ShellTimeout: 180, ContextWindow: 262144, AutoCompact: true, AutoCompactThreshold: 0.6, CompactTailTurns: 6, AutoSaveSession: true, MemoryEnabled: true, TimeTravel: TimeTravel{Enabled: true, MaxCheckpoints: 50, AutoCheckpoint: true}, ArchitectureGuardian: ArchitectureGuardian{Enabled: true, GenomeFile: ".ak-genome.md", ScanInterval: 5}, VibeSecurity: VibeSecurity{Enabled: true, ScanOnWrite: true, BlockOnCritical: true, Checks: []string{"secrets", "sqli", "xss", "forbidden"}}, LiveEnforcement: LiveEnforcement{Enabled: true, RulesFile: ".ak-rules.yaml", BlockOnViolation: true}}}
 }
 
 func Load(path string) (Config, error) {

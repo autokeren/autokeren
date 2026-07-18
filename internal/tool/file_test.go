@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/autokeren/autokeren/internal/safety"
 )
 
 func TestReadFileBlocksEscape(t *testing.T) {
@@ -45,5 +47,34 @@ func TestWriteAndPatchFile(t *testing.T) {
 	}
 	if string(data) != "hello Go" {
 		t.Fatalf("unexpected content: %s", data)
+	}
+}
+
+func TestReadFileProtectsSensitivePaths(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, ".env"), []byte("TOKEN=test"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	reader := ReadFile{Root: root}
+	if needs, _ := reader.NeedsPermission(map[string]any{"path": ".env"}); !needs {
+		t.Fatal(".env harus meminta permission")
+	}
+	if err := os.WriteFile(filepath.Join(root, "id_rsa"), []byte("private"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if result := reader.Run(context.Background(), map[string]any{"path": "id_rsa"}, nil); result.OK {
+		t.Fatalf("private key tidak boleh terbaca: %#v", result)
+	}
+}
+
+func TestWriteFileBlocksCriticalFindingBeforeDiskChange(t *testing.T) {
+	root := t.TempDir()
+	guard := safety.NewGuard(root, safety.Policy{SecurityEnabled: true, ScanOnWrite: true, BlockOnCritical: true, Checks: []string{"secrets"}})
+	result := (WriteFile{Root: root, Guard: guard}).Run(context.Background(), map[string]any{"path": "app.py", "content": "api_key = 'abcdefghijklmnopqrstuvwxyz123456'"}, nil)
+	if result.OK {
+		t.Fatalf("secret harus diblokir: %#v", result)
+	}
+	if _, err := os.Stat(filepath.Join(root, "app.py")); !os.IsNotExist(err) {
+		t.Fatalf("file tidak boleh dibuat saat guard block: %v", err)
 	}
 }

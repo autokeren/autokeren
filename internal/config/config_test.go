@@ -20,7 +20,7 @@ func TestLoadDefaultsAndEnv(t *testing.T) {
 
 func TestLoadYAML(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
-	data := []byte("auth:\n  mode: direct\ncloudflare:\n  primary_model: test-model\nautokeren:\n  fddm:\n    enabled: true\n    url: https://fddm.example.test\n    api_key: configured-fddm-key\n")
+	data := []byte("auth:\n  mode: direct\ncloudflare:\n  primary_model: test-model\nautokeren:\n  fddm:\n    enabled: true\n    url: https://fddm.example.test\n    api_key: configured-fddm-key\n  time_travel:\n    enabled: false\n    max_checkpoints: 8\n  vibe_security:\n    block_on_critical: false\n  live_enforcement:\n    rules_file: rules.yaml\n")
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func TestLoadYAML(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Auth.Mode != "direct" || cfg.Cloudflare.PrimaryModel != "test-model" || !cfg.Autokeren.FDDM.Enabled || cfg.Autokeren.FDDM.URL != "https://fddm.example.test" || cfg.Autokeren.FDDM.APIKey != "configured-fddm-key" {
+	if cfg.Auth.Mode != "direct" || cfg.Cloudflare.PrimaryModel != "test-model" || !cfg.Autokeren.FDDM.Enabled || cfg.Autokeren.FDDM.URL != "https://fddm.example.test" || cfg.Autokeren.FDDM.APIKey != "configured-fddm-key" || cfg.Autokeren.TimeTravel.Enabled || cfg.Autokeren.TimeTravel.MaxCheckpoints != 8 || cfg.Autokeren.VibeSecurity.BlockOnCritical || cfg.Autokeren.LiveEnforcement.RulesFile != "rules.yaml" {
 		t.Fatalf("unexpected config: %#v", cfg)
 	}
 }

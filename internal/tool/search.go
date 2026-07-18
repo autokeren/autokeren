@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/autokeren/autokeren/internal/safety"
 )
 
 type SearchCode struct{ Root string }
@@ -62,6 +64,12 @@ func (t SearchCode) Run(ctx context.Context, args map[string]any, _ Emitter) Res
 			return nil
 		}
 		if ok, _ := filepath.Match(glob, info.Name()); !ok {
+			return nil
+		}
+		if blocked, _ := safety.ValidateRead(path); blocked {
+			return nil
+		}
+		if needsPermission, _ := safety.NeedsReadPermission(path); needsPermission {
 			return nil
 		}
 		f, e := os.Open(path)
