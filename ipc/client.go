@@ -323,9 +323,6 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		c.localRunMu.Unlock()
 		cancel()
 		if err != nil {
-			if c.callbacks != nil && c.callbacks.OnError != nil {
-				c.callbacks.OnError(err.Error())
-			}
 			return err
 		}
 		if c.callbacks != nil && c.callbacks.OnModelEnd != nil {

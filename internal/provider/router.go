@@ -77,7 +77,7 @@ func (s *RouterState) breaker(modelID string, threshold int, openDuration time.D
 			return int(counts.ConsecutiveFailures) >= threshold
 		},
 		IsExcluded: func(err error) bool {
-			return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || IsContextLimit(err)
+			return isDirectContextCancellation(err) || IsContextLimit(err)
 		},
 	})
 	s.breakers[modelID] = breaker
@@ -184,7 +184,7 @@ func (r *Router) Complete(ctx context.Context, request model.Request, onChunk Ch
 			return response, nil
 		}
 		lastErr = err
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || IsContextLimit(err) || StreamStarted(err) {
+		if ctx.Err() != nil || IsContextLimit(err) || StreamStarted(err) {
 			return model.Response{}, err
 		}
 		if index < len(r.targets)-1 {
@@ -217,7 +217,7 @@ func (r *Router) completeTarget(ctx context.Context, target Target, request mode
 		if streamStarted && !StreamStarted(err) {
 			err = &Error{StreamStarted: true, Cause: err}
 		}
-		if !r.shouldRetry(err, attempt) {
+		if !r.shouldRetry(ctx, err, attempt) {
 			return model.Response{}, err
 		}
 		delay := r.backoff(attempt, err)
@@ -228,11 +228,11 @@ func (r *Router) completeTarget(ctx context.Context, target Target, request mode
 	}
 }
 
-func (r *Router) shouldRetry(err error, attempt int) bool {
+func (r *Router) shouldRetry(ctx context.Context, err error, attempt int) bool {
 	if attempt >= r.retry.MaxRetries || err == nil || StreamStarted(err) || IsContextLimit(err) {
 		return false
 	}
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+	if ctx.Err() != nil {
 		return false
 	}
 	providerErr, ok := AsError(err)
@@ -248,6 +248,13 @@ func (r *Router) shouldRetry(err error, attempt int) bool {
 	default:
 		return false
 	}
+}
+
+func isDirectContextCancellation(err error) bool {
+	if _, isProviderError := AsError(err); isProviderError {
+		return false
+	}
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
 func IsContextLimit(err error) bool {

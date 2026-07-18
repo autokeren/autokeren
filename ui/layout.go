@@ -381,7 +381,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Chat.UpdateViewport()
 
 		if msg.Err != nil {
-			m.Chat.AppendMessage("system", fmt.Sprintf("Error: %v", msg.Err))
+			m.Chat.AppendMessage("system", fmt.Sprintf("⚠ Operasi agen gagal: %v\n\nSesi tetap aktif. Coba kirim ulang pesan, atau gunakan /model untuk memilih model lain.", msg.Err))
 			return m, nil
 		}
 
@@ -512,8 +512,15 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case ErrorMsg:
-		m.InitError = msg.Message
-		m.Chat.AppendMessage("system", fmt.Sprintf("error: %s", msg.Message))
+		if !m.Initialized {
+			m.InitError = msg.Message
+			m.Chat.AppendMessage("system", fmt.Sprintf("error: %s", msg.Message))
+			break
+		}
+		m.AgentRunning = false
+		m.CurrentTask = ""
+		m.Sidebar.CurrentTask = ""
+		m.Chat.AppendMessage("system", fmt.Sprintf("⚠ Gangguan agen: %s\n\nSesi tetap aktif. Kamu bisa lanjut mengirim pesan atau mengganti model dengan /model.", msg.Message))
 
 	case ModelsLoadedMsg:
 		m.SelectorModels = msg.Models

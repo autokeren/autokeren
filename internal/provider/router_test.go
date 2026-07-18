@@ -3,6 +3,9 @@ package provider
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -74,6 +77,88 @@ func TestRouterRetriesRetriableError(t *testing.T) {
 	}
 	if primary.calls != 2 || len(events) != 1 || events[0].Attempt != 1 {
 		t.Fatalf("calls=%d events=%#v", primary.calls, events)
+	}
+}
+
+func TestRouterRetriesProviderTransportTimeout(t *testing.T) {
+	primary := &scriptedProvider{results: []scriptedResult{
+		{err: &Error{Cause: context.DeadlineExceeded}},
+		{response: model.Response{Content: "pulih setelah timeout"}},
+	}}
+	events := []RetryEvent{}
+	router := newTestRouter(t, []Target{{ModelID: "primary", Provider: primary}}, RetryPolicy{MaxRetries: 1}, nil, &events)
+
+	response, err := router.Complete(context.Background(), model.Request{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Content != "pulih setelah timeout" || primary.calls != 2 {
+		t.Fatalf("response=%#v calls=%d", response, primary.calls)
+	}
+	if len(events) != 1 || events[0].Attempt != 1 {
+		t.Fatalf("expected one retry event, got %#v", events)
+	}
+}
+
+func TestRouterRetriesHTTPClientTimeout(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if calls.Add(1) == 1 {
+			time.Sleep(75 * time.Millisecond)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"pulih\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"))
+	}))
+	defer server.Close()
+
+	events := []RetryEvent{}
+	router := newTestRouter(t, []Target{{
+		ModelID:  "primary",
+		Provider: OpenAICompatible{Endpoint: server.URL, Client: &http.Client{Timeout: 15 * time.Millisecond}},
+	}}, RetryPolicy{MaxRetries: 1}, nil, &events)
+
+	response, err := router.Complete(context.Background(), model.Request{Messages: []model.Message{{Role: "user", Content: "halo"}}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Content != "pulih" || calls.Load() != 2 {
+		t.Fatalf("response=%#v calls=%d", response, calls.Load())
+	}
+	if len(events) != 1 || events[0].Attempt != 1 {
+		t.Fatalf("expected one retry event, got %#v", events)
+	}
+}
+
+func TestRouterFallsBackAfterProviderTransportTimeout(t *testing.T) {
+	primary := &scriptedProvider{results: []scriptedResult{{err: &Error{Cause: context.DeadlineExceeded}}}}
+	secondary := &scriptedProvider{results: []scriptedResult{{response: model.Response{Content: "fallback setelah timeout"}}}}
+	events := []RetryEvent{}
+	router := newTestRouter(t, []Target{{ModelID: "primary", Provider: primary}, {ModelID: "secondary", Provider: secondary}}, RetryPolicy{}, nil, &events)
+
+	response, err := router.Complete(context.Background(), model.Request{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Content != "fallback setelah timeout" || primary.calls != 1 || secondary.calls != 1 {
+		t.Fatalf("response=%#v primary=%d secondary=%d", response, primary.calls, secondary.calls)
+	}
+	if len(events) != 1 || events[0].Attempt != 0 {
+		t.Fatalf("expected fallback event, got %#v", events)
+	}
+}
+
+func TestRouterStopsForCallerDeadline(t *testing.T) {
+	primary := &scriptedProvider{results: []scriptedResult{{err: &Error{Cause: context.DeadlineExceeded}}}}
+	secondary := &scriptedProvider{results: []scriptedResult{{response: model.Response{Content: "must not run"}}}}
+	events := []RetryEvent{}
+	router := newTestRouter(t, []Target{{ModelID: "primary", Provider: primary}, {ModelID: "secondary", Provider: secondary}}, RetryPolicy{MaxRetries: 1}, nil, &events)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := router.Complete(ctx, model.Request{}, nil)
+	if !errors.Is(err, context.DeadlineExceeded) || primary.calls != 1 || secondary.calls != 0 || len(events) != 0 {
+		t.Fatalf("err=%v primary=%d secondary=%d events=%#v", err, primary.calls, secondary.calls, events)
 	}
 }
 
