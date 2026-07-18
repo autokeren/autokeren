@@ -106,3 +106,15 @@ func TestRunStandaloneInjectsGuidanceAndRelevantMemory(t *testing.T) {
 		}
 	}
 }
+
+func TestDefaultPermissionMakesGhostReadOnlyUnlessCapabilityGranted(t *testing.T) {
+	t.Setenv("AUTOKEREN_GHOST_CHILD", "1")
+	t.Setenv("AUTOKEREN_GHOST_ALLOWED_TOOLS", "patch_file,run_shell")
+	if !defaultPermission("patch_file", "", nil) || !defaultPermission("run_shell", "", nil) || defaultPermission("write_file", "", nil) {
+		t.Fatal("ghost capability policy is not least privilege")
+	}
+	t.Setenv("AUTOKEREN_GHOST_CHILD", "")
+	if !defaultPermission("write_file", "", nil) || defaultPermission("run_shell", "", nil) {
+		t.Fatal("normal standalone permission behavior changed unexpectedly")
+	}
+}

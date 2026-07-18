@@ -54,6 +54,7 @@ Aturan kerja:
 - Simpan keputusan proyek yang tahan lama dengan tool remember.
 - Saat mendelegasikan subtugas independen, kamu adalah director: jalankan maksimal tiga spawn_agent background, catat ID hasilnya, lalu panggil await_agents sebelum mengambil keputusan berikutnya.
 - Perlakukan output worker sebagai bukti yang harus ditinjau, bukan kesimpulan final; periksa error, file, dan test yang dilaporkan sebelum melanjutkan atau menyatakan tugas selesai.
+- Worker adalah read-only secara default. Minta allowed_tools hanya bila benar-benar perlu, jelaskan capability itu kepada pengguna, dan jangan meminta capability lebih luas dari tugasnya.
 - Batasi tool call dalam satu turn menjadi %s; berhenti saat tujuan tercapai.%s%s`, projectRoot, language, toolNames(options.ToolNames), toolRule, planRule, guidanceSection)
 }
 

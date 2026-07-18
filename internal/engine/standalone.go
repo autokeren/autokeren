@@ -17,6 +17,7 @@ import (
 	"github.com/autokeren/autokeren/internal/tool"
 	"github.com/autokeren/autokeren/internal/workflow"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -25,6 +26,18 @@ import (
 var sharedBrowser = browser.GetBrowserManager()
 
 const fallbackSystemPrompt = "Kamu adalah Autokeren, asisten coding CLI berbahasa Indonesia. Jangan mengaku sebagai Claude, ChatGPT, atau produk lain. Jika ditanya siapa kamu, jawab bahwa kamu adalah Autokeren. Bantu pengguna secara praktis dan jujur."
+
+func defaultPermission(name string, _ string, _ map[string]any) bool {
+	if os.Getenv("AUTOKEREN_GHOST_CHILD") != "1" {
+		return name != "run_shell"
+	}
+	for _, allowed := range strings.Split(os.Getenv("AUTOKEREN_GHOST_ALLOWED_TOOLS"), ",") {
+		if strings.TrimSpace(allowed) == name {
+			return true
+		}
+	}
+	return false
+}
 
 func RunStandalone(ctx context.Context, cfg config.Config, root, prompt string, onChunk func(string), resume string) (string, error) {
 	return RunStandaloneEvents(ctx, cfg, root, prompt, Events{OnChunk: onChunk}, resume)
@@ -54,7 +67,7 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 	}
 	ghostManager := ghost.NewGhostManager(root)
 	coordinator := director.New(root, ghostManager)
-	registry := tool.NewRegistry().Register(tool.ReadFile{Root: root}).Register(tool.WriteFile{Root: root}).Register(tool.PatchFile{Root: root}).Register(tool.ListFiles{Root: root}).Register(tool.SearchCode{Root: root}).Register(tool.GitStatus{Root: root}).Register(tool.GitDiff{Root: root}).Register(tool.GitLog{Root: root}).Register(tool.GitCommit{Root: root}).Register(tool.GitBranch{Root: root}).Register(tool.GitAutoCommit{Root: root}).Register(tool.NewTodoList(root)).Register(tool.NewKanban(root)).Register(tool.Proof{Root: root}).Register(tool.Remember{Root: root}).Register(tool.FetchURL{}).Register(tool.CFDeploy{Root: root}).Register(tool.CFBuild{Root: root}).Register(tool.CFVerify{Root: root, Browser: sharedBrowser}).Register(tool.FDDM{}).Register(tool.Genome{Root: root}).Register(tool.CreateProject{Config: cfg}).Register(tool.DeployProject{Config: cfg, Root: root}).Register(tool.ListProjects{Config: cfg}).Register(tool.RepoMap{Root: root}).Register(tool.CFKV{Config: cfg}).Register(tool.CFD1{Config: cfg}).Register(tool.Browser{Manager: sharedBrowser}).Register(tool.Research{}).Register(tool.Review{Root: root}).Register(tool.SecurityScan{Root: root}).Register(tool.Rewind{Root: root}).Register(tool.SpawnGhost{Manager: ghostManager}).Register(tool.AwaitAgents{Coordinator: coordinator}).Register(tool.Collaborate{Manager: ghostManager}).Register(tool.CheckGhost{Manager: ghostManager}).Register(tool.Shell{Root: root})
+	registry := tool.NewRegistry().Register(tool.ReadFile{Root: root}).Register(tool.WriteFile{Root: root}).Register(tool.PatchFile{Root: root}).Register(tool.ListFiles{Root: root}).Register(tool.SearchCode{Root: root}).Register(tool.GitStatus{Root: root}).Register(tool.GitDiff{Root: root}).Register(tool.GitLog{Root: root}).Register(tool.GitCommit{Root: root}).Register(tool.GitBranch{Root: root}).Register(tool.GitAutoCommit{Root: root}).Register(tool.NewTodoList(root)).Register(tool.NewKanban(root)).Register(tool.Proof{Root: root}).Register(tool.Remember{Root: root}).Register(tool.FetchURL{}).Register(tool.CFDeploy{Root: root}).Register(tool.CFBuild{Root: root}).Register(tool.CFVerify{Root: root, Browser: sharedBrowser}).Register(tool.FDDM{}).Register(tool.Genome{Root: root}).Register(tool.CreateProject{Config: cfg}).Register(tool.DeployProject{Config: cfg, Root: root}).Register(tool.ListProjects{Config: cfg}).Register(tool.RepoMap{Root: root}).Register(tool.CFKV{Config: cfg}).Register(tool.CFD1{Config: cfg}).Register(tool.Browser{Manager: sharedBrowser}).Register(tool.Research{}).Register(tool.Review{Root: root}).Register(tool.SecurityScan{Root: root}).Register(tool.Rewind{Root: root}).Register(tool.SpawnGhost{Manager: ghostManager}).Register(tool.AwaitAgents{Coordinator: coordinator}).Register(tool.Collaborate{Manager: ghostManager}).Register(tool.CheckGhost{Manager: ghostManager}).Register(tool.StopGhost{Manager: ghostManager}).Register(tool.Shell{Root: root})
 	var mcpServers []*mcp.Server
 	for _, spec := range cfg.MCPServers {
 		if !spec.Enabled {
@@ -138,7 +151,7 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 	}
 	loop := &Loop{Runner: Runner{Provider: router}, Model: primaryModel, Temperature: cfg.Cloudflare.Temperature, MaxTokens: cfg.Cloudflare.MaxTokens, Tools: registry, Context: store, RequestPrelude: prelude, MaxIterations: cfg.Autokeren.MaxIterations, PlanMode: cfg.Autokeren.PlanMode}
 	if events.ConfirmPermission == nil {
-		events.ConfirmPermission = func(name string, _ string, _ map[string]any) bool { return name != "run_shell" }
+		events.ConfirmPermission = defaultPermission
 	}
 	response, err := loop.Run(ctx, prompt, events)
 	if err != nil {

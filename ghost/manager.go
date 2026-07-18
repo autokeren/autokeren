@@ -14,16 +14,17 @@ import (
 )
 
 type GhostAgentInfo struct {
-	ID         int       `json:"id"`
-	Task       string    `json:"task"`
-	Role       string    `json:"role,omitempty"`
-	Status     string    `json:"status"`
-	StartedAt  time.Time `json:"started_at"`
-	FinishedAt time.Time `json:"finished_at,omitempty"`
-	ExitCode   int       `json:"exit_code"`
-	PID        int       `json:"pid,omitempty"`
-	Error      string    `json:"error,omitempty"`
-	LogFile    string    `json:"log_file"`
+	ID           int       `json:"id"`
+	Task         string    `json:"task"`
+	Role         string    `json:"role,omitempty"`
+	AllowedTools []string  `json:"allowed_tools,omitempty"`
+	Status       string    `json:"status"`
+	StartedAt    time.Time `json:"started_at"`
+	FinishedAt   time.Time `json:"finished_at,omitempty"`
+	ExitCode     int       `json:"exit_code"`
+	PID          int       `json:"pid,omitempty"`
+	Error        string    `json:"error,omitempty"`
+	LogFile      string    `json:"log_file"`
 }
 
 func (info GhostAgentInfo) Runtime() float64 {
@@ -50,10 +51,11 @@ type GhostManager struct {
 }
 
 type SpawnOptions struct {
-	Task    string
-	Context string
-	Role    string
-	ModelID string
+	Task         string
+	Context      string
+	Role         string
+	ModelID      string
+	AllowedTools []string
 }
 
 func NewGhostManager(projectRoot string) *GhostManager {
@@ -129,6 +131,7 @@ func (gm *GhostManager) SpawnWithOptions(options SpawnOptions) (*GhostAgentInfo,
 	if options.Role != "" {
 		task = "Peran: " + options.Role + "\n\n" + task
 	}
+	allowedTools := AllowedTools(options.AllowedTools)
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
 	if gm.activeCountLocked() >= gm.MaxAgents {
@@ -161,6 +164,7 @@ func (gm *GhostManager) SpawnWithOptions(options SpawnOptions) (*GhostAgentInfo,
 	}
 	cmd := exec.CommandContext(ctx, binary, args...)
 	cmd.Dir = gm.ProjectRoot
+	cmd.Env = ChildEnvironment(os.Environ(), allowedTools)
 	configureProcessGroup(cmd)
 	cmd.Stdout = log
 	cmd.Stderr = log
@@ -171,7 +175,7 @@ func (gm *GhostManager) SpawnWithOptions(options SpawnOptions) (*GhostAgentInfo,
 		return nil, fmt.Errorf("gagal memulai ghost: %w", err)
 	}
 
-	info := &GhostAgentInfo{ID: id, Task: task, Role: options.Role, Status: "running", StartedAt: time.Now(), LogFile: logFile, PID: cmd.Process.Pid}
+	info := &GhostAgentInfo{ID: id, Task: task, Role: options.Role, AllowedTools: allowedTools, Status: "running", StartedAt: time.Now(), LogFile: logFile, PID: cmd.Process.Pid}
 	gm.agents[id] = info
 	gm.cancels[id] = cancel
 	gm.procs[id] = cmd
@@ -196,6 +200,7 @@ func (gm *GhostManager) SpawnSync(ctx context.Context, options SpawnOptions) (st
 	defer cancel()
 	cmd := exec.CommandContext(childCtx, gm.binaryPath(), args...)
 	cmd.Dir = gm.ProjectRoot
+	cmd.Env = ChildEnvironment(os.Environ(), options.AllowedTools)
 	configureProcessGroup(cmd)
 	out, err := cmd.CombinedOutput()
 	if childCtx.Err() != nil {

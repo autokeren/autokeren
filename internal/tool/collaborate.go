@@ -14,7 +14,7 @@ func (c Collaborate) Definition() Definition {
 	return Definition{Name: "collaborate", Description: "Run a native Go coder-critic loop.", RequiresPermission: true, Parameters: map[string]any{"type": "object", "properties": map[string]any{"task": map[string]any{"type": "string"}, "coder_role": map[string]any{"type": "string"}, "critic_role": map[string]any{"type": "string"}, "max_turns": map[string]any{"type": "integer"}, "model_id": map[string]any{"type": "string"}}, "required": []string{"task"}}}
 }
 func (c Collaborate) NeedsPermission(map[string]any) (bool, string) {
-	return true, "mulai coder-critic collaboration"
+	return true, "mulai coder-critic collaboration; coder dapat write_file, patch_file, dan run_shell untuk test"
 }
 func (c Collaborate) Run(ctx context.Context, args map[string]any, _ Emitter) Result {
 	task, _ := args["task"].(string)
@@ -42,7 +42,7 @@ func (c Collaborate) Run(ctx context.Context, args map[string]any, _ Emitter) Re
 		} else {
 			prompt += "Kritik reviewer sebelumnya:\n" + feedback + "\nPerbaiki implementasi berdasarkan kritik tersebut."
 		}
-		out, err := c.Manager.SpawnSync(ctx, ghost.SpawnOptions{Task: prompt, Role: coder, ModelID: modelID})
+		out, err := c.Manager.SpawnSync(ctx, ghost.SpawnOptions{Task: prompt, Role: coder, ModelID: modelID, AllowedTools: []string{"write_file", "patch_file", "run_shell"}})
 		if err != nil {
 			return Result{OK: false, Output: out, Error: err.Error()}
 		}
