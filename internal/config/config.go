@@ -47,6 +47,12 @@ type Autokeren struct {
 	MemoryEnabled        bool    `yaml:"memory_enabled"`
 	MaxToolCalls         int     `yaml:"max_tool_calls"`
 	Language             string  `yaml:"language"`
+	FDDM                 FDDM    `yaml:"fddm"`
+}
+type FDDM struct {
+	Enabled bool   `yaml:"enabled"`
+	URL     string `yaml:"url"`
+	APIKey  string `yaml:"api_key"`
 }
 type MCPServer struct {
 	Name    string            `yaml:"name"`

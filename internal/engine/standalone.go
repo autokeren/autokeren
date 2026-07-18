@@ -9,6 +9,7 @@ import (
 	"github.com/autokeren/autokeren/internal/config"
 	contextstore "github.com/autokeren/autokeren/internal/context"
 	"github.com/autokeren/autokeren/internal/director"
+	"github.com/autokeren/autokeren/internal/fddm"
 	"github.com/autokeren/autokeren/internal/mcp"
 	"github.com/autokeren/autokeren/internal/memory"
 	"github.com/autokeren/autokeren/internal/model"
@@ -83,7 +84,12 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 	}
 	ghostManager := ghost.NewGhostManager(root)
 	coordinator := director.New(root, ghostManager)
-	registry := tool.NewRegistry().Register(tool.Environment{}).Register(tool.ReadFile{Root: root}).Register(tool.WriteFile{Root: root}).Register(tool.PatchFile{Root: root}).Register(tool.ListFiles{Root: root}).Register(tool.SearchCode{Root: root}).Register(tool.GitStatus{Root: root}).Register(tool.GitDiff{Root: root}).Register(tool.GitLog{Root: root}).Register(tool.GitCommit{Root: root}).Register(tool.GitBranch{Root: root}).Register(tool.GitAutoCommit{Root: root}).Register(tool.NewTodoList(root)).Register(tool.NewKanban(root)).Register(tool.Proof{Root: root}).Register(tool.Remember{Root: root}).Register(tool.FetchURL{}).Register(tool.CFDeploy{Root: root}).Register(tool.CFBuild{Root: root}).Register(tool.CFVerify{Root: root, Browser: sharedBrowser}).Register(tool.FDDM{}).Register(tool.Genome{Root: root}).Register(tool.CreateProject{Config: cfg}).Register(tool.DeployProject{Config: cfg, Root: root}).Register(tool.ListProjects{Config: cfg}).Register(tool.RepoMap{Root: root}).Register(tool.CFKV{Config: cfg}).Register(tool.CFD1{Config: cfg}).Register(tool.Browser{Manager: sharedBrowser}).Register(tool.Research{}).Register(tool.Review{Root: root}).Register(tool.SecurityScan{Root: root}).Register(tool.Rewind{Root: root}).Register(tool.SpawnGhost{Manager: ghostManager}).Register(tool.AwaitAgents{Coordinator: coordinator}).Register(tool.Collaborate{Manager: ghostManager}).Register(tool.CheckGhost{Manager: ghostManager}).Register(tool.StopGhost{Manager: ghostManager}).Register(tool.Shell{Root: root})
+	registry := tool.NewRegistry().Register(tool.Environment{}).Register(tool.ReadFile{Root: root}).Register(tool.WriteFile{Root: root}).Register(tool.PatchFile{Root: root}).Register(tool.ListFiles{Root: root}).Register(tool.SearchCode{Root: root}).Register(tool.GitStatus{Root: root}).Register(tool.GitDiff{Root: root}).Register(tool.GitLog{Root: root}).Register(tool.GitCommit{Root: root}).Register(tool.GitBranch{Root: root}).Register(tool.GitAutoCommit{Root: root}).Register(tool.NewTodoList(root)).Register(tool.NewKanban(root)).Register(tool.Proof{Root: root}).Register(tool.Remember{Root: root}).Register(tool.FetchURL{}).Register(tool.CFDeploy{Root: root}).Register(tool.CFBuild{Root: root}).Register(tool.CFVerify{Root: root, Browser: sharedBrowser}).Register(tool.Genome{Root: root}).Register(tool.CreateProject{Config: cfg}).Register(tool.DeployProject{Config: cfg, Root: root}).Register(tool.ListProjects{Config: cfg}).Register(tool.RepoMap{Root: root}).Register(tool.CFKV{Config: cfg}).Register(tool.CFD1{Config: cfg}).Register(tool.Browser{Manager: sharedBrowser}).Register(tool.Research{}).Register(tool.Review{Root: root}).Register(tool.SecurityScan{Root: root}).Register(tool.Rewind{Root: root}).Register(tool.SpawnGhost{Manager: ghostManager}).Register(tool.AwaitAgents{Coordinator: coordinator}).Register(tool.Collaborate{Manager: ghostManager}).Register(tool.CheckGhost{Manager: ghostManager}).Register(tool.StopGhost{Manager: ghostManager}).Register(tool.Shell{Root: root})
+	var fddmClient *fddm.Client
+	if cfg.Autokeren.FDDM.Enabled && strings.TrimSpace(cfg.Autokeren.FDDM.URL) != "" {
+		fddmClient = fddm.New(fddm.Config{URL: cfg.Autokeren.FDDM.URL, APIKey: cfg.Autokeren.FDDM.APIKey}, nil)
+		registry.Register(tool.FDDM{Client: fddmClient})
+	}
 	var mcpServers []*mcp.Server
 	for _, spec := range cfg.MCPServers {
 		if !spec.Enabled {
@@ -142,6 +148,11 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 		_ = memoryStore.LogMessage("default", "user", prompt)
 		if context := memoryStore.Context(prompt, 3); context != "" {
 			prelude = append(prelude, model.Message{Role: "system", Content: context})
+		}
+	}
+	if fddmClient != nil {
+		if fddmContext, sniffErr := fddmClient.SniffContext(ctx, prompt); sniffErr == nil && fddmContext != "" {
+			prelude = append(prelude, model.Message{Role: "system", Content: fddmContext})
 		}
 	}
 	targets, err := provider.TargetsForConfig(cfg, &http.Client{Timeout: timeout})
@@ -215,6 +226,9 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 	}
 	if cfg.Autokeren.MemoryEnabled {
 		_ = memoryStore.LogMessage("default", "assistant", response.Content)
+	}
+	if fddmClient != nil {
+		_ = fddmClient.EmitCompletion(ctx, prompt, response.Content)
 	}
 	if err := saveSession(response.Usage); err != nil {
 		return "", err

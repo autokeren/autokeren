@@ -157,6 +157,88 @@ func TestRunStandaloneRecordsRedactedMemoryTranscript(t *testing.T) {
 	}
 }
 
+func TestRunStandaloneUsesFDDMLifecycleWithoutChangingResponse(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("AUTOKEREN_CONFIG_DIR", filepath.Join(root, "config"))
+	var mu sync.Mutex
+	calls := make([]string, 0)
+	var modelMessages []model.Message
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		calls = append(calls, r.URL.Path)
+		mu.Unlock()
+		switch r.URL.Path {
+		case "/api/sniff_text":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`[{"type":"decision","score":0.8,"artifact":"gunakan retry aman"}]`))
+		case "/api/emit_text":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"scent_id":"saved"}`))
+		default:
+			var request struct {
+				Messages []model.Message `json:"messages"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Error(err)
+				return
+			}
+			modelMessages = request.Messages
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"hasil tugas sudah selesai dengan verifikasi aman\"},\"finish_reason\":\"stop\"}]}\n\n"))
+			_, _ = w.Write([]byte("data: [DONE]\n\n"))
+		}
+	}))
+	defer server.Close()
+	cfg := config.Defaults()
+	cfg.Auth.BaseURL = server.URL
+	cfg.Auth.APIKey = "test-key"
+	cfg.Cloudflare.SecondaryModel = ""
+	cfg.Retry.MaxRetries = 0
+	cfg.Autokeren.FDDM = config.FDDM{Enabled: true, URL: server.URL, APIKey: "fddm-key"}
+	content, err := RunStandalone(t.Context(), cfg, root, "cek retry", nil, "")
+	if err != nil || content != "hasil tugas sudah selesai dengan verifikasi aman" {
+		t.Fatalf("content=%q err=%v", content, err)
+	}
+	joinedMessages := ""
+	for _, message := range modelMessages {
+		joinedMessages += message.Content + "\n"
+	}
+	if !strings.Contains(joinedMessages, "FDDM AUTO-SNIFF") || !strings.Contains(joinedMessages, "gunakan retry aman") {
+		t.Fatalf("context FDDM tidak masuk ke request model: %s", joinedMessages)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(calls) != 3 || calls[0] != "/api/sniff_text" || calls[2] != "/api/emit_text" {
+		t.Fatalf("urutan lifecycle FDDM = %#v", calls)
+	}
+}
+
+func TestRunStandaloneContinuesWhenFDDMUnavailable(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("AUTOKEREN_CONFIG_DIR", filepath.Join(root, "config"))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"model tetap responsif ketika FDDM gagal\"},\"finish_reason\":\"stop\"}]}\n\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer server.Close()
+	cfg := config.Defaults()
+	cfg.Auth.BaseURL = server.URL
+	cfg.Auth.APIKey = "test-key"
+	cfg.Cloudflare.SecondaryModel = ""
+	cfg.Retry.MaxRetries = 0
+	cfg.Autokeren.FDDM = config.FDDM{Enabled: true, URL: server.URL}
+	var savedID string
+	content, err := RunStandaloneEvents(t.Context(), cfg, root, "cek FDDM", Events{OnSessionSaved: func(id, _ string) { savedID = id }}, "")
+	if err != nil || content != "model tetap responsif ketika FDDM gagal" || savedID == "" {
+		t.Fatalf("FDDM outage mengganggu task: content=%q err=%v session=%q", content, err, savedID)
+	}
+}
+
 func TestRunStandalonePersistsSessionWhenProviderFails(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("AUTOKEREN_CONFIG_DIR", filepath.Join(root, "config"))
