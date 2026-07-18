@@ -6,21 +6,21 @@ autokeren adalah ekosistem developer platform Cloudflare-first untuk Indonesia.
 
 ```
 User (CLI / Web)
-  ↓ API key
-API Gateway (Workers) ─── D1 (auth, usage, projects)
-  ↓ CF API Token          KV (rate limit)
-Cloudflare (Workers AI, D1, R2, Pages, Workers)
+  ↓ ak_ API key
+Autokeren API Gateway ─── D1 (auth, usage, legacy projects, Apps V2)
+  ↓ privileged platform control plane
+Cloudflare (Workers AI, D1, R2, KV, Workers)
 ```
 
 ## Components
 
-### 1. CLI (`autokeren/`)
-- Bahasa: Python 3.11+
-- Entry: `autokeren` command
+### 1. CLI
+- Runtime interaktif: Go native; Python 3.11+ dipertahankan sebagai compatibility runtime eksplisit.
+- Entry: `autokeren` command.
 - Agent loop: model call → tool dispatch → iterate
-- 20 tools: file, shell, search, git, camofox, cf_deploy, cf_kv, cf_d1, tmux, todo, remember, create_project (soon), deploy_project (soon)
+- Alur beginner publish: `scaffold_app` → source modular + `autokeren.app.json` → `publish_app` → `app_release_status`.
 - Dual auth: platform (API key) atau direct (CF credentials)
-- UI: rich-based, inline streaming, status bar, permission system
+- UI: TUI Go, streaming, status bar, session, memory, dan permission system.
 - Mermaid renderer: visual boxes + arrows di terminal
 - Model selector: fetch dari API, nomor + enter
 
@@ -31,8 +31,11 @@ Cloudflare (Workers AI, D1, R2, Pages, Workers)
   - `GET /v1/models` — list model metadata (public)
   - `POST /v1/chat/completions` — AI inference (auth, streaming, tool calls)
   - `GET /v1/usage` — usage stats (auth)
-  - `POST /v1/projects` — create project (soon, auth)
-  - `POST /v1/projects/:id/deploy` — deploy worker (soon, auth)
+  - `POST /v1/projects` — legacy one-file Worker project (auth)
+  - `POST /v1/projects/:id/deploy` — legacy one-file Worker deploy (auth)
+  - `POST /v2/apps/publish` — managed modular app release (auth)
+  - `GET /v2/releases/:id` — managed release status (auth)
+  - `GET /v2/apps/:id` — managed app/release history (auth)
 - Bindings: D1 (DB), KV (RATE_LIMIT), AI (Workers AI)
 - Model management: D1 `system_settings` table (free_models, pro_models, model_aliases, models_metadata)
 
@@ -61,27 +64,47 @@ CLI parses response:
   - Execute tool → append result → loop
 ```
 
-### Project Deploy (planned)
+### Legacy project deploy
 ```
 CLI → POST /v1/projects {name}
   ↓
 API Gateway:
   1. Validate API key
-  2. Create D1 database (wrangler d1 create)
-  3. Create R2 bucket (wrangler r2 bucket create)
+  2. Gateway creates D1 database through the platform control plane.
+  3. Gateway creates R2 bucket through the platform control plane.
   4. Insert project record → D1
   5. Return {project_id, d1_id, r2_bucket}
   ↓
 CLI → POST /v1/projects/:id/deploy {script}
   ↓
 API Gateway:
-  1. Upload Worker script (CF API)
+  1. Upload one Worker script through the platform control plane.
   2. Set bindings: D1, R2, AI
   3. Enable workers.dev subdomain
   4. Return {url: "https://{worker}.workers.dev"}
 ```
 
-## Project Layout (CLI)
+### Managed Apps V2
+
+```text
+CLI user with only ak_ API key
+  ↓ scaffold_app writes an explicit local manifest and declared source files
+CLI → POST /v2/apps/publish
+  ↓
+Gateway validates source, stores immutable R2 artifact, and records queued release
+  ↓
+Gateway provisions only manifest capabilities, applies checksum-locked migrations,
+uploads Worker modules, verifies the public URL, then marks the release ready
+  ↓
+CLI → GET /v2/releases/:id until ready → verified URL
+```
+
+V2 never falls back silently to V1. A failed update keeps the previous verified app URL. Cloudflare account IDs, tokens, Wrangler configuration, and binding IDs remain inside the platform control plane.
+
+## Project Layout
+
+Runtime Go aktif berada di `main.go`, `cmd/`, `internal/`, dan `ui/`. Struktur berikut adalah compatibility runtime Python yang tetap dipertahankan untuk instalasi dan alur legacy eksplisit.
+
 ```
 autokeren/
 ├── pyproject.toml
