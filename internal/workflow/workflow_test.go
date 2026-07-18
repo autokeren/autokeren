@@ -7,7 +7,7 @@ import (
 
 func TestExpandDeployAndTDD(t *testing.T) {
 	deploy, handled, err := Expand("/deploy aplikasi catatan")
-	if err != nil || !handled || !strings.Contains(deploy, "create_project") {
+	if err != nil || !handled || !strings.Contains(deploy, "scaffold_app") || !strings.Contains(deploy, "publish_app") {
 		t.Fatalf("unexpected deploy workflow: %q handled=%t err=%v", deploy, handled, err)
 	}
 	tdd, handled, err := Expand("/tdd calc.py | tambah pajak")

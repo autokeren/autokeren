@@ -72,7 +72,7 @@ Judges can test the proof-rendering system and run the local verification suite 
 ## Key Features
 
 - **7 AI models** — kimi-code, kimi-2.6, glm-5.2, glm-flash, llama-4-scout, gemma-4, and nemotron with automatic fallback.
-- **Built-in PaaS** — deploy applications to Cloudflare Workers directly from the terminal, with automatic D1 + R2 + AI bindings.
+- **Managed Apps** — build and publish modular applications through Autokeren with `scaffold_app` and `publish_app`. Users need an Autokeren API key, not a Cloudflare account or Wrangler; D1, R2, and AI bindings are provisioned only when declared in the app manifest.
 - **Multi-Agent Mode & Auto Spawn** — Run multiple agents in parallel via `/project`, or let the primary agent dynamically call sub-agents using the `spawn_agent` tool.
 - **MCP Server Support** — Integrate third-party external tools via Model Context Protocol (MCP) and manage them with `/mcp`.
 - **Input History** — Navigate previous command entries using the `↑` / `↓` arrow keys in the terminal.
@@ -289,13 +289,14 @@ autokeren --aistudio
 ```
 If your API key is not configured, you will be prompted to enter it. Alternatively, set the `GEMINI_API_KEY` environment variable.
 
-### Deploy Application
+### Publish an application
 
 ```bash
-autokeren "deploy a simple shoe shop with HTML+CSS, using D1 for products"
+autokeren
+> /deploy a simple shoe shop with a product catalogue and D1 for products
 ```
 
-The agent will automatically create the project, write the code, and deploy to Cloudflare Workers with D1 and R2 bindings.
+The agent creates a modular `autokeren.app.json` manifest and source files, asks before publishing, then waits for the managed release to be verified. This beginner flow requires only an Autokeren API key. The legacy `cf_deploy` and `deploy_project` tools remain available for users who explicitly need an advanced Cloudflare workflow.
 
 ## Available Models
 
@@ -387,7 +388,7 @@ Enter slash commands directly into the chat input box (Tab autocomplete is suppo
 | `/ghost show <id>` | View logs of a specific background ghost agent |
 | `/ghost kill <id\|all>` | Terminate background ghost agents |
 | `/research <query>` | Search Reddit, Hacker News, and Google Web |
-| `/deploy <desc>` | Create project and deploy directly to Cloudflare Pages/Workers |
+| `/deploy <desc>` | Build modular app and publish it through Autokeren |
 
 ## Stored Configurations
 

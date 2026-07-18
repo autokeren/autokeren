@@ -131,7 +131,7 @@ var slashCommands = []SlashCommandInfo{
 	{Name: "/spec", Description: "Interview dan rencana implementasi"},
 	{Name: "/genome", Description: "Scan struktur dan duplikasi codebase"},
 	{Name: "/loop", Description: "Lihat atau pulihkan loop breaker model"},
-	{Name: "/deploy", Description: "Minta agen membangun dan deploy aplikasi Cloudflare"},
+	{Name: "/deploy", Description: "Minta agen membangun dan publish aplikasi melalui Autokeren"},
 	{Name: "/rewind", Description: "Kembalikan perubahan dari checkpoint"},
 	{Name: "/review", Description: "Audit perubahan kode saat ini"},
 	{Name: "/security", Description: "Scan keamanan proyek"},

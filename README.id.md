@@ -73,7 +73,7 @@ Juri dapat menguji sistem rendering acceptance criteria dan menjalankan pengujia
 ## Fitur Utama
 
 - **7 model AI** — kimi-code, kimi-2.6, glm-5.2, glm-flash, llama-4-scout, gemma-4, nemotron dengan fallback otomatis.
-- **PaaS built-in** — deploy aplikasi ke Cloudflare Workers langsung dari terminal, auto D1 + R2 + AI bindings.
+- **Managed Apps** — bangun dan publish aplikasi modular melalui Autokeren dengan `scaffold_app` dan `publish_app`. Pengguna cukup memakai API key Autokeren, tanpa akun Cloudflare atau Wrangler; binding D1, R2, dan AI hanya dibuat bila diminta manifest aplikasi.
 - **Multi-Agent Mode & Auto Spawn** — Jalankan beberapa agent secara paralel via `/project`, atau biarkan agent utama secara dinamis memanggil sub-agent menggunakan tool `spawn_agent`.
 - **MCP Server Support** — Integrasikan tool eksternal pihak ketiga dengan Model Context Protocol (MCP) dan kelola via `/mcp`.
 - **Input History** — Navigasi perintah sebelumnya dengan tombol arah `↑` / `↓` di terminal.
@@ -291,13 +291,14 @@ autokeren --aistudio
 ```
 Jika API Key belum diset, Anda akan diminta memasukkannya secara interaktif dan akan disimpan secara otomatis ke `config.yaml`. Anda juga bisa menggunakan environment variable `GEMINI_API_KEY`.
 
-### Deploy aplikasi
+### Publish aplikasi
 
 ```bash
-autokeren "deploy toko sepatu sederhana dengan HTML+CSS, pakai D1 untuk produk"
+autokeren
+> /deploy toko sepatu sederhana dengan katalog produk dan D1
 ```
 
-Agent akan otomatis create project, tulis kode, dan deploy ke Cloudflare Workers dengan D1 + R2 bindings.
+Agent membuat manifest `autokeren.app.json` dan source modular, meminta izin sebelum publish, lalu menunggu rilis managed terverifikasi. Alur pemula ini hanya membutuhkan API key Autokeren. Tool legacy `cf_deploy` dan `deploy_project` tetap tersedia untuk pengguna yang secara eksplisit memerlukan alur Cloudflare lanjutan.
 
 ### Contoh percakapan
 
@@ -400,7 +401,7 @@ Dapat diketik langsung di kotak input chat (mendukung *autocomplete* otomatis me
 | `/ghost kill <id\|all>` | Kill ghost agent |
 | `/research <query>` | Riset ke Reddit + HN + Web |
 | `/research reddit\|hn\|web <q>` | Riset ke source tertentu |
-| `/deploy <deskripsi>` | Bikin app + deploy ke Cloudflare (auto create_project → write_file → deploy) |
+| `/deploy <deskripsi>` | Bangun app modular dan publish melalui Autokeren |
 
 ## Tools
 
@@ -427,6 +428,9 @@ autokeren membawa 28 tools bawaan dengan permission check dan schema function-ca
 | `create_project` | Buat project PaaS baru (auto D1 + R2 + AI bindings) |
 | `deploy_project` | Deploy code ke project PaaS |
 | `list_projects` | Daftar project PaaS yang sudah dibuat |
+| `scaffold_app` | Buat manifest dan struktur source modular untuk Managed Apps |
+| `publish_app` | Publish source yang tercantum di manifest melalui platform Autokeren |
+| `app_release_status` | Pantau status dan verifikasi release Managed Apps |
 | `spawn_agent` | Spawn sub-agent secara dinamis untuk memparalelkan task |
 | `tmux` | Supervisor long-running task via tmux |
 | `todo` | Kelola todo list multi-step |

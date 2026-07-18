@@ -40,7 +40,7 @@ func Expand(input string) (string, bool, error) {
 }
 
 func deployPrompt(description string) string {
-	return "User minta deploy app ke Cloudflare: " + description + "\n\nLANGKAH WAJIB:\n1. Panggil create_project untuk provisioning proyek.\n2. Tulis Worker code ke file lokal menggunakan write_file atau patch_file.\n3. Jalankan deploy_project atau cf_deploy sesuai target.\n4. Verifikasi URL hasil deploy menggunakan cf_verify bila URL tersedia.\n5. Berikan URL live dan hasil verifikasi.\nJangan mengirim kode inline ke deploy_project."
+	return "User minta membuat dan mempublikasikan aplikasi melalui Autokeren: " + description + "\n\nLANGKAH WAJIB:\n1. Panggil scaffold_app untuk membuat struktur modular dan autokeren.app.json.\n2. Tulis atau patch fitur ke file modular yang tercantum dalam manifest; jangan membuat satu Worker raksasa.\n3. Jika menambah file baru, perbarui daftar files pada autokeren.app.json.\n4. Jalankan test atau verifikasi lokal yang relevan.\n5. Panggil publish_app setelah pengguna menyetujui permission publish.\n6. Ambil app_release_status dari release_id hasil publish sampai status ready, lalu laporkan URL live.\nUntuk alur pemula jangan gunakan cf_deploy atau deploy_project; keduanya hanya jalur advanced/legacy."
 }
 
 func tddPrompt(target, description string) string {

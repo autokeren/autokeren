@@ -23,7 +23,7 @@ func NewVerification(input string) *Verification {
 	switch {
 	case strings.Contains(lower, "jalankan workflow tdd"):
 		return &Verification{kind: "tdd"}
-	case strings.Contains(lower, "user minta deploy app ke cloudflare"):
+	case strings.Contains(lower, "user minta deploy app ke cloudflare"), strings.Contains(lower, "user minta membuat dan mempublikasikan aplikasi melalui autokeren"):
 		return &Verification{kind: "deploy"}
 	default:
 		return nil
@@ -48,13 +48,18 @@ func (v *Verification) ObserveEnd(name string, result tool.Result) {
 		if result.OK {
 			v.inspected = true
 		}
-	case "write_file", "patch_file":
+	case "write_file", "patch_file", "scaffold_app":
 		if result.OK {
 			v.changed = true
 		}
 	case "cf_deploy", "deploy_project":
 		if result.OK {
 			v.deployed = true
+		}
+	case "app_release_status":
+		if result.OK && releaseReady(result.Output) {
+			v.deployed = true
+			v.verified = true
 		}
 	case "cf_verify":
 		if result.OK {
@@ -70,6 +75,16 @@ func (v *Verification) ObserveEnd(name string, result tool.Result) {
 		}
 		v.pendingTest = false
 	}
+}
+
+func releaseReady(output any) bool {
+	data, ok := output.(map[string]any)
+	if !ok {
+		return false
+	}
+	status, _ := data["status"].(string)
+	url, _ := data["url"].(string)
+	return status == "ready" && url != ""
 }
 
 func (v *Verification) Report() string {
