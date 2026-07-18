@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"os/exec"
+
+	"github.com/autokeren/autokeren/internal/runtimeenv"
 )
 
 type Shell struct {
@@ -23,7 +25,8 @@ func (t Shell) Run(ctx context.Context, args map[string]any, emit Emitter) Resul
 	if command == "" {
 		return Result{OK: false, Error: "command is required"}
 	}
-	cmd := exec.CommandContext(ctx, "sh", "-lc", command)
+	program, commandArgs := runtimeenv.Current().ShellInvocation(command)
+	cmd := exec.CommandContext(ctx, program, commandArgs...)
 	cmd.Dir = t.Root
 	var output bytes.Buffer
 	cmd.Stdout = &output
