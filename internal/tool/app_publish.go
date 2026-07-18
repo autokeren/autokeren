@@ -21,8 +21,9 @@ import (
 const appManifestDefaultPath = "autokeren.app.json"
 
 type PublishApp struct {
-	Config config.Config
-	Root   string
+	Config               config.Config
+	Root                 string
+	RequireApprovedProof bool
 }
 
 type AppReleaseStatus struct{ Config config.Config }
@@ -56,7 +57,7 @@ type appSourceFile struct {
 }
 
 func (t PublishApp) Definition() Definition {
-	return Definition{Name: "publish_app", Description: "Publish a modular app through Autokeren Apps V2. Reads autokeren.app.json and its declared project files; users never need Cloudflare or Wrangler.", RequiresPermission: true, Parameters: map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "app_id": map[string]any{"type": "string"}, "manifest_path": map[string]any{"type": "string"}}}}
+	return Definition{Name: "publish_app", Description: "Publish a modular app through Autokeren Apps V2. Reads autokeren.app.json and its declared project files; users never need Cloudflare or Wrangler.", RequiresPermission: true, Parameters: map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "app_id": map[string]any{"type": "string"}, "manifest_path": map[string]any{"type": "string"}, "proof_id": map[string]any{"type": "string", "description": "Required by /safe-deploy after a human-approved SHIP proof."}}}}
 }
 
 func (t PublishApp) NeedsPermission(args map[string]any) (bool, string) {
@@ -71,11 +72,20 @@ func (t PublishApp) Run(ctx context.Context, args map[string]any, _ Emitter) Res
 	name, _ := args["name"].(string)
 	appID, _ := args["app_id"].(string)
 	manifestPath, _ := args["manifest_path"].(string)
+	proofID, _ := args["proof_id"].(string)
 	if manifestPath == "" {
 		manifestPath = appManifestDefaultPath
 	}
 	if strings.TrimSpace(name) == "" && strings.TrimSpace(appID) == "" {
 		return Result{OK: false, Error: "name wajib untuk aplikasi baru"}
+	}
+	if t.RequireApprovedProof {
+		if strings.TrimSpace(proofID) == "" {
+			return Result{OK: false, Error: "safe deploy membutuhkan proof_id yang sudah SHIP dan disetujui manusia"}
+		}
+		if err := ApprovedProofForCurrentCommit(t.Root, proofID); err != nil {
+			return Result{OK: false, Error: "safe deploy diblokir: " + err.Error()}
+		}
 	}
 	manifest, files, err := loadAppArtifact(t.Root, manifestPath)
 	if err != nil {

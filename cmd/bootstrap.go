@@ -307,13 +307,13 @@ func promptLine(reader *bufio.Reader, out io.Writer, label string) (string, erro
 
 func runProof(root string, args []string, out io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("format: --proof <list|replay|report|plan|record> ...")
+		return errors.New("format: --proof <list|replay|report|plan|record|approve> ...")
 	}
 	action := args[0]
 	toolArgs := map[string]any{"action": action}
 	switch action {
 	case "list":
-	case "replay", "report":
+	case "replay", "report", "approve":
 		if len(args) < 2 {
 			return fmt.Errorf("format: --proof %s <proof-id|file>", action)
 		}
@@ -352,11 +352,39 @@ func runProof(root string, args []string, out io.Writer) error {
 	if !result.OK {
 		return errors.New(result.Error)
 	}
-	fprintln(out, result.Output)
+	fprintln(out, formatProofOutput(result.Output))
 	return nil
 }
 
 func fprintln(out io.Writer, value any) { _, _ = fmt.Fprintln(out, value) }
+
+func formatProofOutput(value any) string {
+	data, ok := value.(map[string]any)
+	if !ok {
+		return fmt.Sprint(value)
+	}
+	proofID, _ := data["proof_id"].(string)
+	message, _ := data["message"].(string)
+	verdict, _ := data["verdict"].(string)
+	approvedAt, _ := data["approved_at"].(string)
+	lines := make([]string, 0, 3)
+	if message != "" {
+		lines = append(lines, message)
+	}
+	if proofID != "" {
+		lines = append(lines, "Proof ID: "+proofID)
+	}
+	if verdict != "" {
+		lines = append(lines, "Verdict: "+verdict)
+	}
+	if approvedAt != "" {
+		lines = append(lines, "Approval: APPROVED at "+approvedAt)
+	}
+	if len(lines) == 0 {
+		return fmt.Sprint(value)
+	}
+	return strings.Join(lines, "\n")
+}
 
 func configPathForDisplay(path string) string {
 	if path != "" {

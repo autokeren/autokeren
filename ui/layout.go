@@ -132,6 +132,7 @@ var slashCommands = []SlashCommandInfo{
 	{Name: "/genome", Description: "Scan struktur dan duplikasi codebase"},
 	{Name: "/loop", Description: "Lihat atau pulihkan loop breaker model"},
 	{Name: "/deploy", Description: "Minta agen membangun dan publish aplikasi melalui Autokeren"},
+	{Name: "/safe-deploy", Description: "Build, Proof, approval manusia, lalu publish terverifikasi"},
 	{Name: "/rewind", Description: "Kembalikan perubahan dari checkpoint"},
 	{Name: "/review", Description: "Audit perubahan kode saat ini"},
 	{Name: "/security", Description: "Scan keamanan proyek"},

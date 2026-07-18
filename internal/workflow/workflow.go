@@ -5,6 +5,8 @@ import (
 	"strings"
 )
 
+const releaseProofRequiredMarker = "[[autokeren:release-proof-required]]"
+
 func Expand(input string) (string, bool, error) {
 	parts := strings.Fields(input)
 	if len(parts) == 0 {
@@ -17,6 +19,11 @@ func Expand(input string) (string, bool, error) {
 			return "", true, fmt.Errorf("format: /deploy <deskripsi app>")
 		}
 		return deployPrompt(argument), true, nil
+	case "/safe-deploy":
+		if argument == "" {
+			return "", true, fmt.Errorf("format: /safe-deploy <deskripsi app>")
+		}
+		return safeDeployPrompt(argument), true, nil
 	case "/tdd":
 		segments := strings.SplitN(argument, "|", 2)
 		if len(segments) != 2 || strings.TrimSpace(segments[0]) == "" || strings.TrimSpace(segments[1]) == "" {
@@ -39,8 +46,20 @@ func Expand(input string) (string, bool, error) {
 	}
 }
 
+func RequiresApprovedProof(input string) bool {
+	return strings.HasPrefix(strings.TrimSpace(input), releaseProofRequiredMarker)
+}
+
+func WithoutReleaseProofMarker(input string) string {
+	return strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(input), releaseProofRequiredMarker))
+}
+
 func deployPrompt(description string) string {
 	return "User minta membuat dan mempublikasikan aplikasi melalui Autokeren: " + description + "\n\nLANGKAH WAJIB:\n1. Panggil scaffold_app untuk membuat struktur modular dan autokeren.app.json.\n2. Tulis atau patch fitur ke file modular yang tercantum dalam manifest; jangan membuat satu Worker raksasa.\n3. Jika menambah file baru, perbarui daftar files pada autokeren.app.json.\n4. Jalankan test atau verifikasi lokal yang relevan.\n5. Panggil publish_app setelah pengguna menyetujui permission publish.\n6. Ambil app_release_status dari release_id hasil publish dengan wait_seconds hingga 50 sampai status ready, lalu laporkan URL live.\nUntuk alur pemula jangan gunakan cf_deploy atau deploy_project; keduanya hanya jalur advanced/legacy."
+}
+
+func safeDeployPrompt(description string) string {
+	return releaseProofRequiredMarker + "\nUser minta membuat dan mempublikasikan aplikasi melalui Safe Deploy Autokeren: " + description + "\n\nLANGKAH WAJIB:\n1. Panggil scaffold_app untuk membuat struktur modular dan autokeren.app.json.\n2. Tulis atau patch fitur ke file modular yang tercantum dalam manifest; jangan membuat satu Worker raksasa.\n3. Jika menambah file baru, perbarui daftar files pada autokeren.app.json.\n4. Jalankan test atau verifikasi lokal yang relevan dan gunakan hanya hasil nyata sebagai evidence.\n5. Panggil proof action plan dengan acceptance criteria yang spesifik untuk aplikasi ini.\n6. Panggil proof action record untuk setiap kriteria dengan status dan bukti test yang nyata. Jangan pernah menandai passed tanpa hasil verifikasi.\n7. Panggil proof action report. Jika verdict bukan SHIP, berhenti dan jangan publish.\n8. Panggil proof action approve untuk meminta persetujuan manusia atas proof SHIP pada commit saat ini.\n9. Hanya setelah approval berhasil, panggil publish_app dengan proof_id yang sama. Safe Deploy akan memblokir publish tanpa proof SHIP yang disetujui dan masih cocok dengan commit saat ini.\n10. Ambil app_release_status dari release_id hasil publish dengan wait_seconds hingga 50 sampai status ready, lalu laporkan URL live.\nJangan gunakan cf_deploy atau deploy_project pada Safe Deploy."
 }
 
 func tddPrompt(target, description string) string {

@@ -45,12 +45,23 @@ Juri dapat menguji sistem rendering acceptance criteria dan menjalankan pengujia
 
 *(Catatan: Perintah replay memvisualisasikan dokumen bukti rilis yang telah tersimpan. Langkah ini tidak menjalankan pengujian secara dinamis.)*
 
+### Alur Safe Deploy
+
+Untuk aplikasi nyata, gunakan alur interaktif Go native ini, bukan langsung publish:
+
+```text
+/safe-deploy buat landing page toko sepatu responsif dengan automated test
+```
+
+Autokeren wajib membuat proof plan, mencatat bukti verifikasi nyata, menghasilkan `SHIP`, meminta persetujuan manusia, lalu mencocokkan proof yang sudah disetujui dengan Git commit saat ini sebelum boleh publish. Perubahan kode setelah approval membuat proof lama `stale` dan Safe Deploy akan memblokir publish sampai verifikasi dilakukan ulang.
+
 ### 🛠️ Kontribusi Hackathon (Yang dibangun selama event)
 
 * **Integrasi Model OpenAI** ([openai.py](autokeren/models/openai.py)): Klien model native yang mendukung completions, streaming, dan tool calling untuk GPT-5.6 dan Codex.
 * **Migrasi Runtime Go Native** ([cmd](cmd), [internal](internal)): Memindahkan loop provider aktif, dispatch tool, session/context, CLI proof, dan bootstrap provider ke Go.
 * **Wizard Login Berbasis Provider** ([bootstrap.go](cmd/bootstrap.go)): Setup Go native yang memvalidasi provider dan menyimpan model utama/cadangan yang cocok untuk runtime Go native.
-* **Proof Tool** ([proof.go](internal/tool/proof.go)): Tool Go native untuk merencanakan (plan), merekam bukti (record), membuat laporan (report), replay, dan melihat daftar (list) bukti rilis.
+* **Proof Tool** ([proof.go](internal/tool/proof.go)): Tool Go native untuk merencanakan (plan), merekam bukti (record), membuat laporan (report), replay, approval manusia, dan melihat daftar (list) bukti rilis.
+* **Safe Deploy Gate** ([workflow.go](internal/workflow/workflow.go)): `/safe-deploy` mewajibkan proof `SHIP` yang disetujui manusia dan terikat ke Git commit saat ini sebelum managed publish boleh berjalan.
 * **Slash Command `/proof`** ([cli.py](autokeren/cli.py), [tui.py](autokeren/tui.py)): Perintah interaktif di terminal dan TUI untuk menjalankan tugas-tugas bukti rilis.
 * **Aplikasi Demo Deterministik** ([app.py](examples/proof-demo/app.py)): Aplikasi endpoint checkout sederhana yang menunjukkan cacat validasi email dan log verifikasinya.
 

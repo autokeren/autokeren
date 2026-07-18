@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -351,6 +352,47 @@ func TestNativeGenomeAndLoopCommands(t *testing.T) {
 	}
 	if handled, err := c.localSlash("/loop break", &reply); !handled || err != nil || c.localConfig.Cloudflare.PrimaryModel != "secondary" {
 		t.Fatalf("loop break failed: handled=%v err=%v config=%#v", handled, err, c.localConfig.Cloudflare)
+	}
+}
+
+func TestNativeProofSlashFlowSupportsTitlesWithSpaces(t *testing.T) {
+	root := t.TempDir()
+	for _, args := range [][]string{
+		{"init"},
+		{"config", "user.name", "Autokeren Test"},
+		{"config", "user.email", "test@example.invalid"},
+		{"commit", "--allow-empty", "-m", "initial"},
+	} {
+		command := exec.Command("git", append([]string{"-C", root}, args...)...)
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, output)
+		}
+	}
+	c := &Client{localRoot: root}
+	var reply map[string]any
+	if handled, err := c.localSlash("/proof plan Shoe store release | Homepage loads | Tests pass", &reply); !handled || err != nil {
+		t.Fatalf("proof plan failed: handled=%v err=%v", handled, err)
+	}
+	if !strings.Contains(reply["content"].(string), "Proof ID:") {
+		t.Fatalf("proof plan did not return an ID: %#v", reply)
+	}
+	entries, err := os.ReadDir(filepath.Join(root, ".autokeren", "proofs"))
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("expected one proof artifact: entries=%#v err=%v", entries, err)
+	}
+	proofID := strings.TrimSuffix(entries[0].Name(), ".json")
+	for _, command := range []string{
+		"/proof record " + proofID + " 1 passed | browser: PASS",
+		"/proof record " + proofID + " 2 passed | go test ./...: PASS",
+		"/proof approve " + proofID,
+		"/proof report " + proofID,
+	} {
+		if handled, err := c.localSlash(command, &reply); !handled || err != nil {
+			t.Fatalf("proof command %q failed: handled=%v err=%v", command, handled, err)
+		}
+	}
+	if !strings.Contains(reply["content"].(string), "Approval: APPROVED") {
+		t.Fatalf("approved proof report missing approval: %#v", reply)
 	}
 }
 

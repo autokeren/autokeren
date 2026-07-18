@@ -44,12 +44,23 @@ Judges can test the proof-rendering system and run the local verification suite 
 
 *(Note: The replay command displays a pre-recorded, verified proof run containing the test evidence. It does not run the tests dynamically itself.)*
 
+### Safe Deploy Workflow
+
+For a real application, use the interactive native-Go workflow instead of publishing directly:
+
+```text
+/safe-deploy build a responsive shoe-store landing page with automated tests
+```
+
+Autokeren must create a proof plan, record real verification evidence, produce `SHIP`, request human approval, and match the approved proof to the current Git commit before it can publish. A later code change makes the proof stale and blocks the safe publish until it is re-verified.
+
 ### 🛠️ Hackathon Contribution (What was built)
 
 * **OpenAI Model Integration** ([openai.py](autokeren/models/openai.py)): Native model client supporting GPT-5.6 and Codex completions, streaming, and tool calls.
 * **Native Go Runtime Migration** ([cmd](cmd), [internal](internal)): Moved the active provider loop, tool dispatch, session/context handling, proof CLI, and provider-aware bootstrap to Go.
 * **Provider-Aware Login Wizard** ([bootstrap.go](cmd/bootstrap.go)): Go-native setup that validates providers and saves a matching primary and fallback model for the native Go runtime.
-* **Proof Tool** ([proof.go](internal/tool/proof.go)): Native Go tool to plan, record, report, replay, and list release evidence runs.
+* **Proof Tool** ([proof.go](internal/tool/proof.go)): Native Go tool to plan, record, report, replay, approve, and list release evidence runs.
+* **Safe Deploy Gate** ([workflow.go](internal/workflow/workflow.go)): `/safe-deploy` requires a human-approved `SHIP` proof bound to the current Git commit before the managed publish tool can run.
 * **`/proof` Slash Command** ([cli.py](autokeren/cli.py), [tui.py](autokeren/tui.py)): Interactive commands to execute proof tasks.
 * **Deterministic Demo App** ([app.py](examples/proof-demo/app.py)): A mock checkout app showing defect validation and verification logs.
 

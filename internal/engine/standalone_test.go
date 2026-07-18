@@ -16,6 +16,8 @@ import (
 	"github.com/autokeren/autokeren/internal/memory"
 	"github.com/autokeren/autokeren/internal/model"
 	"github.com/autokeren/autokeren/internal/session"
+	"github.com/autokeren/autokeren/internal/tool"
+	"github.com/autokeren/autokeren/internal/workflow"
 )
 
 func TestRunStandaloneFallsBackToSecondaryModel(t *testing.T) {
@@ -64,6 +66,57 @@ func TestRunStandaloneFallsBackToSecondaryModel(t *testing.T) {
 	defer mu.Unlock()
 	if len(models) != 2 || models[0] != "primary" || models[1] != "secondary" {
 		t.Fatalf("models = %#v", models)
+	}
+}
+
+func TestSafeDeployBlocksPublishWithoutApprovedProof(t *testing.T) {
+	requests := 0
+	safeToolNames := map[string]bool{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if requests == 1 {
+			var request model.Request
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Error(err)
+				return
+			}
+			for _, definition := range request.Tools {
+				safeToolNames[definition.Function.Name] = true
+			}
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		if requests == 1 {
+			_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"publish-1\",\"type\":\"function\",\"function\":{\"name\":\"publish_app\",\"arguments\":\"{\\\"name\\\":\\\"shoe-store\\\"}\"}}]}}]}\n\ndata: [DONE]\n\n"))
+			return
+		}
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"publish diblokir sampai proof disetujui\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"))
+	}))
+	defer server.Close()
+	cfg := config.Defaults()
+	cfg.Auth.BaseURL = server.URL
+	cfg.Auth.APIKey = "test-key"
+	cfg.Cloudflare.SecondaryModel = ""
+	cfg.Retry.MaxRetries = 0
+	prompt, handled, err := workflow.Expand("/safe-deploy landing page toko sepatu")
+	if err != nil || !handled {
+		t.Fatalf("safe deploy expansion failed: prompt=%q handled=%t err=%v", prompt, handled, err)
+	}
+	var publishResult string
+	content, err := RunStandaloneEvents(t.Context(), cfg, t.TempDir(), prompt, Events{OnToolEnd: func(name string, result tool.Result) {
+		if name == "publish_app" {
+			publishResult = result.Error
+		}
+	}}, "")
+	if err != nil || content != "publish diblokir sampai proof disetujui" {
+		t.Fatalf("unexpected safe deploy result: content=%q err=%v", content, err)
+	}
+	if !strings.Contains(publishResult, "proof_id") {
+		t.Fatalf("publish was not proof-gated: %q", publishResult)
+	}
+	for _, forbidden := range []string{"cf_deploy", "deploy_project"} {
+		if safeToolNames[forbidden] {
+			t.Fatalf("safe deploy exposed legacy bypass tool %q", forbidden)
+		}
 	}
 }
 

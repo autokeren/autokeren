@@ -20,17 +20,26 @@ type proofCriterion struct {
 	VerifiedAt string `json:"verified_at,omitempty"`
 }
 type proofData struct {
-	ID           string           `json:"id"`
-	Title        string           `json:"title"`
-	CreatedAt    string           `json:"created_at"`
-	SourceCommit string           `json:"source_commit,omitempty"`
-	Criteria     []proofCriterion `json:"criteria"`
+	ID             string           `json:"id"`
+	Title          string           `json:"title"`
+	CreatedAt      string           `json:"created_at"`
+	SourceCommit   string           `json:"source_commit,omitempty"`
+	Criteria       []proofCriterion `json:"criteria"`
+	ApprovedAt     string           `json:"approved_at,omitempty"`
+	ApprovedCommit string           `json:"approved_commit,omitempty"`
 }
 
 func (p Proof) Definition() Definition {
-	return Definition{Name: "proof", Description: "Manage release proof criteria and verdicts.", Parameters: map[string]any{"type": "object", "properties": map[string]any{"action": map[string]any{"type": "string", "enum": []string{"plan", "record", "report", "list", "replay"}}, "proof_id": map[string]any{"type": "string"}, "title": map[string]any{"type": "string"}, "criteria": map[string]any{"type": "array"}, "criterion_num": map[string]any{"type": "integer"}, "status": map[string]any{"type": "string"}, "evidence": map[string]any{"type": "string"}}, "required": []string{"action"}}}
+	return Definition{Name: "proof", Description: "Manage release proof criteria, human approval, and verdicts.", Parameters: map[string]any{"type": "object", "properties": map[string]any{"action": map[string]any{"type": "string", "enum": []string{"plan", "record", "report", "list", "replay", "approve"}}, "proof_id": map[string]any{"type": "string"}, "title": map[string]any{"type": "string"}, "criteria": map[string]any{"type": "array"}, "criterion_num": map[string]any{"type": "integer"}, "status": map[string]any{"type": "string"}, "evidence": map[string]any{"type": "string"}}, "required": []string{"action"}}}
 }
-func (p Proof) NeedsPermission(map[string]any) (bool, string) { return true, "Modify release proof" }
+func (p Proof) NeedsPermission(args map[string]any) (bool, string) {
+	action, _ := args["action"].(string)
+	if action == "approve" {
+		proofID, _ := args["proof_id"].(string)
+		return true, "setujui proof rilis " + proofID + " untuk commit saat ini"
+	}
+	return false, ""
+}
 func (p Proof) Run(ctx context.Context, args map[string]any, _ Emitter) Result {
 	select {
 	case <-ctx.Done():
@@ -114,10 +123,20 @@ func (p Proof) Run(ctx context.Context, args map[string]any, _ Emitter) Result {
 		data.Criteria[idx].Status = status
 		data.Criteria[idx].Evidence = ev
 		data.Criteria[idx].VerifiedAt = time.Now().UTC().Format(time.RFC3339)
+		data.ApprovedAt = ""
+		data.ApprovedCommit = ""
 		if err := writeProof(filepath.Join(dir, data.ID+".json"), data); err != nil {
 			return Result{OK: false, Error: err.Error()}
 		}
 		return Result{OK: true, Output: map[string]any{"proof_id": data.ID, "verdict": verdict(data.Criteria)}}
+	case "approve":
+		if err := approveProof(p.Root, &data); err != nil {
+			return Result{OK: false, Error: err.Error()}
+		}
+		if err := writeProof(filepath.Join(dir, data.ID+".json"), data); err != nil {
+			return Result{OK: false, Error: err.Error()}
+		}
+		return Result{OK: true, Output: map[string]any{"proof_id": data.ID, "verdict": "SHIP", "approved_at": data.ApprovedAt}}
 	case "report", "replay":
 		return Result{OK: true, Output: formatProof(data, action)}
 	default:
@@ -154,7 +173,50 @@ func formatProof(d proofData, kind string) string {
 		}
 		out += "\n"
 	}
+	if d.ApprovedAt != "" {
+		out += fmt.Sprintf("Approval: APPROVED at %s for commit %s\n", d.ApprovedAt, d.ApprovedCommit)
+	} else {
+		out += "Approval: WAITING_FOR_HUMAN\n"
+	}
 	return out
+}
+
+func ApprovedProofForCurrentCommit(root, proofID string) error {
+	if !regexp.MustCompile(`^proof-[A-Za-z0-9T_-]+$`).MatchString(proofID) {
+		return fmt.Errorf("proof_id tidak valid")
+	}
+	path := filepath.Join(root, ".autokeren", "proofs", proofID+".json")
+	data, err := loadProof(path)
+	if err != nil {
+		return fmt.Errorf("gagal memuat proof %s: %w", proofID, err)
+	}
+	if verdict(data.Criteria) != "SHIP" {
+		return fmt.Errorf("proof %s belum SHIP", proofID)
+	}
+	if data.ApprovedAt == "" || data.ApprovedCommit == "" {
+		return fmt.Errorf("proof %s belum disetujui manusia; jalankan /proof approve %s", proofID, proofID)
+	}
+	current := gitSHA(root)
+	if current == "" || data.SourceCommit == "" || data.ApprovedCommit != current || data.SourceCommit != current {
+		return fmt.Errorf("proof %s stale: commit saat ini tidak sama dengan commit proof yang disetujui", proofID)
+	}
+	return nil
+}
+
+func approveProof(root string, data *proofData) error {
+	if verdict(data.Criteria) != "SHIP" {
+		return fmt.Errorf("proof belum SHIP; semua kriteria wajib passed sebelum approval")
+	}
+	current := gitSHA(root)
+	if current == "" || data.SourceCommit == "" {
+		return fmt.Errorf("approval membutuhkan repository Git dengan commit yang dapat diidentifikasi")
+	}
+	if data.SourceCommit != current {
+		return fmt.Errorf("proof stale: source commit berbeda dengan commit workspace saat ini; buat proof baru")
+	}
+	data.ApprovedAt = time.Now().UTC().Format(time.RFC3339)
+	data.ApprovedCommit = current
+	return nil
 }
 func gitSHA(root string) string {
 	cmd := exec.Command("git", "-C", root, "rev-parse", "HEAD")

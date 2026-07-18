@@ -859,6 +859,45 @@ func compactTailTurns(configured int) int {
 	return configured
 }
 
+func proofUsage() string {
+	return "Proof release workflow:\n" +
+		"  /proof plan <judul> | <kriteria 1> | <kriteria 2>\n" +
+		"  /proof record <proof-id> <nomor> <passed|failed|blocked|manual_review> | <bukti>\n" +
+		"  /proof report <proof-id>\n" +
+		"  /proof approve <proof-id>\n" +
+		"  /proof list\n" +
+		"  /proof replay <file-json>\n\n" +
+		"Safe Deploy hanya akan publish jika proof berstatus SHIP, disetujui manusia, dan commit masih sama."
+}
+
+func proofOutput(value any) string {
+	data, ok := value.(map[string]any)
+	if !ok {
+		return fmt.Sprint(value)
+	}
+	proofID, _ := data["proof_id"].(string)
+	message, _ := data["message"].(string)
+	verdict, _ := data["verdict"].(string)
+	approvedAt, _ := data["approved_at"].(string)
+	lines := make([]string, 0, 3)
+	if message != "" {
+		lines = append(lines, message)
+	}
+	if proofID != "" {
+		lines = append(lines, "Proof ID: "+proofID)
+	}
+	if verdict != "" {
+		lines = append(lines, "Verdict: "+verdict)
+	}
+	if approvedAt != "" {
+		lines = append(lines, "Approval: APPROVED at "+approvedAt)
+	}
+	if len(lines) == 0 {
+		return fmt.Sprint(value)
+	}
+	return strings.Join(lines, "\n")
+}
+
 func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 	parts := strings.Fields(input)
 	if len(parts) == 0 || !strings.HasPrefix(parts[0], "/") {
@@ -867,7 +906,7 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 	var output string
 	switch parts[0] {
 	case "/help":
-		output = "Perintah: /help, /model, /lang, /permissions, /memory, /copy, /debug, /export, /mcp, /save, /resume, /sessions, /project, /tdd, /spec, /ghost, /research, /deploy, /proof, /review, /security, /rewind, /genome, /loop, /config, /local, /approval, /reset, /q"
+		output = "Perintah: /help, /model, /lang, /permissions, /memory, /copy, /debug, /export, /mcp, /save, /resume, /sessions, /project, /tdd, /spec, /ghost, /research, /deploy, /safe-deploy, /proof, /review, /security, /rewind, /genome, /loop, /config, /local, /approval, /reset, /q"
 	case "/permissions":
 		output = "Tool berisiko akan meminta izin di TUI. Gunakan /approval all untuk mengizinkan semua tool selama sesi ini, atau /approval ask untuk kembali bertanya."
 	case "/debug":
@@ -1142,32 +1181,64 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 			return true, errors.New("format: /loop status|reset|break")
 		}
 	case "/proof":
-		action := "list"
-		if len(parts) > 1 {
-			action = parts[1]
+		argument := strings.TrimSpace(strings.TrimPrefix(input, "/proof"))
+		if argument == "" || argument == "help" {
+			output = proofUsage()
+			break
 		}
+		action, rest, _ := strings.Cut(argument, " ")
+		action = strings.ToLower(strings.TrimSpace(action))
+		rest = strings.TrimSpace(rest)
 		args := map[string]any{"action": action}
-		if action == "replay" && len(parts) > 2 {
-			args["proof_id"] = parts[2]
-		} else if len(parts) > 2 {
-			args["proof_id"] = parts[2]
-		}
-		if action == "plan" {
-			if len(parts) < 4 {
-				return true, errors.New("format: /proof plan <title> <criterion1>|<criterion2>")
+		switch action {
+		case "list":
+			if rest != "" {
+				return true, errors.New("format: /proof list")
 			}
-			args["title"] = parts[2]
-			criteria := strings.Split(strings.Join(parts[3:], " "), "|")
-			items := make([]any, 0, len(criteria))
-			for _, criterion := range criteria {
+		case "plan":
+			segments := strings.Split(rest, "|")
+			if len(segments) < 2 || strings.TrimSpace(segments[0]) == "" {
+				return true, errors.New("format: /proof plan <judul> | <kriteria 1> | <kriteria 2>")
+			}
+			items := make([]any, 0, len(segments)-1)
+			for _, criterion := range segments[1:] {
 				if value := strings.TrimSpace(criterion); value != "" {
 					items = append(items, value)
 				}
 			}
+			if len(items) == 0 {
+				return true, errors.New("minimal satu kriteria wajib diisi")
+			}
+			args["title"] = strings.TrimSpace(segments[0])
 			args["criteria"] = items
+		case "record":
+			beforeEvidence, evidence, _ := strings.Cut(rest, "|")
+			fields := strings.Fields(beforeEvidence)
+			if len(fields) != 3 {
+				return true, errors.New("format: /proof record <proof-id> <nomor> <status> | <bukti>")
+			}
+			number, err := strconv.Atoi(fields[1])
+			if err != nil || number < 1 {
+				return true, errors.New("nomor kriteria harus angka positif")
+			}
+			args["proof_id"] = fields[0]
+			args["criterion_num"] = float64(number)
+			args["status"] = strings.ToLower(fields[2])
+			args["evidence"] = strings.TrimSpace(evidence)
+		case "report", "approve", "replay":
+			if rest == "" {
+				target := "proof-id"
+				if action == "replay" {
+					target = "file"
+				}
+				return true, fmt.Errorf("format: /proof %s <%s>", action, target)
+			}
+			args["proof_id"] = rest
+		default:
+			return true, errors.New("aksi proof tidak dikenal; gunakan /proof help")
 		}
 		result := (tool.Proof{Root: c.localRoot}).Run(context.Background(), args, nil)
-		output = fmt.Sprint(result.Output)
+		output = proofOutput(result.Output)
 		if !result.OK {
 			output = result.Error
 		}
