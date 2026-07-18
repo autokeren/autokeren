@@ -69,7 +69,7 @@ func TestDirectorWorkerMailboxEndToEnd(t *testing.T) {
 	}
 	content, err := RunStandalone(t.Context(), cfg, root, "DIRECTOR_E2E delegasikan review", nil, "")
 	if err != nil || content != "director menerima bukti worker" {
-		t.Fatalf("content=%q err=%v", content, err)
+		t.Fatalf("content=%q err=%v\nartifacts:\n%s", content, err, ghostArtifacts(root))
 	}
 	mailboxData, err := os.ReadFile(filepath.Join(root, ".autokeren", "agent-mailbox.json"))
 	if err != nil {
@@ -84,6 +84,29 @@ func TestDirectorWorkerMailboxEndToEnd(t *testing.T) {
 	if count < 3 {
 		t.Fatalf("expected director, worker, and mailbox requests; got %d", count)
 	}
+}
+
+func ghostArtifacts(root string) string {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return err.Error()
+	}
+	parts := make([]string, 0)
+	for _, entry := range entries {
+		if !strings.HasPrefix(entry.Name(), ".ak-ghost-") {
+			continue
+		}
+		data, readErr := os.ReadFile(filepath.Join(root, entry.Name()))
+		if readErr != nil {
+			parts = append(parts, entry.Name()+": "+readErr.Error())
+			continue
+		}
+		parts = append(parts, entry.Name()+": "+string(data))
+	}
+	if len(parts) == 0 {
+		return "tidak ada artifact ghost"
+	}
+	return strings.Join(parts, "\n")
 }
 
 func repositoryRoot(t *testing.T) string {
