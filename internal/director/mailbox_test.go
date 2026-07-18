@@ -42,3 +42,12 @@ func TestAwaitReturnsWhenWorkersFinish(t *testing.T) {
 		t.Fatalf("mailbox=%#v err=%v", mailbox, err)
 	}
 }
+
+func TestAwaitPersistsTimedOutWorkersWithoutLyingAboutTheirStatus(t *testing.T) {
+	root := t.TempDir()
+	agents := &fakeAgents{items: []*ghost.GhostAgentInfo{{ID: 4, Status: "running"}}, outputs: map[int]string{}}
+	mailbox, err := New(root, agents).Await(context.Background(), []int{4}, time.Millisecond)
+	if err == nil || mailbox.WaitStatus != "timed_out" || len(mailbox.PendingAgentIDs) != 1 || mailbox.PendingAgentIDs[0] != 4 || mailbox.Entries[0].Status != "running" {
+		t.Fatalf("mailbox=%#v err=%v", mailbox, err)
+	}
+}

@@ -31,8 +31,10 @@ type MailboxEntry struct {
 }
 
 type Mailbox struct {
-	UpdatedAt time.Time      `json:"updated_at"`
-	Entries   []MailboxEntry `json:"entries"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	WaitStatus      string         `json:"wait_status"`
+	PendingAgentIDs []int          `json:"pending_agent_ids,omitempty"`
+	Entries         []MailboxEntry `json:"entries"`
 }
 
 type Coordinator struct {
@@ -71,6 +73,11 @@ func (c *Coordinator) Await(ctx context.Context, ids []int, timeout time.Duratio
 		case <-ctx.Done():
 			return Mailbox{}, ctx.Err()
 		case <-deadline.C:
+			mailbox.WaitStatus = "timed_out"
+			mailbox.PendingAgentIDs = pendingAgentIDs(mailbox.Entries)
+			if persistErr := c.persist(mailbox); persistErr != nil {
+				return Mailbox{}, persistErr
+			}
 			return mailbox, fmt.Errorf("menunggu hasil agent melewati batas waktu")
 		case <-ticker.C:
 		}
@@ -114,11 +121,25 @@ func (c *Coordinator) collect(ids []int) (Mailbox, bool, error) {
 		return Mailbox{}, false, fmt.Errorf("satu atau lebih agent tidak ditemukan")
 	}
 	sort.Slice(entries, func(left, right int) bool { return entries[left].AgentID < entries[right].AgentID })
-	mailbox := Mailbox{UpdatedAt: time.Now().UTC(), Entries: entries}
+	mailbox := Mailbox{UpdatedAt: time.Now().UTC(), WaitStatus: "ready", Entries: entries}
+	if pending {
+		mailbox.WaitStatus = "pending"
+		mailbox.PendingAgentIDs = pendingAgentIDs(entries)
+	}
 	if err := c.persist(mailbox); err != nil {
 		return Mailbox{}, false, err
 	}
 	return mailbox, pending, nil
+}
+
+func pendingAgentIDs(entries []MailboxEntry) []int {
+	ids := make([]int, 0)
+	for _, entry := range entries {
+		if entry.Status == "running" || entry.Status == "unknown" {
+			ids = append(ids, entry.AgentID)
+		}
+	}
+	return ids
 }
 
 func (c *Coordinator) persist(mailbox Mailbox) error {
