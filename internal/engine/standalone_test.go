@@ -67,6 +67,54 @@ func TestRunStandaloneFallsBackToSecondaryModel(t *testing.T) {
 	}
 }
 
+func TestRunStandaloneRecoversMalformedToolCallBeforeStrictProviderRejectsHistory(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("AUTOKEREN_CONFIG_DIR", filepath.Join(root, "config"))
+	requests := 0
+	recoverySeen := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		requests++
+		w.Header().Set("Content-Type", "text/event-stream")
+		if requests == 1 {
+			_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"broken-call\",\"type\":\"function\",\"function\":{\"name\":\"run_shell\",\"arguments\":\"{\\\"command\\\":\\\"pwd\\\"\"}}]}}]}\n\ndata: [DONE]\n\n"))
+			return
+		}
+		var payload model.Request
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		for _, message := range payload.Messages {
+			if message.Role == "assistant" {
+				for _, call := range message.ToolCalls {
+					if !json.Valid([]byte(call.Function.Arguments)) {
+						http.Error(w, "Assistant tool call function.arguments must be valid JSON.", http.StatusBadRequest)
+						return
+					}
+				}
+			}
+			if message.Role == "system" && strings.Contains(message.Content, "format argumennya rusak") {
+				recoverySeen = true
+			}
+		}
+		if requests == 2 {
+			_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"list-files\",\"type\":\"function\",\"function\":{\"name\":\"list_files\",\"arguments\":\"{\\\"path\\\":\\\".\\\"}\"}}]}}]}\n\ndata: [DONE]\n\n"))
+			return
+		}
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"pulih dan lanjut\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"))
+	}))
+	defer server.Close()
+	cfg := config.Defaults()
+	cfg.Auth.BaseURL = server.URL
+	cfg.Auth.APIKey = "test-key"
+	cfg.Cloudflare.SecondaryModel = ""
+	cfg.Retry.MaxRetries = 0
+	content, err := RunStandalone(t.Context(), cfg, root, "cek project", nil, "")
+	if err != nil || content != "pulih dan lanjut" || requests != 3 || !recoverySeen {
+		t.Fatalf("malformed call tidak pulih: content=%q err=%v requests=%d recovery=%t", content, err, requests, recoverySeen)
+	}
+}
+
 func TestRunStandaloneWritesCheckpointAndRewindsFile(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("AUTOKEREN_CONFIG_DIR", filepath.Join(root, "config"))

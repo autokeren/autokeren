@@ -108,24 +108,28 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 			l.Context.Add(model.Message{Role: "assistant", Content: content})
 			return model.Response{Content: content, Model: last.Model, Usage: last.Usage}, nil
 		}
-		// Preserve any streamed reasoning/content alongside tool calls, but always
-		// dispatch the calls before deciding that the turn is complete.
-		l.Context.Add(model.Message{Role: "assistant", Content: last.Content, ToolCalls: last.ToolCalls})
+		preparedCalls := prepareToolCalls(last.ToolCalls)
+		validCalls := make([]model.ToolCall, 0, len(preparedCalls))
+		for _, prepared := range preparedCalls {
+			if prepared.err == nil {
+				validCalls = append(validCalls, prepared.call)
+			}
+		}
+		l.Context.Add(model.Message{Role: "assistant", Content: last.Content, ToolCalls: validCalls})
 		l.emitContext(events)
 		backgroundAgentIDs := make([]int, 0)
-		for _, call := range last.ToolCalls {
-			args := map[string]any{}
-			if call.Function.Arguments != "" {
-				if err := json.Unmarshal([]byte(call.Function.Arguments), &args); err != nil {
-					result := tool.Result{OK: false, Error: "argumen tool tidak valid: " + err.Error()}
-					l.Context.Add(model.Message{Role: "tool", Name: call.Function.Name, ToolCallID: call.ID, Content: result.Error})
-					l.emitContext(events)
-					if events.OnToolEnd != nil {
-						events.OnToolEnd(call.Function.Name, result)
-					}
-					continue
+		for _, prepared := range preparedCalls {
+			call := prepared.call
+			if prepared.err != nil {
+				message := invalidToolCallRecovery(call, prepared.err)
+				if events.OnToolOutput != nil {
+					events.OnToolOutput("recovery", message)
 				}
+				l.Context.Add(model.Message{Role: "system", Content: message})
+				l.emitContext(events)
+				continue
 			}
+			args := prepared.args
 			t, ok := l.Tools.Get(call.Function.Name)
 			if !ok {
 				result := tool.Result{OK: false, Error: "tool not found: " + call.Function.Name}
@@ -194,6 +198,50 @@ func (l *Loop) emitContext(events Events) {
 	if events.OnContextUpdated != nil && l.Context != nil {
 		events.OnContextUpdated(l.Context.TokenEstimate(), l.Context.MaxTokens())
 	}
+}
+
+type preparedToolCall struct {
+	call model.ToolCall
+	args map[string]any
+	err  error
+}
+
+func prepareToolCalls(calls []model.ToolCall) []preparedToolCall {
+	prepared := make([]preparedToolCall, 0, len(calls))
+	for _, call := range calls {
+		args, err := decodeToolCallArguments(call)
+		prepared = append(prepared, preparedToolCall{call: call, args: args, err: err})
+	}
+	return prepared
+}
+
+func decodeToolCallArguments(call model.ToolCall) (map[string]any, error) {
+	if strings.TrimSpace(call.ID) == "" {
+		return nil, fmt.Errorf("ID tool call kosong")
+	}
+	if strings.TrimSpace(call.Function.Name) == "" {
+		return nil, fmt.Errorf("nama tool kosong")
+	}
+	args := map[string]any{}
+	arguments := strings.TrimSpace(call.Function.Arguments)
+	if arguments == "" {
+		return args, nil
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+		return nil, fmt.Errorf("argumen harus berupa object JSON valid: %w", err)
+	}
+	if args == nil {
+		return map[string]any{}, nil
+	}
+	return args, nil
+}
+
+func invalidToolCallRecovery(call model.ToolCall, err error) string {
+	name := strings.TrimSpace(call.Function.Name)
+	if name == "" {
+		name = "tool"
+	}
+	return fmt.Sprintf("Tool call %s tidak dijalankan karena format argumennya rusak (%v). Buat ulang satu tool call %s dengan arguments berupa satu object JSON lengkap dan valid sesuai schema. Jangan kirim ulang fragmen atau JSON yang digabung.", name, err, name)
 }
 
 func hasToolResults(messages []model.Message) bool {
