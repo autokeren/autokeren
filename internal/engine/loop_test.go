@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -249,6 +250,64 @@ func TestLoopRecoversMalformedToolArgumentsWithoutForwardingInvalidJSON(t *testi
 	response, err := loop.Run(context.Background(), "coba tool", Events{})
 	if err != nil || response.Content != "argumen diperbaiki" || p.calls != 3 || !p.recoveryPrompt || p.invalidLeaked || !p.toolRetried {
 		t.Fatalf("response=%#v err=%v calls=%d recovery=%t leaked=%t retried=%t", response, err, p.calls, p.recoveryPrompt, p.invalidLeaked, p.toolRetried)
+	}
+}
+
+type poisonedSessionProvider struct {
+	calls         int
+	recoverySeen  bool
+	invalidLeaked bool
+	orphanLeaked  bool
+}
+
+func (p *poisonedSessionProvider) Complete(_ context.Context, request model.Request, _ provider.ChunkHandler) (model.Response, error) {
+	p.calls++
+	knownCalls := map[string]struct{}{}
+	for _, message := range request.Messages {
+		if message.Role == "assistant" {
+			for _, call := range message.ToolCalls {
+				knownCalls[call.ID] = struct{}{}
+				if !json.Valid([]byte(call.Function.Arguments)) {
+					p.invalidLeaked = true
+				}
+			}
+		}
+		if message.Role == "tool" {
+			if _, ok := knownCalls[message.ToolCallID]; !ok {
+				p.orphanLeaked = true
+			}
+		}
+		if message.Role == "system" && strings.Contains(message.Content, "Riwayat") && strings.Contains(message.Content, "dibersihkan") {
+			p.recoverySeen = true
+		}
+	}
+	return model.Response{Content: "sesi lama pulih"}, nil
+}
+
+func TestLoopCleansPoisonedResumedToolHistoryBeforeProviderRequest(t *testing.T) {
+	store := contextstore.New(262144, false, 0.6)
+	store.Replace([]model.Message{
+		{Role: "system", Content: "aturan"},
+		{Role: "user", Content: "permintaan lama"},
+		{Role: "assistant", ToolCalls: []model.ToolCall{{ID: "broken", Type: "function", Function: model.ToolCallFunction{Name: "run_shell", Arguments: `{"command":"pwd"`}}}},
+		{Role: "tool", Name: "run_shell", ToolCallID: "broken", Content: "argumen tool tidak valid"},
+	})
+	p := &poisonedSessionProvider{}
+	loop := &Loop{Runner: Runner{Provider: p}, Context: store, MaxIterations: 2}
+	response, err := loop.Run(context.Background(), "lanjut", Events{})
+	if err != nil || response.Content != "sesi lama pulih" || p.calls != 1 || !p.recoverySeen || p.invalidLeaked || p.orphanLeaked {
+		t.Fatalf("poisoned session tidak dibersihkan: response=%#v err=%v calls=%d recovery=%t invalid=%t orphan=%t", response, err, p.calls, p.recoverySeen, p.invalidLeaked, p.orphanLeaked)
+	}
+}
+
+func TestSanitizeToolHistoryPreservesCompletedValidToolCalls(t *testing.T) {
+	valid := model.ToolCall{ID: "valid", Type: "function", Function: model.ToolCallFunction{Name: "echo", Arguments: `{"value":"ok"}`}}
+	cleaned, removed := sanitizeToolHistory([]model.Message{
+		{Role: "assistant", ToolCalls: []model.ToolCall{valid}},
+		{Role: "tool", Name: "echo", ToolCallID: "valid", Content: `{"ok":true}`},
+	})
+	if removed != 0 || len(cleaned) != 2 || len(cleaned[0].ToolCalls) != 1 || cleaned[1].ToolCallID != "valid" {
+		t.Fatalf("tool history valid berubah: cleaned=%#v removed=%d", cleaned, removed)
 	}
 }
 

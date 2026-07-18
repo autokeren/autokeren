@@ -236,11 +236,14 @@ func TestIsContextLimitRecognizesCommonProviderMessages(t *testing.T) {
 	for _, message := range []string{
 		"request exceeds the context window",
 		"context limit reached",
-		"provider code 8007",
+		"provider code 8007: context length exceeded",
 	} {
 		if !IsContextLimit(errors.New(message)) {
 			t.Fatalf("context limit not recognized: %q", message)
 		}
+	}
+	if IsContextLimit(errors.New("8007: Assistant tool call function.arguments must be valid JSON")) {
+		t.Fatal("tool call JSON error tidak boleh dianggap context limit")
 	}
 }
 

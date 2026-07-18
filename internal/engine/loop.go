@@ -60,6 +60,11 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 	contextRecoveryAttempts := 0
 	autonomousContinuationAttempts := 0
 	for iteration := 0; iteration < limit; iteration++ {
+		if sanitized, removed := sanitizeToolHistory(l.Context.Messages()); removed > 0 {
+			l.Context.Replace(sanitized)
+			l.Context.Add(model.Message{Role: "system", Content: fmt.Sprintf("Riwayat %d tool call atau hasil tool yang tidak valid telah dibersihkan agar provider dapat melanjutkan. Jika tool masih diperlukan, buat ulang satu tool call dengan arguments object JSON lengkap dan valid.", removed)})
+			l.emitContext(events)
+		}
 		request := model.Request{Model: l.Model, Messages: mergeRequestMessages(l.Context.Messages(), l.RequestPrelude), Tools: definitions(l.Tools), Temperature: l.Temperature, MaxTokens: l.MaxTokens}
 		var onChunk provider.ChunkHandler
 		if events.OnChunk != nil {
@@ -242,6 +247,72 @@ func invalidToolCallRecovery(call model.ToolCall, err error) string {
 		name = "tool"
 	}
 	return fmt.Sprintf("Tool call %s tidak dijalankan karena format argumennya rusak (%v). Buat ulang satu tool call %s dengan arguments berupa satu object JSON lengkap dan valid sesuai schema. Jangan kirim ulang fragmen atau JSON yang digabung.", name, err, name)
+}
+
+func sanitizeToolHistory(messages []model.Message) ([]model.Message, int) {
+	cleaned := make([]model.Message, 0, len(messages))
+	removed := 0
+	for index := 0; index < len(messages); {
+		message := messages[index]
+		if message.Role != "assistant" || len(message.ToolCalls) == 0 {
+			if message.Role == "tool" {
+				removed++
+				index++
+				continue
+			}
+			cleaned = append(cleaned, message)
+			index++
+			continue
+		}
+		validCalls := make([]model.ToolCall, 0, len(message.ToolCalls))
+		validIDs := map[string]struct{}{}
+		for _, call := range message.ToolCalls {
+			if _, err := decodeToolCallArguments(call); err != nil {
+				removed++
+				continue
+			}
+			if _, duplicate := validIDs[call.ID]; duplicate {
+				removed++
+				continue
+			}
+			validIDs[call.ID] = struct{}{}
+			validCalls = append(validCalls, call)
+		}
+		next := index + 1
+		toolResults := make([]model.Message, 0, len(validCalls))
+		resultIDs := map[string]struct{}{}
+		for next < len(messages) && messages[next].Role == "tool" {
+			result := messages[next]
+			if _, expected := validIDs[result.ToolCallID]; expected {
+				if _, duplicate := resultIDs[result.ToolCallID]; !duplicate {
+					resultIDs[result.ToolCallID] = struct{}{}
+					toolResults = append(toolResults, result)
+				} else {
+					removed++
+				}
+			} else {
+				removed++
+			}
+			next++
+		}
+		complete := len(validCalls) > 0 && len(resultIDs) == len(validCalls)
+		if !complete {
+			removed += len(validCalls) + len(toolResults)
+			message.ToolCalls = nil
+			if strings.TrimSpace(message.Content) != "" {
+				cleaned = append(cleaned, message)
+			} else {
+				removed++
+			}
+			index = next
+			continue
+		}
+		message.ToolCalls = validCalls
+		cleaned = append(cleaned, message)
+		cleaned = append(cleaned, toolResults...)
+		index = next
+	}
+	return cleaned, removed
 }
 
 func hasToolResults(messages []model.Message) bool {
