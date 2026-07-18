@@ -109,6 +109,7 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 	}
 	store := contextstore.New(cfg.Autokeren.ContextWindow, cfg.Autokeren.AutoCompact, cfg.Autokeren.AutoCompactThreshold)
 	store.SetCompactTail(cfg.Autokeren.CompactTailTurns)
+	store.SetReserveTokens(cfg.Cloudflare.MaxTokens + 8000)
 	sessions, err := session.NewManager(root)
 	if err != nil {
 		return "", err

@@ -255,7 +255,7 @@ func IsContextLimit(err error) bool {
 		return false
 	}
 	message := strings.ToLower(err.Error())
-	return strings.Contains(message, "8007") || strings.Contains(message, "context length")
+	return strings.Contains(message, "8007") || strings.Contains(message, "context length") || strings.Contains(message, "context window") || strings.Contains(message, "context limit") || strings.Contains(message, "exceeds")
 }
 
 const (

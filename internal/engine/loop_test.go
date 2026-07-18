@@ -240,3 +240,40 @@ func TestLoopCompactsAndRetriesContextLimitOnce(t *testing.T) {
 		t.Fatalf("response=%#v err=%v calls=%d compacted=%t retries=%d", response, err, p.calls, p.compacted, retries)
 	}
 }
+
+type contextLimitTwiceThenSuccessProvider struct {
+	calls     int
+	compacted bool
+}
+
+func (p *contextLimitTwiceThenSuccessProvider) Complete(_ context.Context, request model.Request, _ provider.ChunkHandler) (model.Response, error) {
+	p.calls++
+	if p.calls <= 2 {
+		return model.Response{}, &provider.Error{Status: 400, Cause: errors.New("request exceeds the context window")}
+	}
+	for _, message := range request.Messages {
+		if message.Role == "system" && strings.Contains(message.Content, "Ringkasan context lama") {
+			p.compacted = true
+		}
+	}
+	return model.Response{Content: "pulih setelah compact kedua"}, nil
+}
+
+func TestLoopRetriesMultipleContextLimitRecoveries(t *testing.T) {
+	store := contextstore.New(262144, false, 0.6)
+	store.SetCompactTail(1)
+	store.Replace([]model.Message{
+		{Role: "system", Content: "rules"},
+		{Role: "user", Content: "old task"},
+		{Role: "assistant", Content: "old answer"},
+		{Role: "user", Content: "older task"},
+		{Role: "assistant", Content: "older answer"},
+	})
+	p := &contextLimitTwiceThenSuccessProvider{}
+	retries := 0
+	loop := &Loop{Runner: Runner{Provider: p}, Context: store, MaxIterations: 4}
+	response, err := loop.Run(context.Background(), "current task", Events{OnRetry: func(int, time.Duration, string) { retries++ }})
+	if err != nil || response.Content != "pulih setelah compact kedua" || p.calls != 3 || !p.compacted || retries != 2 {
+		t.Fatalf("response=%#v err=%v calls=%d compacted=%t retries=%d", response, err, p.calls, p.compacted, retries)
+	}
+}

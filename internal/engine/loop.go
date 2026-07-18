@@ -35,6 +35,8 @@ type Loop struct {
 	PlanMode       bool
 }
 
+const maxContextRecoveryAttempts = 3
+
 func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.Response, error) {
 	if l.Runner.Provider == nil {
 		return model.Response{}, fmt.Errorf("agent provider is nil")
@@ -51,7 +53,7 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 		limit = 50
 	}
 	var last model.Response
-	recoveredFromLimit := false
+	contextRecoveryAttempts := 0
 	for iteration := 0; iteration < limit; iteration++ {
 		request := model.Request{Model: l.Model, Messages: mergeRequestMessages(l.Context.Messages(), l.RequestPrelude), Tools: definitions(l.Tools), Temperature: l.Temperature, MaxTokens: l.MaxTokens}
 		var onChunk provider.ChunkHandler
@@ -60,18 +62,19 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 		}
 		last, err := l.Runner.RunTurn(ctx, request, onChunk)
 		if err != nil {
-			if provider.IsContextLimit(err) && !recoveredFromLimit {
+			if provider.IsContextLimit(err) && contextRecoveryAttempts < maxContextRecoveryAttempts {
 				before, after, changed := l.Context.Compact()
 				if changed {
-					recoveredFromLimit = true
+					contextRecoveryAttempts++
 					if events.OnRetry != nil {
-						events.OnRetry(0, 0, fmt.Sprintf("context penuh; compact otomatis %d → %d token lalu mencoba ulang", before, after))
+						events.OnRetry(contextRecoveryAttempts, 0, fmt.Sprintf("context penuh; compact otomatis %d → %d token lalu mencoba ulang", before, after))
 					}
 					continue
 				}
 			}
 			return model.Response{}, err
 		}
+		contextRecoveryAttempts = 0
 		if len(last.ToolCalls) == 0 {
 			l.Context.Add(model.Message{Role: "assistant", Content: last.Content})
 			if strings.TrimSpace(last.Content) == "" {

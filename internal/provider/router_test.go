@@ -147,6 +147,18 @@ func TestRouterDoesNotFallbackContextLimit(t *testing.T) {
 	}
 }
 
+func TestIsContextLimitRecognizesCommonProviderMessages(t *testing.T) {
+	for _, message := range []string{
+		"request exceeds the context window",
+		"context limit reached",
+		"provider code 8007",
+	} {
+		if !IsContextLimit(errors.New(message)) {
+			t.Fatalf("context limit not recognized: %q", message)
+		}
+	}
+}
+
 func TestRouterHonorsRetryAfter(t *testing.T) {
 	primary := &scriptedProvider{results: []scriptedResult{
 		{err: &Error{Status: 429, RetryAfter: 2 * time.Second, Cause: errors.New("rate limited")}},

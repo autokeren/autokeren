@@ -13,6 +13,7 @@ type Store struct {
 	mu          sync.RWMutex
 	messages    []model.Message
 	maxTokens   int
+	reserve     int
 	autoCompact bool
 	threshold   float64
 	compactTail int
@@ -57,6 +58,15 @@ func (s *Store) SetCompactTail(turns int) {
 	defer s.mu.Unlock()
 	s.compactTail = turns
 }
+func (s *Store) SetReserveTokens(tokens int) {
+	if tokens < 0 {
+		tokens = 0
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.reserve = tokens
+	s.compactLocked()
+}
 func (s *Store) Compact() (int, int, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -65,7 +75,16 @@ func (s *Store) Compact() (int, int, bool) {
 	return before, estimate(s.messages), changed
 }
 func (s *Store) compactLocked() {
-	if !s.autoCompact || estimate(s.messages) <= int(float64(s.maxTokens)*s.threshold) {
+	tokens := estimate(s.messages)
+	reservedLimit := s.maxTokens - s.reserve
+	if reservedLimit < 1 {
+		reservedLimit = 1
+	}
+	if s.reserve > 0 && tokens >= reservedLimit {
+		s.compactNowLocked()
+		return
+	}
+	if !s.autoCompact || tokens < int(float64(s.maxTokens)*s.threshold) {
 		return
 	}
 	s.compactNowLocked()
