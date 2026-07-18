@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -76,6 +77,9 @@ func (gm *GhostManager) loadExisting() {
 		return
 	}
 	for _, entry := range entries {
+		if id, ok := ghostFileID(entry.Name()); ok && id >= gm.nextID {
+			gm.nextID = id + 1
+		}
 		if filepath.Ext(entry.Name()) != ".json" || !strings.HasPrefix(entry.Name(), ".ak-ghost-") {
 			continue
 		}
@@ -96,10 +100,21 @@ func (gm *GhostManager) loadExisting() {
 			info.Status = "completed"
 		}
 		gm.agents[info.ID] = &info
-		if info.ID >= gm.nextID {
-			gm.nextID = info.ID + 1
+	}
+}
+
+func ghostFileID(name string) (int, bool) {
+	if !strings.HasPrefix(name, ".ak-ghost-") {
+		return 0, false
+	}
+	for _, extension := range []string{".json", ".log"} {
+		if strings.HasSuffix(name, extension) {
+			value := strings.TrimSuffix(strings.TrimPrefix(name, ".ak-ghost-"), extension)
+			id, err := strconv.Atoi(value)
+			return id, err == nil && id > 0
 		}
 	}
+	return 0, false
 }
 
 func (gm *GhostManager) Spawn(task string) (*GhostAgentInfo, error) {
@@ -121,12 +136,22 @@ func (gm *GhostManager) SpawnWithOptions(options SpawnOptions) (*GhostAgentInfo,
 	}
 
 	id := gm.nextID
-	gm.nextID++
-	logFile := filepath.Join(gm.ProjectRoot, fmt.Sprintf(".ak-ghost-%d.log", id))
-	log, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
-	if err != nil {
-		return nil, fmt.Errorf("gagal membuka log ghost: %w", err)
+	var logFile string
+	var log *os.File
+	for {
+		logFile = filepath.Join(gm.ProjectRoot, fmt.Sprintf(".ak-ghost-%d.log", id))
+		opened, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0o600)
+		if os.IsExist(err) {
+			id++
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("gagal membuka log ghost: %w", err)
+		}
+		log = opened
+		break
 	}
+	gm.nextID = id + 1
 
 	binary := gm.binaryPath()
 	ctx, cancel := context.WithTimeout(context.Background(), gm.Timeout)
@@ -142,6 +167,7 @@ func (gm *GhostManager) SpawnWithOptions(options SpawnOptions) (*GhostAgentInfo,
 	if err := cmd.Start(); err != nil {
 		cancel()
 		_ = log.Close()
+		_ = os.Remove(logFile)
 		return nil, fmt.Errorf("gagal memulai ghost: %w", err)
 	}
 
