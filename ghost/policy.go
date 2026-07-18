@@ -38,31 +38,42 @@ func AllowedTools(values []string) []string {
 
 func ChildEnvironment(parent []string, allowedTools []string, resultPath string) []string {
 	permitted := map[string]struct{}{
+		"APPDATA":               {},
 		"AUTOKEREN_API_KEY":     {},
 		"AK_API_KEY":            {},
 		"AUTOKEREN_CONFIG_DIR":  {},
+		"COMSPEC":               {},
 		"CLOUDFLARE_ACCOUNT_ID": {},
 		"CLOUDFLARE_API_KEY":    {},
 		"CLOUDFLARE_API_TOKEN":  {},
 		"GEMINI_API_KEY":        {},
 		"HOME":                  {},
+		"HOMEDRIVE":             {},
+		"HOMEPATH":              {},
 		"HTTP_PROXY":            {},
 		"HTTPS_PROXY":           {},
 		"LANG":                  {},
 		"LC_ALL":                {},
 		"LC_CTYPE":              {},
+		"LOCALAPPDATA":          {},
 		"NO_PROXY":              {},
 		"OPENAI_API_KEY":        {},
 		"PATH":                  {},
+		"PATHEXT":               {},
 		"SSL_CERT_FILE":         {},
 		"SSL_CERT_DIR":          {},
+		"SYSTEMROOT":            {},
+		"TEMP":                  {},
+		"TMP":                   {},
+		"USERPROFILE":           {},
+		"WINDIR":                {},
 		"XDG_CONFIG_HOME":       {},
 	}
 	environment := make([]string, 0, len(parent)+2)
 	for _, item := range parent {
 		key, _, found := strings.Cut(item, "=")
 		if found {
-			if _, ok := permitted[key]; ok {
+			if _, ok := permitted[strings.ToUpper(strings.TrimSpace(key))]; ok {
 				environment = append(environment, item)
 			}
 		}

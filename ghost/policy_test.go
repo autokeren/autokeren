@@ -25,3 +25,21 @@ func TestChildEnvironmentStripsUnrelatedSecrets(t *testing.T) {
 		}
 	}
 }
+
+func TestChildEnvironmentPreservesWindowsRuntimeVariablesCaseInsensitively(t *testing.T) {
+	environment := strings.Join(ChildEnvironment([]string{
+		"Path=C:\\Tools",
+		"SystemRoot=C:\\Windows",
+		"ComSpec=C:\\Windows\\System32\\cmd.exe",
+		"UserProfile=C:\\Users\\agent",
+		"UNRELATED_SECRET=drop",
+	}, nil, ""), "\n")
+	for _, expected := range []string{"Path=C:\\Tools", "SystemRoot=C:\\Windows", "ComSpec=C:\\Windows\\System32\\cmd.exe", "UserProfile=C:\\Users\\agent"} {
+		if !strings.Contains(environment, expected) {
+			t.Fatalf("environment missing %q: %s", expected, environment)
+		}
+	}
+	if strings.Contains(environment, "UNRELATED_SECRET") {
+		t.Fatalf("unexpected secret in environment: %s", environment)
+	}
+}
