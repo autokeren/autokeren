@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -88,8 +89,8 @@ func Defaults() Config {
 func Load(path string) (Config, error) {
 	cfg := Defaults()
 	if path == "" {
-		if home, err := os.UserHomeDir(); err == nil {
-			path = filepath.Join(home, ".config", "autokeren", "config.yaml")
+		if resolved, err := defaultConfigPath(); err == nil {
+			path = resolved
 		}
 	}
 	if path != "" {
@@ -135,11 +136,11 @@ func firstEnv(keys ...string) string {
 
 func Save(path string, cfg Config) error {
 	if path == "" {
-		home, err := os.UserHomeDir()
+		resolved, err := defaultConfigPath()
 		if err != nil {
 			return err
 		}
-		path = filepath.Join(home, ".config", "autokeren", "config.yaml")
+		path = resolved
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
@@ -153,4 +154,15 @@ func Save(path string, cfg Config) error {
 		return err
 	}
 	return os.Chmod(cleanPath, 0o600)
+}
+
+func defaultConfigPath() (string, error) {
+	if directory := strings.TrimSpace(os.Getenv("AUTOKEREN_CONFIG_DIR")); directory != "" {
+		return filepath.Join(directory, "config.yaml"), nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".config", "autokeren", "config.yaml"), nil
 }

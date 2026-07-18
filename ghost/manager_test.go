@@ -1,6 +1,7 @@
 package ghost
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -36,7 +37,10 @@ func TestManagerReservesIDsFromLegacyLogsAndMetadata(t *testing.T) {
 func TestRefreshDiscoversGhostCreatedByAnotherRuntimeOwner(t *testing.T) {
 	root := t.TempDir()
 	manager := NewGhostManager(root)
-	metadata := `{"id":4,"task":"delegate","status":"completed","pid":1234,"log_file":"` + filepath.Join(root, ".ak-ghost-4.log") + `"}`
+	metadata, err := json.Marshal(GhostAgentInfo{ID: 4, Task: "delegate", Status: "completed", PID: 1234, LogFile: filepath.Join(root, ".ak-ghost-4.log")})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(root, ".ak-ghost-4.json"), []byte(metadata), 0o600); err != nil {
 		t.Fatal(err)
 	}

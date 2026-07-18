@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -33,6 +34,9 @@ func TestLoadYAML(t *testing.T) {
 }
 
 func TestSaveRestrictsExistingConfigPermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows uses ACLs instead of POSIX file permissions")
+	}
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	if err := os.WriteFile(path, []byte("auth: {}\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -46,5 +50,18 @@ func TestSaveRestrictsExistingConfigPermissions(t *testing.T) {
 	}
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("permission config = %o, mau 600", info.Mode().Perm())
+	}
+}
+
+func TestLoadUsesConfigDirectoryOverride(t *testing.T) {
+	directory := t.TempDir()
+	t.Setenv("AUTOKEREN_CONFIG_DIR", directory)
+	path := filepath.Join(directory, "config.yaml")
+	if err := Save(path, Config{Auth: Auth{Mode: "local", LocalEndpoint: "http://localhost:11434"}}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load("")
+	if err != nil || cfg.Auth.Mode != "local" {
+		t.Fatalf("config override tidak dimuat: %#v err=%v", cfg, err)
 	}
 }
