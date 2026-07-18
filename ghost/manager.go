@@ -238,7 +238,7 @@ func (gm *GhostManager) binaryPath() string {
 }
 
 func resolveBinaryPath(path string, windows bool) string {
-	if _, err := os.Stat(path); err == nil || !windows || filepath.Ext(path) != "" {
+	if !windows || filepath.Ext(path) != "" {
 		return path
 	}
 	if _, err := os.Stat(path + ".exe"); err == nil {

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -47,7 +48,11 @@ func TestDirectorWorkerMailboxEndToEnd(t *testing.T) {
 
 	root := t.TempDir()
 	repoRoot := repositoryRoot(t)
-	binary := filepath.Join(root, "autokeren-cli")
+	binaryName := "autokeren-cli"
+	if runtime.GOOS == "windows" {
+		binaryName += ".exe"
+	}
+	binary := filepath.Join(root, binaryName)
 	build := exec.Command("go", "build", "-o", binary, ".")
 	build.Dir = repoRoot
 	if output, err := build.CombinedOutput(); err != nil {

@@ -60,3 +60,16 @@ func TestResolveBinaryPathFindsWindowsExecutableExtension(t *testing.T) {
 		t.Fatalf("resolved path = %q", resolved)
 	}
 }
+
+func TestResolveBinaryPathPrefersWindowsExecutableExtension(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "autokeren-cli")
+	if err := os.WriteFile(path, []byte("legacy"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path+".exe", []byte("binary"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if resolved := resolveBinaryPath(path, true); resolved != path+".exe" {
+		t.Fatalf("resolved path = %q", resolved)
+	}
+}
