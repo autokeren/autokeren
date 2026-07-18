@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -222,17 +223,28 @@ func (gm *GhostManager) SpawnSync(ctx context.Context, options SpawnOptions) (st
 
 func (gm *GhostManager) binaryPath() string {
 	if binary := os.Getenv("AUTOKEREN_GHOST_BIN"); binary != "" {
-		return binary
+		return resolveBinaryPath(binary, runtime.GOOS == "windows")
 	}
 	for _, candidate := range []string{"./autokeren-cli", "./ak"} {
-		if _, err := os.Stat(filepath.Join(gm.ProjectRoot, candidate)); err == nil {
-			return candidate
+		path := resolveBinaryPath(filepath.Join(gm.ProjectRoot, candidate), runtime.GOOS == "windows")
+		if _, err := os.Stat(path); err == nil {
+			return path
 		}
 	}
 	if executable, err := os.Executable(); err == nil {
 		return executable
 	}
 	return "autokeren"
+}
+
+func resolveBinaryPath(path string, windows bool) string {
+	if _, err := os.Stat(path); err == nil || !windows || filepath.Ext(path) != "" {
+		return path
+	}
+	if _, err := os.Stat(path + ".exe"); err == nil {
+		return path + ".exe"
+	}
+	return path
 }
 
 func (gm *GhostManager) wait(id int, cmd *exec.Cmd, ctx context.Context, log *os.File) {
