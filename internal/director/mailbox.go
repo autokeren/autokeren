@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/autokeren/autokeren/ghost"
@@ -44,8 +45,9 @@ type Mailbox struct {
 }
 
 type Coordinator struct {
-	root   string
-	agents AgentSource
+	root      string
+	agents    AgentSource
+	persistMu sync.Mutex
 }
 
 func New(root string, agents AgentSource) *Coordinator {
@@ -179,6 +181,8 @@ func (c *Coordinator) persist(mailbox Mailbox) error {
 	if c.root == "" {
 		return nil
 	}
+	c.persistMu.Lock()
+	defer c.persistMu.Unlock()
 	path := filepath.Join(c.root, ".autokeren", "agent-mailbox.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return fmt.Errorf("buat direktori mailbox: %w", err)
@@ -187,11 +191,24 @@ func (c *Coordinator) persist(mailbox Mailbox) error {
 	if err != nil {
 		return fmt.Errorf("serialisasi mailbox: %w", err)
 	}
-	temporary := path + ".tmp"
-	if err := os.WriteFile(temporary, data, 0o600); err != nil {
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".agent-mailbox-")
+	if err != nil {
+		return fmt.Errorf("buat file mailbox sementara: %w", err)
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(0o600); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("atur izin mailbox sementara: %w", err)
+	}
+	if _, err := temporary.Write(data); err != nil {
+		_ = temporary.Close()
 		return fmt.Errorf("tulis mailbox: %w", err)
 	}
-	if err := os.Rename(temporary, path); err != nil {
+	if err := temporary.Close(); err != nil {
+		return fmt.Errorf("tutup mailbox sementara: %w", err)
+	}
+	if err := os.Rename(temporaryPath, path); err != nil {
 		return fmt.Errorf("simpan mailbox: %w", err)
 	}
 	return nil

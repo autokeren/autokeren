@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,13 +14,37 @@ import (
 )
 
 type fakeAgents struct {
+	mu      sync.RWMutex
 	items   []*ghost.GhostAgentInfo
 	outputs map[int]string
 }
 
-func (f *fakeAgents) List() []*ghost.GhostAgentInfo { return f.items }
-func (f *fakeAgents) Refresh()                      {}
-func (f *fakeAgents) GetOutput(id int) string       { return f.outputs[id] }
+func (f *fakeAgents) List() []*ghost.GhostAgentInfo {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	items := make([]*ghost.GhostAgentInfo, 0, len(f.items))
+	for _, item := range f.items {
+		copyItem := *item
+		items = append(items, &copyItem)
+	}
+	return items
+}
+func (f *fakeAgents) Refresh() {}
+func (f *fakeAgents) GetOutput(id int) string {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	return f.outputs[id]
+}
+func (f *fakeAgents) setStatus(id int, status string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, item := range f.items {
+		if item.ID == id {
+			item.Status = status
+			return
+		}
+	}
+}
 
 func TestCollectPersistsBoundedWorkerResults(t *testing.T) {
 	root := t.TempDir()
@@ -49,7 +74,7 @@ func TestMonitorBackgroundPersistsWorkerResultWithoutBlockingCaller(t *testing.T
 	agents := &fakeAgents{items: []*ghost.GhostAgentInfo{{ID: 1, Status: "running"}}, outputs: map[int]string{1: "selesai"}}
 	coordinator := New(root, agents)
 	coordinator.MonitorBackground([]int{1})
-	agents.items[0].Status = "completed"
+	agents.setStatus(1, "completed")
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
 		data, _ := os.ReadFile(filepath.Join(root, ".autokeren", "agent-mailbox.json"))
@@ -59,6 +84,27 @@ func TestMonitorBackgroundPersistsWorkerResultWithoutBlockingCaller(t *testing.T
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatal("background monitor did not persist completed worker result")
+}
+
+func TestConcurrentCollectionLeavesValidMailbox(t *testing.T) {
+	root := t.TempDir()
+	agents := &fakeAgents{items: []*ghost.GhostAgentInfo{{ID: 1, Status: "completed"}}, outputs: map[int]string{1: "selesai"}}
+	coordinator := New(root, agents)
+	var workers sync.WaitGroup
+	for range 8 {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			if _, err := coordinator.Collect([]int{1}); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	workers.Wait()
+	data, err := os.ReadFile(filepath.Join(root, ".autokeren", "agent-mailbox.json"))
+	if err != nil || !strings.Contains(string(data), "completed") {
+		t.Fatalf("mailbox akhir tidak valid: data=%q err=%v", data, err)
+	}
 }
 
 func TestAwaitPersistsTimedOutWorkersWithoutLyingAboutTheirStatus(t *testing.T) {

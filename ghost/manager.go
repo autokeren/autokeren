@@ -374,8 +374,8 @@ func (gm *GhostManager) Refresh() {
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
 	gm.loadExistingLocked()
-	for id, info := range gm.agents {
-		if info.Status == "running" && !gm.ownsRunningProcessLocked(id, info) {
+	for _, info := range gm.agents {
+		if info.Status == "running" && !gm.ownsRunningProcessLocked(info) {
 			info.Status = "completed"
 			info.FinishedAt = time.Now()
 			info.Error = "ghost tidak lagi dapat diverifikasi sebagai proses Autokeren"
@@ -384,12 +384,9 @@ func (gm *GhostManager) Refresh() {
 	}
 }
 
-func (gm *GhostManager) ownsRunningProcessLocked(id int, info *GhostAgentInfo) bool {
+func (gm *GhostManager) ownsRunningProcessLocked(info *GhostAgentInfo) bool {
 	if info == nil || info.PID <= 0 {
 		return false
-	}
-	if cmd, ok := gm.procs[id]; ok && cmd.Process != nil && cmd.Process.Pid == info.PID && cmd.ProcessState == nil {
-		return processAlive(info.PID)
 	}
 	return processMatches(info)
 }
@@ -397,11 +394,15 @@ func (gm *GhostManager) ownsRunningProcessLocked(id int, info *GhostAgentInfo) b
 func (gm *GhostManager) GetOutput(agentID int) string {
 	gm.mu.RLock()
 	info, ok := gm.agents[agentID]
+	logFile := ""
+	if ok {
+		logFile = info.LogFile
+	}
 	gm.mu.RUnlock()
-	if !ok || info.LogFile == "" {
+	if !ok || logFile == "" {
 		return ""
 	}
-	data, err := os.ReadFile(info.LogFile)
+	data, err := os.ReadFile(logFile)
 	if err != nil {
 		return ""
 	}
