@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.4] - 2026-07-18
+
+### Changed
+- fix: preserve Windows environment for ghost agents
+
 ## [0.12.3] - 2026-07-18
 
 ### Changed
