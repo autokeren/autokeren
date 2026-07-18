@@ -32,7 +32,7 @@ type SidebarModel struct {
 }
 
 func NewSidebarModel() SidebarModel {
-	version := "v0.13.0"
+	version := "v0.13.1"
 	return SidebarModel{
 		ModelName:     "—",
 		ProjectName:   "—",
