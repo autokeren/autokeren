@@ -28,14 +28,64 @@ var (
 	engineMode     string
 	taskPrompt     string
 	resumeSession  string
+	showAboutFlag  bool
+	initFlag       bool
+	loginFlag      bool
+	proofMode      bool
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "autokeren [prompt]",
-	Short: "autokeren — Cloudflare-first agentic coding CLI",
-	Long:  `autokeren adalah CLI agentic coding yang dirancang khusus untuk stack Cloudflare-first.`,
-	Args:  cobra.MaximumNArgs(1),
+	Use:     "autokeren [prompt]",
+	Short:   "autokeren — Cloudflare-first agentic coding CLI",
+	Long:    `autokeren adalah CLI agentic coding yang dirancang khusus untuk stack Cloudflare-first.`,
+	Version: runtimeVersion(),
+	Args: func(cmd *cobra.Command, args []string) error {
+		if proofMode {
+			return nil
+		}
+		return cobra.MaximumNArgs(1)(cmd, args)
+	},
 	Run: func(cmd *cobra.Command, args []string) {
+		if showAboutFlag {
+			showAbout(cmd.OutOrStdout())
+			return
+		}
+		if initFlag {
+			if err := runInit(cmd.InOrStdin(), cmd.OutOrStdout(), configPath); err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Error init Go: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		}
+		if loginFlag {
+			if err := runLogin(cmd.InOrStdin(), cmd.OutOrStdout(), configPath, nil); err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Error login Go: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		}
+
+		// Tentukan project root default ke direktori kerja saat ini.
+		if projectRoot == "" {
+			var err error
+			projectRoot, err = os.Getwd()
+			if err != nil {
+				projectRoot = "."
+			}
+		} else {
+			absPath, err := filepath.Abs(projectRoot)
+			if err == nil {
+				projectRoot = absPath
+			}
+		}
+		if proofMode {
+			if err := runProof(projectRoot, args, cmd.OutOrStdout()); err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Error proof Go: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		}
+
 		prompt := ""
 		if len(args) > 0 {
 			prompt = args[0]
@@ -48,20 +98,6 @@ var rootCmd = &cobra.Command{
 			return
 		} else if handled {
 			prompt = expanded
-		}
-
-		// Tentukan project root default ke direktori kerja saat ini
-		if projectRoot == "" {
-			var err error
-			projectRoot, err = os.Getwd()
-			if err != nil {
-				projectRoot = "."
-			}
-		} else {
-			absPath, err := filepath.Abs(projectRoot)
-			if err == nil {
-				projectRoot = absPath
-			}
 		}
 
 		if (engineMode == "go" || engineMode == "auto") && (prompt != "" || nonInteractive) {
@@ -158,7 +194,7 @@ var rootCmd = &cobra.Command{
 		if resumeSession != "" {
 			opts["resume_session"] = resumeSession
 		}
-		if engineMode == "go" {
+		if engineMode == "go" || engineMode == "auto" {
 			opts["engine"] = "go"
 		}
 
@@ -271,6 +307,7 @@ func Execute() {
 
 func init() {
 	rootCmd.Flags().StringVarP(&projectRoot, "project-root", "w", "", "Path ke project root")
+	rootCmd.Flags().StringVar(&projectRoot, "workspace", "", "Alias untuk --project-root")
 	rootCmd.Flags().StringVar(&configPath, "config", "", "Path ke custom config YAML")
 	rootCmd.Flags().StringVarP(&modelOverride, "model", "m", "", "Override model primary")
 	rootCmd.Flags().BoolVar(&useAIStudio, "aistudio", false, "Gunakan backend Google AI Studio")
@@ -280,4 +317,8 @@ func init() {
 	rootCmd.Flags().StringVar(&engineMode, "engine", "go", "Engine runtime: go (default), auto, atau python")
 	rootCmd.Flags().StringVar(&taskPrompt, "task", "", "Deskripsi task untuk dijalankan")
 	rootCmd.Flags().StringVarP(&resumeSession, "resume", "r", "", "Resume sesi percakapan dari disk")
+	rootCmd.Flags().BoolVar(&showAboutFlag, "about", false, "Tampilkan info autokeren")
+	rootCmd.Flags().BoolVar(&initFlag, "init", false, "Buat atau timpa config secara interaktif")
+	rootCmd.Flags().BoolVar(&loginFlag, "login", false, "Login dan validasi provider")
+	rootCmd.Flags().BoolVar(&proofMode, "proof", false, "Jalankan aksi proof native Go")
 }

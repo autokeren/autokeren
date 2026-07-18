@@ -10,13 +10,15 @@ build-prebuilt:
 	@echo "Mengompilasi silang biner pre-built untuk distribusi..."
 	mkdir -p autokeren/bin
 	# Linux x64
-	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o autokeren/bin/ak-linux-amd64 main.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o autokeren/bin/ak-linux-amd64 main.go
+	# Linux ARM64
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o autokeren/bin/ak-linux-arm64 main.go
 	# Windows x64
-	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o autokeren/bin/ak-windows-amd64.exe main.go
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o autokeren/bin/ak-windows-amd64.exe main.go
 	# macOS Intel
-	GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o autokeren/bin/ak-darwin-amd64 main.go
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o autokeren/bin/ak-darwin-amd64 main.go
 	# macOS Apple Silicon
-	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o autokeren/bin/ak-darwin-arm64 main.go
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o autokeren/bin/ak-darwin-arm64 main.go
 	@echo "Kompilasi silang selesai."
 
 # Jalankan semua test suite (Go & Python)

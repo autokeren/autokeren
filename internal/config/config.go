@@ -148,5 +148,9 @@ func Save(path string, cfg Config) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Clean(path), data, 0o600)
+	cleanPath := filepath.Clean(path)
+	if err := os.WriteFile(cleanPath, data, 0o600); err != nil {
+		return err
+	}
+	return os.Chmod(cleanPath, 0o600)
 }

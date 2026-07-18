@@ -4,7 +4,7 @@
 
 [English](README.md) | **Bahasa Indonesia** | [简体中文](README.zh-CN.md) | [Português (Brasil)](README.pt-BR.md) | [Español](README.es.md) | [日本語](README.ja.md)
 
-autokeren adalah CLI agentic coding yang dirancang khusus untuk stack Cloudflare-first. Dibangun dengan Python, autokeren menghadirkan antarmuka **Text User Interface (TUI) interaktif** yang membagi layar menjadi panel status statis dan area obrolan dinamis, mendukung 7 model AI dengan fallback otomatis, dilengkapi tools bawaan untuk file, shell, git, deploy Cloudflare, serta PaaS built-in.
+autokeren adalah CLI agentic coding untuk stack Cloudflare-first. Runtime aktif dan antarmuka **Text User Interface (TUI)**-nya native Go; Python dipertahankan hanya sebagai runtime kompatibilitas eksplisit. autokeren mendukung fallback model otomatis serta tool untuk file, shell, git, deploy Cloudflare, dan PaaS built-in.
 
 [![CI](https://github.com/autokeren/autokeren/actions/workflows/ci.yml/badge.svg)](https://github.com/autokeren/autokeren/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -48,14 +48,15 @@ Juri dapat menguji sistem rendering acceptance criteria dan menjalankan pengujia
 ### 🛠️ Kontribusi Hackathon (Yang dibangun selama event)
 
 * **Integrasi Model OpenAI** ([openai.py](autokeren/models/openai.py)): Klien model native yang mendukung completions, streaming, dan tool calling untuk GPT-5.6 dan Codex.
-* **Wizard Login Interaktif** ([cli.py](autokeren/cli.py)): Wizard setup interaktif untuk memilih provider (termasuk OpenAI API) dan mengonfigurasi model utama & cadangan.
-* **Proof Tool** ([proof.py](autokeren/tools/proof.py)): Tool native untuk merencanakan (plan), merekam bukti (record), membuat laporan (report), dan melihat daftar (list) bukti rilis.
+* **Migrasi Runtime Go Native** ([cmd](cmd), [internal](internal)): Memindahkan loop provider aktif, dispatch tool, session/context, CLI proof, dan bootstrap login ke Go. Python tetap tersedia hanya melalui `--engine python` untuk kompatibilitas.
+* **Wizard Login Interaktif** ([bootstrap.go](cmd/bootstrap.go)): Wizard setup Go native untuk memilih dan memvalidasi provider, termasuk OpenAI API.
+* **Proof Tool** ([proof.go](internal/tool/proof.go)): Tool Go native untuk merencanakan (plan), merekam bukti (record), membuat laporan (report), replay, dan melihat daftar (list) bukti rilis.
 * **Slash Command `/proof`** ([cli.py](autokeren/cli.py), [tui.py](autokeren/tui.py)): Perintah interaktif di terminal dan TUI untuk menjalankan tugas-tugas bukti rilis.
 * **Aplikasi Demo Deterministik** ([app.py](examples/proof-demo/app.py)): Aplikasi endpoint checkout sederhana yang menunjukkan cacat validasi email dan log verifikasinya.
 
 ### 🧠 Transparansi Kolaborasi (Manusia vs. AI)
 
-* **Akselerasi Codex**: Codex mempercepat implementasi IPC socket lokal berbasis JSON-RPC 2.0 antara Go dan Python, serta parsing argumen CLI untuk bypass TUI.
+* **Akselerasi Codex**: Codex mempercepat migrasi Go: router provider, dispatch tool, session tahan restart, proof replay, bootstrap login, dan launcher kompatibilitas.
 * **Kontribusi GPT-5.6**: GPT-5.6 menulis unit test komprehensif, validasi keamanan path traversal, dan mesin verifikasi skema JSON.
 * **Keputusan Arsitektur Manusia**:
   * *Pilihan Komunikasi*: Menggunakan Local TCP Socket untuk JSON-RPC guna mengisolasi stdout Python dari print/warning pihak ketiga yang dapat merusak parsing TUI Go.
@@ -533,23 +534,13 @@ mcp_servers:
 pipx upgrade autokeren
 ```
 
-## Arsitektur Hybrid (Go + Python)
+## Runtime Go dan Distribusi pipx
 
-`autokeren` memakai runtime Go-first bertahap dengan fallback Python untuk kompatibilitas:
+Secara default, `autokeren` menjalankan perintah berikut lewat runtime Go native: `autokeren` interaktif, mode prompt/task, `--login`, `--init`, `--proof`, session, tools, router provider, dan TUI Bubble Tea.
 
-1.  **Runtime agent Go (default untuk mode task/CLI):**
-    Menangani streaming provider, loop multi-turn, tool inti, session, MCP stdio, dan proses ghost native. Ini adalah runtime default; tetap bisa dipilih eksplisit dengan `--engine go` bila diperlukan.
-2.  **Runtime kompatibilitas Python:**
-    Tetap tersedia lewat `--engine python` dan dipakai otomatis saat `--engine auto` gagal menjalankan jalur provider Go.
-3.  **Frontend & TUI (Go):**
-    Ditulis menggunakan framework **Bubble Tea** dan **Lip Gloss**. Mengelola visual terminal (Layout, File Explorer, Kanban Board, Debate View, input history) dan mengontrol subprocess browser Go-Rod untuk e2e testing.
-2.  **Core AI & Brain (Python):**
-    Menangani logika multi-turn agentic loop, multi-model fallback routing, static analysis (AST parsing), dan permission screening.
-3.  **Jalur IPC (Inter-Process Communication):**
-    Menggunakan protokol **JSON-RPC 2.0** yang dialirkan secara asinkron melalui **Local TCP Socket** pada port dinamis.
+`pipx install autokeren` tetap menjadi cara instalasi dan update yang didukung. Paket Python hanya menyediakan launcher lintas-platform kecil serta binary Go yang sesuai; Python bukan runtime agent aktif. `pipx upgrade autokeren` akan memasang launcher dan binary yang cocok secara bersamaan.
 
-    *Mengapa menggunakan Local TCP Socket?*
-    Ini memisahkan data komunikasi JSON-RPC utama dari standard output (stdout) terminal Python. Jika dependensi Python atau kode program mencetak output acak (`print()`), output tersebut akan keluar di stderr background tanpa mencemari data obrolan TUI, menghindarkan crash atau pembekuan antarmuka (*TUI freeze*).
+Python dipertahankan sebagai jalur kompatibilitas eksplisit: gunakan `autokeren --engine python` untuk integrasi lama seperti custom role, Telegram, atau Google Antigravity. `autokeren --engine auto` memulai Go terlebih dahulu dan dapat memakai jalur kompatibilitas hanya jika provider native tidak bisa berjalan.
 
 ## Contributing
 

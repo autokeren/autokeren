@@ -70,6 +70,19 @@ func (p Proof) Run(ctx context.Context, args map[string]any, _ Emitter) Result {
 		}
 		return Result{OK: true, Output: map[string]any{"proof_id": id, "message": "proof plan created"}}
 	}
+	switch action {
+	case "list":
+		entries, _ := os.ReadDir(dir)
+		var out []string
+		for _, e := range entries {
+			if filepath.Ext(e.Name()) == ".json" {
+				if d, e2 := loadProof(filepath.Join(dir, e.Name())); e2 == nil {
+					out = append(out, fmt.Sprintf("%s — %s [%s]", d.ID, d.Title, verdict(d.Criteria)))
+				}
+			}
+		}
+		return Result{OK: true, Output: strings.Join(out, "\n")}
+	}
 	id, _ := args["proof_id"].(string)
 	if action == "replay" {
 		id = strings.TrimSpace(id)
@@ -107,17 +120,6 @@ func (p Proof) Run(ctx context.Context, args map[string]any, _ Emitter) Result {
 		return Result{OK: true, Output: map[string]any{"proof_id": data.ID, "verdict": verdict(data.Criteria)}}
 	case "report", "replay":
 		return Result{OK: true, Output: formatProof(data, action)}
-	case "list":
-		entries, _ := os.ReadDir(dir)
-		var out []string
-		for _, e := range entries {
-			if filepath.Ext(e.Name()) == ".json" {
-				if d, e2 := loadProof(filepath.Join(dir, e.Name())); e2 == nil {
-					out = append(out, fmt.Sprintf("%s — %s [%s]", d.ID, d.Title, verdict(d.Criteria)))
-				}
-			}
-		}
-		return Result{OK: true, Output: strings.Join(out, "\n")}
 	default:
 		return Result{OK: false, Error: "action proof tidak dikenal"}
 	}

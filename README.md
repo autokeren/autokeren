@@ -4,7 +4,7 @@
 
 **English** | [Bahasa Indonesia](README.id.md) | [简体中文](README.zh-CN.md) | [Português (Brasil)](README.pt-BR.md) | [Español](README.es.md) | [日本語](README.ja.md)
 
-`autokeren` is an agentic coding CLI specifically designed for the Cloudflare-first stack. Built with Python, `autokeren` provides an interactive **Text User Interface (TUI)** that splits the screen into a static status panel and a dynamic chat area. It supports 7 AI models with automatic fallback, and comes equipped with built-in tools for file management, shell execution, git control, Cloudflare deployments, and a built-in PaaS.
+`autokeren` is an agentic coding CLI for the Cloudflare-first stack. Its active runtime and interactive **Text User Interface (TUI)** are native Go, with Python retained only as an explicit compatibility runtime. It supports automatic model fallback and includes tools for files, shell commands, git, Cloudflare deployments, and the built-in PaaS.
 
 [![CI](https://github.com/autokeren/autokeren/actions/workflows/ci.yml/badge.svg)](https://github.com/autokeren/autokeren/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -47,14 +47,15 @@ Judges can test the proof-rendering system and run the local verification suite 
 ### 🛠️ Hackathon Contribution (What was built)
 
 * **OpenAI Model Integration** ([openai.py](autokeren/models/openai.py)): Native model client supporting GPT-5.6 and Codex completions, streaming, and tool calls.
-* **Interactive Login Wizard** ([cli.py](autokeren/cli.py)): Interactive setup wizard to select providers (including OpenAI API) and configure models.
-* **Proof Tool** ([proof.py](autokeren/tools/proof.py)): Native tool to plan, record, report, and list release evidence runs.
+* **Native Go Runtime Migration** ([cmd](cmd), [internal](internal)): Moved the active provider loop, tool dispatch, session/context handling, proof CLI, and login bootstrap to Go. Python remains available only via `--engine python` for compatibility.
+* **Interactive Login Wizard** ([bootstrap.go](cmd/bootstrap.go)): Go-native setup wizard to select and validate providers, including OpenAI API.
+* **Proof Tool** ([proof.go](internal/tool/proof.go)): Native Go tool to plan, record, report, replay, and list release evidence runs.
 * **`/proof` Slash Command** ([cli.py](autokeren/cli.py), [tui.py](autokeren/tui.py)): Interactive commands to execute proof tasks.
 * **Deterministic Demo App** ([app.py](examples/proof-demo/app.py)): A mock checkout app showing defect validation and verification logs.
 
 ### 🧠 Collaboration Disclosure (Human vs. AI)
 
-* **Codex Acceleration**: Codex accelerated the development of Python-Go IPC bindings, JSON-RPC 2.0 message parsing, and the interactive argparse TUI bypass logic.
+* **Codex Acceleration**: Codex accelerated the Go migration, including the provider router, tool dispatch, durable sessions, proof replay, login bootstrap, and compatibility launcher.
 * **GPT-5.6 Contribution**: GPT-5.6 generated comprehensive unit tests, security validations (path traversal checks), and the strict JSON schema verification engine.
 * **Human Decisions**:
   * *Architectural Choice*: Moving the IPC channel to a local TCP socket rather than standard output (`stdout`) to avoid parser crashes caused by dependency prints/warnings.
@@ -486,23 +487,13 @@ To upgrade to the latest version:
 pipx upgrade autokeren
 ```
 
-## Hybrid Go + Python Architecture
+## Go Runtime and pipx Distribution
 
-`autokeren` uses a staged Go-first runtime with Python compatibility fallback:
+`autokeren` runs the following commands through the native Go runtime by default: interactive `autokeren`, prompt/task mode, `--login`, `--init`, `--proof`, sessions, tools, provider routing, and the Bubble Tea TUI.
 
-1.  **Go agent runtime (default for task/CLI mode):**
-    Handles the provider stream, multi-turn loop, core tools, sessions, MCP stdio, and native ghost processes. This is the default runtime; select it explicitly with `--engine go` when needed.
-2.  **Python compatibility runtime:**
-    Remains available with `--engine python` and is used automatically when `--engine auto` cannot start the Go provider path.
-3.  **Frontend & TUI (Go):**
-    Built using **Bubble Tea** and **Lip Gloss**. Manages layout, file explorer tree, input command history, Kanban board, debate panels, and controls the Go-Rod browser automation process.
-2.  **Core AI & Brain (Python):**
-    Manages the multi-turn agentic loop, multi-model fallback router, static analysis (AST parsing), and security scanning.
-3.  **IPC (Inter-Process Communication):**
-    Asynchronous **JSON-RPC 2.0** connection established over a **Local TCP Socket** on a dynamic random local port.
-    
-    *Why Local TCP Socket?*
-    This isolates JSON-RPC data packets from the standard output (stdout) stream of the Python process. Any accidental outputs (`print()`) or warnings printed by dependencies are piped directly to background stderr, eliminating parser crashes and TUI freeze bugs.
+`pipx install autokeren` remains the supported installer and updater. The Python package supplies the small cross-platform launcher and the matching compiled Go binary; it does not make Python the active agent runtime. `pipx upgrade autokeren` installs the next matching launcher and binary together.
+
+Python is retained as an explicit compatibility path: use `autokeren --engine python` for legacy integrations such as custom roles, Telegram, or Google Antigravity. `autokeren --engine auto` starts Go first and may use the compatibility path only if the native provider path cannot start.
 
 ## Contributing
 

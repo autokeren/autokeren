@@ -731,9 +731,9 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
             ui.cleanup()
 
 
-def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
-    """Mencoba meluncurkan TUI Go (ak). Mengembalikan False jika harus fallback ke Python TUI."""
-    if args.about or args.init or args.login or args.prompt or args.task or args.non_interactive or args.telegram or args.proof:
+def _try_run_go_runtime(args: argparse.Namespace, sys_argv: list[str]) -> bool:
+    """Menjalankan runtime Go untuk perintah normal; Python hanya untuk kompatibilitas eksplisit."""
+    if args.engine == "python" or args.role or args.agy or args.telegram or args.telegram_token or args.telegram_allow_user:
         return False
 
     import os
@@ -772,6 +772,8 @@ def _try_run_go_tui(args: argparse.Namespace, sys_argv: list[str]) -> bool:
     elif os_name == "linux":
         if "amd64" in arch or "x86_64" in arch:
             prebuilt_name = "ak-linux-amd64"
+        elif "arm64" in arch or "aarch64" in arch:
+            prebuilt_name = "ak-linux-arm64"
     elif os_name == "darwin":
         if "arm64" in arch or "aarch64" in arch:
             prebuilt_name = "ak-darwin-arm64"
@@ -863,6 +865,7 @@ def main() -> int:
     parser.add_argument("--login", action="store_true", help="Login dengan API key dari developers.autokeren.com")
     parser.add_argument("--config", help="Path to config YAML")
     parser.add_argument("--plan", action="store_true", help="Start in plan mode")
+    parser.add_argument("--engine", choices=("go", "python", "auto"), default="go", help="Pilih runtime (default: go)")
     parser.add_argument("--project-root", default=".", help="Project root path")
     parser.add_argument("--workspace", "-w", dest="project_root", help="Alias for --project-root")
     parser.add_argument("--model", "-m", help="Override primary model (alias atau @cf/... ID)")
@@ -878,6 +881,8 @@ def main() -> int:
     parser.add_argument("--proof", nargs="+", help="Jalankan proof action (list, report, replay, plan, record)")
     parser.add_argument("prompt", nargs="?", help="Single prompt to run non-interactively")
     args = parser.parse_args()
+
+    _try_run_go_runtime(args, sys.argv)
 
     if args.about:
         console.print(f"\n[bold]autokeren[/bold] v{__version__}")
@@ -1102,7 +1107,6 @@ def main() -> int:
                 cfg.cloudflare.primary_model = args.model
 
     project_root = Path(args.project_root).expanduser().resolve()
-    _try_run_go_tui(args, sys.argv)
     memory = MemoryManager(str(project_root))
     reg = build_registry(cfg, project_root, memory)
 

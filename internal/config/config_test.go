@@ -31,3 +31,20 @@ func TestLoadYAML(t *testing.T) {
 		t.Fatalf("unexpected config: %#v", cfg)
 	}
 }
+
+func TestSaveRestrictsExistingConfigPermissions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("auth: {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Save(path, Defaults()); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("permission config = %o, mau 600", info.Mode().Perm())
+	}
+}

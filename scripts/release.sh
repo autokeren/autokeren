@@ -67,6 +67,7 @@ sed -i "s/__version__ = \"$CURRENT\"/__version__ = \"$NEW_VER\"/" autokeren/__in
 sed -i "s/^version = \"$CURRENT\"/version = \"$NEW_VER\"/" pyproject.toml
 sed -i "s/version = \"v$CURRENT\"/version = \"v$NEW_VER\"/" ui/layout.go
 sed -i "s/version = \"v$CURRENT\"/version = \"v$NEW_VER\"/" ui/sidebar.go
+sed -i "s/const fallbackVersion = \"$CURRENT\"/const fallbackVersion = \"$NEW_VER\"/" cmd/bootstrap.go
 
 # Verifikasi
 if ! grep -q "\"$NEW_VER\"" autokeren/__init__.py; then
@@ -83,6 +84,10 @@ if ! grep -q "version = \"v$NEW_VER\"" ui/layout.go; then
 fi
 if ! grep -q "version = \"v$NEW_VER\"" ui/sidebar.go; then
   echo "❌ Gagal update ui/sidebar.go"
+  exit 1
+fi
+if ! grep -q "const fallbackVersion = \"$NEW_VER\"" cmd/bootstrap.go; then
+  echo "❌ Gagal update versi runtime Go"
   exit 1
 fi
 
@@ -112,12 +117,21 @@ ruff check . --quiet || { echo "❌ ruff gagal"; exit 1; }
 echo "🔍 Cek mypy..."
 mypy autokeren || { echo "❌ mypy gagal"; exit 1; }
 
+echo "🔍 Jalankan pytest..."
+python3 -m pytest -q || { echo "❌ pytest gagal"; exit 1; }
+
+echo "🔍 Jalankan Go test..."
+go test ./... || { echo "❌ Go test gagal"; exit 1; }
+
+echo "🔍 Jalankan Go vet..."
+go vet ./... || { echo "❌ Go vet gagal"; exit 1; }
+
 # ── Compile Go prebuilt binaries ─────────────────────────────────────
 echo "🔨 Mengompilasi silang biner Go untuk semua platform..."
 make build-prebuilt || { echo "❌ Kompilasi Go gagal"; exit 1; }
 
 # ── Commit + tag ──────────────────────────────────────────────────────
-git add autokeren/__init__.py pyproject.toml CHANGELOG.md ui/layout.go ui/sidebar.go autokeren/bin/
+git add autokeren/__init__.py pyproject.toml CHANGELOG.md ui/layout.go ui/sidebar.go cmd/bootstrap.go autokeren/bin/
 
 COMMIT_MSG="chore(release): bump version $NEW_VER"
 if [ -n "$DESC" ]; then
