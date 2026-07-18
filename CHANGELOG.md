@@ -4,6 +4,11 @@ Semua perubahan penting pada autokeren didokumentasikan di sini.
 
 Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), dan project mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-07-18
+
+### Changed
+- feat: Go runtime parity, recovery, safety guards, and synchronized ghost supervision
+
 ## [0.12.8] - 2026-07-18
 
 ### Changed
