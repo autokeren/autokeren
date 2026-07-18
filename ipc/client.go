@@ -25,6 +25,7 @@ import (
 	"github.com/autokeren/autokeren/internal/config"
 	contextstore "github.com/autokeren/autokeren/internal/context"
 	"github.com/autokeren/autokeren/internal/engine"
+	kanbanstore "github.com/autokeren/autokeren/internal/kanban"
 	memorystore "github.com/autokeren/autokeren/internal/memory"
 	"github.com/autokeren/autokeren/internal/model"
 	projectstore "github.com/autokeren/autokeren/internal/project"
@@ -364,11 +365,8 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		if c.localNeuronsQuota > 0 {
 			status["status_bar_info"] = map[string]any{"neurons_used": c.localNeuronsUsed, "neurons_remaining": c.localNeuronsRemaining, "neurons_quota": c.localNeuronsQuota}
 		}
-		if data, err := os.ReadFile(filepath.Join(c.localRoot, ".autokeren", "kanban.json")); err == nil {
-			var tasks any
-			if json.Unmarshal(data, &tasks) == nil {
-				status["kanban_tasks"] = tasks
-			}
+		if tasks, err := kanbanstore.New(c.localRoot).List(); err == nil {
+			status["kanban_tasks"] = tasks
 		}
 		if data, err := os.ReadFile(filepath.Join(c.localRoot, ".autokeren", "todos.json")); err == nil {
 			var todos any
@@ -515,11 +513,14 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 			}
 		}
 		return nil
-	case "kanban.add", "kanban.move", "kanban.delete":
+	case "kanban.add", "kanban.move", "kanban.update", "kanban.delete", "kanban.clear":
 		args, _ := params.(map[string]interface{})
 		toolArgs := make(map[string]any, len(args)+1)
 		for key, value := range args {
 			toolArgs[key] = value
+		}
+		if id, ok := args["id"]; ok {
+			toolArgs["task_id"] = id
 		}
 		action := strings.TrimPrefix(method, "kanban.")
 		toolArgs["action"] = action

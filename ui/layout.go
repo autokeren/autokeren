@@ -749,15 +749,20 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					val := m.KanbanInputTitle.Value()
 					if val != "" {
 						var reply map[string]interface{}
-						_ = m.IPCClient.Call("kanban.add", map[string]interface{}{
+						if err := m.IPCClient.Call("kanban.add", map[string]interface{}{
 							"title":    val,
 							"status":   "todo",
 							"priority": "medium",
-						}, &reply)
+						}, &reply); err != nil {
+							m.Chat.AppendMessage("system", fmt.Sprintf("⚠ Kanban gagal menambah task: %v", err))
+							return m, nil
+						}
 
-						// Ambil status terbaru
 						var statusReply map[string]interface{}
-						_ = m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply)
+						if err := m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply); err != nil {
+							m.Chat.AppendMessage("system", fmt.Sprintf("⚠ Kanban gagal diperbarui: %v", err))
+							return m, nil
+						}
 						parsed := parseStatusReply(statusReply, m.ProjectRoot)
 						m.KanbanTasks = parsed.KanbanTasks
 						m.Sidebar.Todos = parsed.Todos
@@ -832,14 +837,19 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						nextStatus = "todo"
 					}
 					var reply map[string]interface{}
-					_ = m.IPCClient.Call("kanban.move", map[string]interface{}{
+					if err := m.IPCClient.Call("kanban.move", map[string]interface{}{
 						"id":     task.ID,
 						"status": nextStatus,
-					}, &reply)
+					}, &reply); err != nil {
+						m.Chat.AppendMessage("system", fmt.Sprintf("⚠ Kanban gagal memindahkan task: %v", err))
+						return m, nil
+					}
 
-					// Refresh
 					var statusReply map[string]interface{}
-					_ = m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply)
+					if err := m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply); err != nil {
+						m.Chat.AppendMessage("system", fmt.Sprintf("⚠ Kanban gagal diperbarui: %v", err))
+						return m, nil
+					}
 					parsed := parseStatusReply(statusReply, m.ProjectRoot)
 					m.KanbanTasks = parsed.KanbanTasks
 					m.Sidebar.Todos = parsed.Todos
@@ -854,13 +864,18 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "d", "x":
 				if task, ok := m.getSelectedTask(); ok {
 					var reply map[string]interface{}
-					_ = m.IPCClient.Call("kanban.delete", map[string]interface{}{
+					if err := m.IPCClient.Call("kanban.delete", map[string]interface{}{
 						"id": task.ID,
-					}, &reply)
+					}, &reply); err != nil {
+						m.Chat.AppendMessage("system", fmt.Sprintf("⚠ Kanban gagal menghapus task: %v", err))
+						return m, nil
+					}
 
-					// Refresh
 					var statusReply map[string]interface{}
-					_ = m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply)
+					if err := m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply); err != nil {
+						m.Chat.AppendMessage("system", fmt.Sprintf("⚠ Kanban gagal diperbarui: %v", err))
+						return m, nil
+					}
 					parsed := parseStatusReply(statusReply, m.ProjectRoot)
 					m.KanbanTasks = parsed.KanbanTasks
 					m.Sidebar.Todos = parsed.Todos
@@ -1030,7 +1045,10 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.SelectedColumn = 0
 				m.SelectedTaskIndex = 0
 				var statusReply map[string]interface{}
-				_ = m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply)
+				if err := m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply); err != nil {
+					m.Chat.AppendMessage("system", fmt.Sprintf("⚠ Kanban gagal dimuat: %v", err))
+					return m, nil
+				}
 				parsed := parseStatusReply(statusReply, m.ProjectRoot)
 				m.KanbanTasks = parsed.KanbanTasks
 				m.Sidebar.Todos = parsed.Todos
@@ -1221,7 +1239,10 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.SelectedColumn = 0
 					m.SelectedTaskIndex = 0
 					var statusReply map[string]interface{}
-					_ = m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply)
+					if err := m.IPCClient.Call("agent.status", map[string]interface{}{}, &statusReply); err != nil {
+						m.Chat.AppendMessage("system", fmt.Sprintf("⚠ Kanban gagal dimuat: %v", err))
+						return m, nil
+					}
 					parsed := parseStatusReply(statusReply, m.ProjectRoot)
 					m.KanbanTasks = parsed.KanbanTasks
 					m.Sidebar.Todos = parsed.Todos

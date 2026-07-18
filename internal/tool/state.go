@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+
+	"github.com/autokeren/autokeren/internal/kanban"
 )
 
 type Todo struct {
@@ -101,23 +104,13 @@ func (t *TodoList) save() error {
 	return os.WriteFile(t.path(), data, 0o600)
 }
 
-type KanbanTask struct {
-	ID          int    `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Status      string `json:"status"`
-	Priority    string `json:"priority"`
-}
 type Kanban struct {
-	Root   string
-	mu     sync.Mutex
-	Tasks  []KanbanTask
-	NextID int
+	Store *kanban.Store
 }
 
-func NewKanban(root string) *Kanban { return &Kanban{Root: root, NextID: 1} }
+func NewKanban(root string) *Kanban { return &Kanban{Store: kanban.New(root)} }
 func (k *Kanban) Definition() Definition {
-	return Definition{Name: "kanban", Description: "Manage project Kanban tasks.", Parameters: map[string]any{"type": "object", "properties": map[string]any{"action": map[string]any{"type": "string"}, "task_id": map[string]any{"type": "integer"}, "title": map[string]any{"type": "string"}, "description": map[string]any{"type": "string"}, "status": map[string]any{"type": "string"}, "priority": map[string]any{"type": "string"}}, "required": []string{"action"}}}
+	return Definition{Name: "kanban", Description: "Kelola papan Kanban SQLite dan metadata manajemen proyek.", Parameters: map[string]any{"type": "object", "properties": map[string]any{"action": map[string]any{"type": "string", "enum": []string{"add", "move", "update", "delete", "list", "clear", "set_metadata", "get_metadata", "list_metadata"}}, "task_id": map[string]any{"type": "integer"}, "title": map[string]any{"type": "string"}, "description": map[string]any{"type": "string"}, "status": map[string]any{"type": "string", "enum": []string{"todo", "in_progress", "done"}}, "priority": map[string]any{"type": "string", "enum": []string{"low", "medium", "high"}}, "meta_key": map[string]any{"type": "string"}, "meta_value": map[string]any{"type": "string"}}, "required": []string{"action"}}}
 }
 func (k *Kanban) NeedsPermission(map[string]any) (bool, string) { return false, "" }
 func (k *Kanban) Run(ctx context.Context, args map[string]any, _ Emitter) Result {
@@ -126,92 +119,117 @@ func (k *Kanban) Run(ctx context.Context, args map[string]any, _ Emitter) Result
 		return Result{OK: false, Error: ctx.Err().Error()}
 	default:
 	}
-	k.mu.Lock()
-	defer k.mu.Unlock()
-	_ = k.load()
 	action, _ := args["action"].(string)
-	idv, _ := args["task_id"].(float64)
-	id := int(idv)
 	switch action {
 	case "add":
 		title, _ := args["title"].(string)
-		if title == "" {
-			return Result{OK: false, Error: "title wajib"}
-		}
+		description, _ := args["description"].(string)
 		status, _ := args["status"].(string)
-		if status == "" {
-			status = "todo"
-		}
 		priority, _ := args["priority"].(string)
-		if priority == "" {
-			priority = "medium"
+		task, err := k.Store.Add(title, description, status, priority)
+		if err != nil {
+			return Result{OK: false, Error: err.Error()}
 		}
-		k.Tasks = append(k.Tasks, KanbanTask{ID: k.NextID, Title: title, Status: status, Priority: priority})
-		k.NextID++
+		return Result{OK: true, Output: task}
 	case "move", "update":
-		for i := range k.Tasks {
-			if k.Tasks[i].ID == id {
-				if v, ok := args["status"].(string); ok && v != "" {
-					k.Tasks[i].Status = v
-				}
-				if v, ok := args["title"].(string); ok && v != "" {
-					k.Tasks[i].Title = v
-				}
-				if v, ok := args["description"].(string); ok {
-					k.Tasks[i].Description = v
-				}
-				if v, ok := args["priority"].(string); ok && v != "" {
-					k.Tasks[i].Priority = v
-				}
-				if err := k.save(); err != nil {
-					return Result{OK: false, Error: err.Error()}
-				}
-				return Result{OK: true, Output: k.Tasks[i]}
+		id := taskID(args)
+		update := kanban.Update{}
+		if action == "move" {
+			status, ok := args["status"].(string)
+			if !ok || status == "" {
+				return Result{OK: false, Error: "status wajib untuk move"}
+			}
+			update.Status = &status
+		} else {
+			if value, ok := args["title"].(string); ok {
+				update.Title = &value
+			}
+			if value, ok := args["description"].(string); ok {
+				update.Description = &value
+			}
+			if value, ok := args["status"].(string); ok {
+				update.Status = &value
+			}
+			if value, ok := args["priority"].(string); ok {
+				update.Priority = &value
 			}
 		}
-		return Result{OK: false, Error: "task not found"}
+		task, changed, err := k.Store.Update(id, update)
+		if err != nil {
+			return Result{OK: false, Error: err.Error()}
+		}
+		if !changed {
+			return Result{OK: false, Error: "task tidak ditemukan"}
+		}
+		return Result{OK: true, Output: task}
 	case "delete":
-		for i := range k.Tasks {
-			if k.Tasks[i].ID == id {
-				k.Tasks = append(k.Tasks[:i], k.Tasks[i+1:]...)
-				break
-			}
+		deleted, err := k.Store.Delete(taskID(args))
+		if err != nil {
+			return Result{OK: false, Error: err.Error()}
 		}
+		if !deleted {
+			return Result{OK: false, Error: "task tidak ditemukan"}
+		}
+		tasks, err := k.Store.List()
+		if err != nil {
+			return Result{OK: false, Error: err.Error()}
+		}
+		return Result{OK: true, Output: tasks}
 	case "clear":
-		k.Tasks = nil
+		if err := k.Store.Clear(); err != nil {
+			return Result{OK: false, Error: err.Error()}
+		}
 	case "list":
+		tasks, err := k.Store.List()
+		if err != nil {
+			return Result{OK: false, Error: err.Error()}
+		}
+		return Result{OK: true, Output: tasks}
+	case "set_metadata":
+		key, _ := args["meta_key"].(string)
+		value, _ := args["meta_value"].(string)
+		if strings.TrimSpace(value) == "" {
+			return Result{OK: false, Error: "meta_value wajib diisi"}
+		}
+		if err := k.Store.SetMetadata(key, value); err != nil {
+			return Result{OK: false, Error: err.Error()}
+		}
+		return Result{OK: true, Output: "metadata tersimpan"}
+	case "get_metadata":
+		key, _ := args["meta_key"].(string)
+		if strings.TrimSpace(key) == "" {
+			return Result{OK: false, Error: "meta_key wajib diisi"}
+		}
+		value, err := k.Store.GetMetadata(key, "")
+		if err != nil {
+			return Result{OK: false, Error: err.Error()}
+		}
+		return Result{OK: true, Output: key + ": " + value}
+	case "list_metadata":
+		metadata, err := k.Store.Metadata()
+		if err != nil {
+			return Result{OK: false, Error: err.Error()}
+		}
+		return Result{OK: true, Output: metadata}
 	default:
 		return Result{OK: false, Error: "action kanban tidak dikenal"}
 	}
-	if action != "list" {
-		if err := k.save(); err != nil {
-			return Result{OK: false, Error: err.Error()}
-		}
-	}
-	return Result{OK: true, Output: k.Tasks}
-}
-func (k *Kanban) path() string { return filepath.Join(k.Root, ".autokeren", "kanban.json") }
-func (k *Kanban) load() error {
-	data, err := os.ReadFile(k.path())
-	if os.IsNotExist(err) {
-		return nil
-	}
+	tasks, err := k.Store.List()
 	if err != nil {
-		return err
+		return Result{OK: false, Error: err.Error()}
 	}
-	if err = json.Unmarshal(data, &k.Tasks); err == nil {
-		for _, v := range k.Tasks {
-			if v.ID >= k.NextID {
-				k.NextID = v.ID + 1
-			}
-		}
-	}
-	return err
+	return Result{OK: true, Output: tasks}
 }
-func (k *Kanban) save() error {
-	if err := os.MkdirAll(filepath.Dir(k.path()), 0o700); err != nil {
-		return err
+
+func taskID(args map[string]any) int {
+	switch value := args["task_id"].(type) {
+	case int:
+		return value
+	case int64:
+		return int(value)
+	case float64:
+		return int(value)
+	default:
+		return 0
 	}
-	data, _ := json.MarshalIndent(k.Tasks, "", "  ")
-	return os.WriteFile(k.path(), data, 0o600)
 }
