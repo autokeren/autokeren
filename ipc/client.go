@@ -25,6 +25,7 @@ import (
 	"github.com/autokeren/autokeren/internal/config"
 	contextstore "github.com/autokeren/autokeren/internal/context"
 	"github.com/autokeren/autokeren/internal/engine"
+	memorystore "github.com/autokeren/autokeren/internal/memory"
 	"github.com/autokeren/autokeren/internal/model"
 	projectstore "github.com/autokeren/autokeren/internal/project"
 	"github.com/autokeren/autokeren/internal/provider"
@@ -969,13 +970,12 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 		raw, _ := json.MarshalIndent(c.localConfig, "", "  ")
 		output = string(raw)
 	case "/memory":
-		data, err := os.ReadFile(filepath.Join(c.localRoot, ".autokeren", "memory.md"))
-		if err != nil && !os.IsNotExist(err) {
-			return true, err
-		}
-		output = string(data)
+		memory := memorystore.New(c.localRoot)
+		output = memory.Load()
 		if output == "" {
 			output = "Memory project kosong."
+		} else {
+			output = "MEMORY:\n" + output + "\n\nFile: " + memory.Path()
 		}
 	case "/export":
 		name := "autokeren_export_" + time.Now().Format("20060102_150405") + ".md"

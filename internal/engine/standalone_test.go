@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -49,7 +50,9 @@ func TestRunStandaloneFallsBackToSecondaryModel(t *testing.T) {
 	cfg.Retry.MaxRetries = 0
 	cfg.Retry.CircuitFailureThreshold = 1
 
-	content, err := RunStandalone(t.Context(), cfg, t.TempDir(), "halo", nil, "")
+	root := t.TempDir()
+	t.Setenv("AUTOKEREN_CONFIG_DIR", filepath.Join(root, "config"))
+	content, err := RunStandalone(t.Context(), cfg, root, "halo", nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,6 +68,7 @@ func TestRunStandaloneFallsBackToSecondaryModel(t *testing.T) {
 
 func TestRunStandaloneInjectsGuidanceAndRelevantMemory(t *testing.T) {
 	root := t.TempDir()
+	t.Setenv("AUTOKEREN_CONFIG_DIR", filepath.Join(root, "config"))
 	if err := os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte("Gunakan command go test sebelum commit."), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -105,6 +109,51 @@ func TestRunStandaloneInjectsGuidanceAndRelevantMemory(t *testing.T) {
 		if !strings.Contains(joined, expected) {
 			t.Fatalf("missing %q in system messages: %s", expected, joined)
 		}
+	}
+}
+
+func TestRunStandaloneRecordsRedactedMemoryTranscript(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("AUTOKEREN_CONFIG_DIR", filepath.Join(root, "config"))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"deploy siap\"},\"finish_reason\":\"stop\"}]}\n\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer server.Close()
+	cfg := config.Defaults()
+	cfg.Auth.BaseURL = server.URL
+	cfg.Auth.APIKey = "test-key"
+	cfg.Cloudflare.SecondaryModel = ""
+	cfg.Retry.MaxRetries = 0
+	secret := "sk-live-abcdefghijklmno"
+	if _, err := RunStandalone(t.Context(), cfg, root, "cek api_key="+secret, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", memory.New(root).DatabasePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	rows, err := db.Query("SELECT role, content FROM messages ORDER BY id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	entries := make([]string, 0)
+	for rows.Next() {
+		var role, content string
+		if err := rows.Scan(&role, &content); err != nil {
+			t.Fatal(err)
+		}
+		entries = append(entries, role+":"+content)
+	}
+	joined := strings.Join(entries, "\n")
+	if !strings.Contains(joined, "user:") || !strings.Contains(joined, "assistant:deploy siap") {
+		t.Fatalf("transkrip memory tidak lengkap: %s", joined)
+	}
+	if strings.Contains(joined, secret) {
+		t.Fatalf("secret bocor ke transkrip memory: %s", joined)
 	}
 }
 

@@ -133,9 +133,13 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 		MaxToolCalls: cfg.Autokeren.MaxToolCalls,
 		Language:     cfg.Autokeren.Language,
 	})
+	if cfg.Autokeren.MemoryEnabled {
+		systemPrompt = withProjectMemory(systemPrompt, memoryStore.Load())
+	}
 	store.Replace(withSystemPrompt(store.Messages(), systemPrompt))
 	prelude := []model.Message{}
 	if cfg.Autokeren.MemoryEnabled {
+		_ = memoryStore.LogMessage("default", "user", prompt)
 		if context := memoryStore.Context(prompt, 3); context != "" {
 			prelude = append(prelude, model.Message{Role: "system", Content: context})
 		}
@@ -208,6 +212,9 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 	}
 	if events.OnResponse != nil {
 		events.OnResponse(response)
+	}
+	if cfg.Autokeren.MemoryEnabled {
+		_ = memoryStore.LogMessage("default", "assistant", response.Content)
 	}
 	if err := saveSession(response.Usage); err != nil {
 		return "", err
@@ -313,6 +320,14 @@ func withSystemPrompt(messages []model.Message, systemPrompt string) []model.Mes
 	updated := append([]model.Message(nil), messages...)
 	updated[0].Content = systemPrompt
 	return updated
+}
+
+func withProjectMemory(systemPrompt, projectMemory string) string {
+	projectMemory = strings.TrimSpace(projectMemory)
+	if projectMemory == "" {
+		return systemPrompt
+	}
+	return strings.TrimSpace(systemPrompt) + "\n\nMemori proyek:\n" + projectMemory
 }
 
 func registryToolNames(registry *tool.Registry) []string {
