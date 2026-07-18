@@ -13,20 +13,24 @@ import (
 )
 
 type Worker struct {
-	Name       string    `json:"name"`
-	Task       string    `json:"task"`
-	Status     string    `json:"status"`
-	Output     string    `json:"output,omitempty"`
-	Error      string    `json:"error,omitempty"`
-	GhostID    int       `json:"ghost_id,omitempty"`
-	StartedAt  time.Time `json:"started_at,omitempty"`
-	FinishedAt time.Time `json:"finished_at,omitempty"`
+	Name        string    `json:"name"`
+	Task        string    `json:"task"`
+	Status      string    `json:"status"`
+	DependsOn   []string  `json:"depends_on,omitempty"`
+	Attempts    int       `json:"attempts"`
+	MaxAttempts int       `json:"max_attempts"`
+	Output      string    `json:"output,omitempty"`
+	Error       string    `json:"error,omitempty"`
+	GhostID     int       `json:"ghost_id,omitempty"`
+	StartedAt   time.Time `json:"started_at,omitempty"`
+	FinishedAt  time.Time `json:"finished_at,omitempty"`
 }
 
 type Project struct {
-	Name      string    `json:"name"`
-	Workers   []*Worker `json:"workers"`
-	CreatedAt time.Time `json:"created_at"`
+	Name             string    `json:"name"`
+	Workers          []*Worker `json:"workers"`
+	SchedulerEnabled bool      `json:"scheduler_enabled"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 type Manager struct {
@@ -39,6 +43,13 @@ type Manager struct {
 type persistedState struct {
 	Active   string              `json:"active"`
 	Projects map[string]*Project `json:"projects"`
+}
+
+type Schedule struct {
+	Launched int
+	Queued   int
+	Blocked  int
+	Capacity int
 }
 
 func NewManager() *Manager {
@@ -65,6 +76,13 @@ func NewPersistentManager(projectRoot string) (*Manager, error) {
 	}
 	if state.Projects != nil {
 		manager.projects = state.Projects
+		for _, project := range manager.projects {
+			for _, worker := range project.Workers {
+				if worker.MaxAttempts < 1 {
+					worker.MaxAttempts = 2
+				}
+			}
+		}
 	}
 	manager.active = state.Active
 	return manager, nil
@@ -106,7 +124,7 @@ func (m *Manager) AddWorker(name, task string) (*Worker, error) {
 			return nil, fmt.Errorf("agent %q sudah ada", name)
 		}
 	}
-	worker := &Worker{Name: name, Task: task, Status: "pending"}
+	worker := &Worker{Name: name, Task: task, Status: "pending", MaxAttempts: 2}
 	project.Workers = append(project.Workers, worker)
 	if err := m.persistLocked(); err != nil {
 		return nil, err
@@ -149,21 +167,137 @@ func (m *Manager) ActiveName() string {
 	return m.active
 }
 
-func (m *Manager) Run(ghosts *ghost.GhostManager) (int, error) {
+func (m *Manager) SetDependencies(name string, dependencies []string) (*Worker, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	project := m.projects[m.active]
+	if project == nil {
+		return nil, fmt.Errorf("belum ada project aktif")
+	}
+	worker := project.worker(name)
+	if worker == nil {
+		return nil, fmt.Errorf("agent %q tidak ditemukan", name)
+	}
+	clean := uniqueNames(dependencies)
+	for _, dependency := range clean {
+		if dependency == name || project.worker(dependency) == nil {
+			return nil, fmt.Errorf("dependency %q tidak valid", dependency)
+		}
+	}
+	previous := worker.DependsOn
+	worker.DependsOn = clean
+	if project.hasCycle() {
+		worker.DependsOn = previous
+		return nil, fmt.Errorf("dependency membuat siklus DAG")
+	}
+	if err := m.persistLocked(); err != nil {
+		return nil, err
+	}
+	return workerCopy(worker), nil
+}
+
+func (m *Manager) Retry(name string) (*Worker, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	project := m.projects[m.active]
+	if project == nil {
+		return nil, fmt.Errorf("belum ada project aktif")
+	}
+	worker := project.worker(name)
+	if worker == nil || worker.Status != "error" {
+		return nil, fmt.Errorf("agent %q tidak dalam status error", name)
+	}
+	if worker.Attempts >= worker.MaxAttempts {
+		return nil, fmt.Errorf("batas retry agent %q sudah tercapai (%d)", name, worker.MaxAttempts)
+	}
+	worker.Status, worker.Error, worker.GhostID, worker.FinishedAt = "pending", "", 0, time.Time{}
+	if err := m.persistLocked(); err != nil {
+		return nil, err
+	}
+	return workerCopy(worker), nil
+}
+
+func (m *Manager) Run(ghosts *ghost.GhostManager) (Schedule, error) {
+	if err := m.Refresh(ghosts); err != nil {
+		return Schedule{}, err
+	}
+	return m.schedule(ghosts, true)
+}
+
+func (m *Manager) Tick(ghosts *ghost.GhostManager) (Schedule, error) {
 	if ghosts == nil {
-		return 0, fmt.Errorf("ghost manager tidak tersedia")
+		return Schedule{}, nil
+	}
+	m.mu.RLock()
+	hasActiveProject := m.projects[m.active] != nil
+	m.mu.RUnlock()
+	if !hasActiveProject {
+		return Schedule{Capacity: ghosts.AvailableCapacity()}, nil
+	}
+	if err := m.Refresh(ghosts); err != nil {
+		return Schedule{}, err
+	}
+	return m.schedule(ghosts, false)
+}
+
+func (m *Manager) Pause() (*Project, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	project := m.projects[m.active]
+	if project == nil {
+		return nil, fmt.Errorf("belum ada project aktif")
+	}
+	project.SchedulerEnabled = false
+	if err := m.persistLocked(); err != nil {
+		return nil, err
+	}
+	return projectCopy(project), nil
+}
+
+func (m *Manager) schedule(ghosts *ghost.GhostManager, enable bool) (Schedule, error) {
+	if ghosts == nil {
+		return Schedule{}, fmt.Errorf("ghost manager tidak tersedia")
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	project := m.projects[m.active]
 	if project == nil {
-		return 0, fmt.Errorf("belum ada project aktif")
+		return Schedule{}, fmt.Errorf("belum ada project aktif")
 	}
-	launched := 0
+	schedule := Schedule{Capacity: ghosts.AvailableCapacity()}
+	if enable {
+		project.SchedulerEnabled = true
+	}
+	if !project.SchedulerEnabled {
+		return schedule, nil
+	}
 	for _, worker := range project.Workers {
+		if worker.Status == "blocked" && strings.HasPrefix(worker.Error, "menunggu dependency gagal:") {
+			worker.Status, worker.Error = "pending", ""
+		}
 		if worker.Status != "pending" {
 			continue
 		}
+		ready, blockedBy := project.ready(worker)
+		if blockedBy != "" {
+			worker.Status, worker.Error = "blocked", "menunggu dependency gagal: "+blockedBy
+			schedule.Blocked++
+			continue
+		}
+		if !ready || schedule.Launched >= schedule.Capacity {
+			schedule.Queued++
+			continue
+		}
+		if worker.MaxAttempts < 1 {
+			worker.MaxAttempts = 2
+		}
+		if worker.Attempts >= worker.MaxAttempts {
+			worker.Status = "error"
+			worker.Error = fmt.Sprintf("batas retry tercapai (%d)", worker.MaxAttempts)
+			worker.FinishedAt = time.Now()
+			continue
+		}
+		worker.Attempts++
 		info, err := ghosts.SpawnWithOptions(ghost.SpawnOptions{Task: worker.Task, Role: worker.Name, Context: "Project: " + project.Name})
 		if err != nil {
 			worker.Status = "error"
@@ -174,15 +308,12 @@ func (m *Manager) Run(ghosts *ghost.GhostManager) (int, error) {
 		worker.GhostID = info.ID
 		worker.Status = "running"
 		worker.StartedAt = time.Now()
-		launched++
-	}
-	if launched == 0 {
-		return 0, fmt.Errorf("tidak ada agent pending untuk dijalankan")
+		schedule.Launched++
 	}
 	if err := m.persistLocked(); err != nil {
-		return 0, err
+		return Schedule{}, err
 	}
-	return launched, nil
+	return schedule, nil
 }
 
 func (m *Manager) Refresh(ghosts *ghost.GhostManager) error {
@@ -241,7 +372,7 @@ func (m *Manager) persistLocked() error {
 }
 
 func (p *Project) Summary() string {
-	total, done, running, failed := len(p.Workers), 0, 0, 0
+	total, done, running, failed, blocked := len(p.Workers), 0, 0, 0, 0
 	for _, worker := range p.Workers {
 		switch worker.Status {
 		case "done":
@@ -250,9 +381,11 @@ func (p *Project) Summary() string {
 			running++
 		case "error":
 			failed++
+		case "blocked":
+			blocked++
 		}
 	}
-	return fmt.Sprintf("%d workers — selesai:%d berjalan:%d error:%d", total, done, running, failed)
+	return fmt.Sprintf("%d workers — selesai:%d berjalan:%d error:%d blocked:%d", total, done, running, failed, blocked)
 }
 
 func (p *Project) Worker(name string) *Worker {
@@ -262,6 +395,76 @@ func (p *Project) Worker(name string) *Worker {
 		}
 	}
 	return nil
+}
+
+func (p *Project) worker(name string) *Worker {
+	for _, worker := range p.Workers {
+		if worker.Name == name {
+			return worker
+		}
+	}
+	return nil
+}
+
+func (p *Project) ready(worker *Worker) (bool, string) {
+	for _, dependency := range worker.DependsOn {
+		candidate := p.worker(dependency)
+		if candidate == nil {
+			return false, dependency
+		}
+		if candidate.Status == "error" || candidate.Status == "blocked" {
+			return false, dependency
+		}
+		if candidate.Status != "done" {
+			return false, ""
+		}
+	}
+	return true, ""
+}
+
+func (p *Project) hasCycle() bool {
+	visiting, visited := map[string]bool{}, map[string]bool{}
+	var visit func(string) bool
+	visit = func(name string) bool {
+		if visiting[name] {
+			return true
+		}
+		if visited[name] {
+			return false
+		}
+		visiting[name] = true
+		worker := p.worker(name)
+		if worker != nil {
+			for _, dependency := range worker.DependsOn {
+				if visit(dependency) {
+					return true
+				}
+			}
+		}
+		visiting[name], visited[name] = false, true
+		return false
+	}
+	for _, worker := range p.Workers {
+		if visit(worker.Name) {
+			return true
+		}
+	}
+	return false
+}
+
+func uniqueNames(values []string) []string {
+	seen := map[string]struct{}{}
+	output := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			if _, ok := seen[value]; !ok {
+				seen[value] = struct{}{}
+				output = append(output, value)
+			}
+		}
+	}
+	return output
 }
 
 func projectCopy(project *Project) *Project {

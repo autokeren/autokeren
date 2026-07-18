@@ -9,8 +9,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/autokeren/autokeren/ghost"
 	"github.com/autokeren/autokeren/internal/config"
 	"github.com/autokeren/autokeren/internal/model"
+	projectstore "github.com/autokeren/autokeren/internal/project"
 	"github.com/autokeren/autokeren/internal/provider"
 )
 
@@ -194,9 +196,57 @@ func TestProjectCommandBuildsNativeProject(t *testing.T) {
 	if output, err := c.projectCommand("add reviewer periksa struktur proyek"); err != nil || output == "" {
 		t.Fatalf("add worker failed: %q err=%v", output, err)
 	}
+	if output, err := c.projectCommand("add deploy rilis proyek"); err != nil || output == "" {
+		t.Fatalf("add dependent worker failed: %q err=%v", output, err)
+	}
+	if output, err := c.projectCommand("depends deploy reviewer"); err != nil || !strings.Contains(output, "reviewer") {
+		t.Fatalf("dependency command failed: %q err=%v", output, err)
+	}
 	output, err := c.projectCommand("status")
-	if err != nil || !strings.Contains(output, "reviewer [pending]") {
+	if err != nil || !strings.Contains(output, "reviewer [pending]") || !strings.Contains(output, "after:reviewer") {
 		t.Fatalf("unexpected status: %q err=%v", output, err)
+	}
+	if output, err := c.projectCommand("pause"); err != nil || !strings.Contains(output, "dijeda") {
+		t.Fatalf("pause command failed: %q err=%v", output, err)
+	}
+}
+
+func TestAgentStatusOnlyTicksProjectAfterSchedulerIsStarted(t *testing.T) {
+	c := &Client{localRoot: t.TempDir()}
+	if _, err := c.projectCommand("new demo"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.projectCommand("add reviewer periksa proyek"); err != nil {
+		t.Fatal(err)
+	}
+	c.localGhosts.MaxAgents = 0
+	var status map[string]any
+	if err := c.callLocal("agent.status", map[string]interface{}{}, &status); err != nil {
+		t.Fatal(err)
+	}
+	if c.localProjects.Active().SchedulerEnabled {
+		t.Fatal("status polling must not start a new project scheduler")
+	}
+	if _, err := c.projectCommand("run"); err != nil {
+		t.Fatal(err)
+	}
+	if !c.localProjects.Active().SchedulerEnabled {
+		t.Fatal("project run must enable persistent scheduling")
+	}
+	if err := c.callLocal("agent.status", map[string]interface{}{}, &status); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAgentStatusDoesNotErrorWithoutAnActiveProject(t *testing.T) {
+	c := &Client{
+		localRoot:     t.TempDir(),
+		localProjects: projectstore.NewManager(),
+		localGhosts:   ghost.NewGhostManager(t.TempDir()),
+	}
+	var status map[string]any
+	if err := c.callLocal("agent.status", map[string]interface{}{}, &status); err != nil {
+		t.Fatal(err)
 	}
 }
 

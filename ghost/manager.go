@@ -75,6 +75,12 @@ func NewGhostManager(projectRoot string) *GhostManager {
 }
 
 func (gm *GhostManager) loadExisting() {
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
+	gm.loadExistingLocked()
+}
+
+func (gm *GhostManager) loadExistingLocked() {
 	entries, err := os.ReadDir(gm.ProjectRoot)
 	if err != nil {
 		return
@@ -326,9 +332,20 @@ func (gm *GhostManager) ActiveList() []*GhostAgentInfo {
 	return list
 }
 
+func (gm *GhostManager) AvailableCapacity() int {
+	gm.mu.RLock()
+	defer gm.mu.RUnlock()
+	available := gm.MaxAgents - gm.activeCountLocked()
+	if available < 0 {
+		return 0
+	}
+	return available
+}
+
 func (gm *GhostManager) Refresh() {
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
+	gm.loadExistingLocked()
 	for _, info := range gm.agents {
 		if info.Status == "running" && (info.PID <= 0 || !processAlive(info.PID) || !processIsAutokeren(info.PID)) {
 			info.Status = "completed"

@@ -32,3 +32,17 @@ func TestManagerReservesIDsFromLegacyLogsAndMetadata(t *testing.T) {
 		t.Fatalf("next ID reused an existing ghost artifact: %d", manager.nextID)
 	}
 }
+
+func TestRefreshDiscoversGhostCreatedByAnotherRuntimeOwner(t *testing.T) {
+	root := t.TempDir()
+	manager := NewGhostManager(root)
+	metadata := `{"id":4,"task":"delegate","status":"completed","pid":1234,"log_file":"` + filepath.Join(root, ".ak-ghost-4.log") + `"}`
+	if err := os.WriteFile(filepath.Join(root, ".ak-ghost-4.json"), []byte(metadata), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manager.Refresh()
+	list := manager.List()
+	if len(list) != 1 || list[0].ID != 4 || list[0].Status != "completed" {
+		t.Fatalf("refresh did not load external ghost metadata: %#v", list)
+	}
+}

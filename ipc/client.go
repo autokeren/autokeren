@@ -336,6 +336,11 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		}
 		return nil
 	case "agent.status":
+		if c.localProjects != nil && c.localGhosts != nil {
+			if _, err := c.localProjects.Tick(c.localGhosts); err != nil && c.callbacks != nil && c.callbacks.OnError != nil {
+				c.callbacks.OnError(err.Error())
+			}
+		}
 		modelID := c.localModelID
 		if modelID == "" {
 			modelID = c.localConfig.Cloudflare.PrimaryModel
@@ -644,7 +649,7 @@ func (c *Client) projectCommand(argument string) (string, error) {
 	}
 	parts := strings.Fields(argument)
 	if len(parts) == 0 {
-		return "Perintah /project:\n  /project new <nama>\n  /project add <agent> <task>\n  /project run\n  /project status\n  /project output <agent>\n  /project list\n  /project switch <nama>", nil
+		return "Perintah /project:\n  /project new <nama>\n  /project add <agent> <task>\n  /project depends <agent> <dep1,dep2>\n  /project run\n  /project pause\n  /project retry <agent>\n  /project status\n  /project output <agent>\n  /project list\n  /project switch <nama>", nil
 	}
 	subcommand := parts[0]
 	rest := strings.TrimSpace(strings.TrimPrefix(argument, subcommand))
@@ -666,13 +671,38 @@ func (c *Client) projectCommand(argument string) (string, error) {
 		}
 		return fmt.Sprintf("Agent %q ditambahkan. Task: %s", worker.Name, worker.Task), nil
 	case "run":
-		launched, err := c.localProjects.Run(c.localGhosts)
+		schedule, err := c.localProjects.Run(c.localGhosts)
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("Menjalankan %d agent Go secara paralel. Pantau dengan /project status.", launched), nil
+		return fmt.Sprintf("Scheduler: %d diluncurkan, %d antre, %d blocked, kapasitas %d. Pantau dengan /project status.", schedule.Launched, schedule.Queued, schedule.Blocked, schedule.Capacity), nil
+	case "pause":
+		project, err := c.localProjects.Pause()
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Scheduler project %q dijeda. Worker yang sudah berjalan tetap diselesaikan.", project.Name), nil
+	case "depends":
+		fields := strings.Fields(rest)
+		if len(fields) != 2 {
+			return "", errors.New("format: /project depends <agent> <dep1,dep2>")
+		}
+		worker, err := c.localProjects.SetDependencies(fields[0], strings.Split(fields[1], ","))
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Dependency %q: %s", worker.Name, strings.Join(worker.DependsOn, ", ")), nil
+	case "retry":
+		if rest == "" {
+			return "", errors.New("format: /project retry <agent>")
+		}
+		worker, err := c.localProjects.Retry(rest)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Agent %q masuk antrean retry (%d/%d). Jalankan /project run.", worker.Name, worker.Attempts, worker.MaxAttempts), nil
 	case "status":
-		if err := c.localProjects.Refresh(c.localGhosts); err != nil {
+		if _, err := c.localProjects.Tick(c.localGhosts); err != nil {
 			return "", err
 		}
 		project := c.localProjects.Active()
@@ -682,7 +712,11 @@ func (c *Client) projectCommand(argument string) (string, error) {
 		var builder strings.Builder
 		builder.WriteString("Project: " + project.Name + " — " + project.Summary())
 		for _, worker := range project.Workers {
-			builder.WriteString(fmt.Sprintf("\n- %s [%s] %s", worker.Name, worker.Status, worker.Task))
+			dependency := ""
+			if len(worker.DependsOn) > 0 {
+				dependency = " after:" + strings.Join(worker.DependsOn, ",")
+			}
+			builder.WriteString(fmt.Sprintf("\n- %s [%s] retry:%d/%d%s %s", worker.Name, worker.Status, worker.Attempts, worker.MaxAttempts, dependency, worker.Task))
 		}
 		return builder.String(), nil
 	case "output":
