@@ -97,7 +97,12 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 			args := map[string]any{}
 			if call.Function.Arguments != "" {
 				if err := json.Unmarshal([]byte(call.Function.Arguments), &args); err != nil {
-					return model.Response{}, fmt.Errorf("invalid arguments for %s: %w", call.Function.Name, err)
+					result := tool.Result{OK: false, Error: "argumen tool tidak valid: " + err.Error()}
+					l.Context.Add(model.Message{Role: "tool", Name: call.Function.Name, ToolCallID: call.ID, Content: result.Error})
+					if events.OnToolEnd != nil {
+						events.OnToolEnd(call.Function.Name, result)
+					}
+					continue
 				}
 			}
 			t, ok := l.Tools.Get(call.Function.Name)

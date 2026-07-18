@@ -60,3 +60,18 @@ func TestOpenAICompatibleReturnsTypedStatusError(t *testing.T) {
 		t.Fatalf("unexpected provider error: %#v", providerErr)
 	}
 }
+
+func TestParseSSEDeduplicatesRepeatedToolCallSnapshots(t *testing.T) {
+	payload := `{"model":"gemini-test","choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"spawn_agent","arguments":"{\"task\":\"audit\",\"background\":true}"}}]}}]}`
+	response, _, err := parseSSE(strings.NewReader("data: "+payload+"\n\ndata: "+payload+"\n\ndata: "+payload+"\n\ndata: [DONE]\n"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response.ToolCalls) != 1 {
+		t.Fatalf("tool calls = %#v", response.ToolCalls)
+	}
+	call := response.ToolCalls[0]
+	if call.Function.Name != "spawn_agent" || call.Function.Arguments != `{"task":"audit","background":true}` {
+		t.Fatalf("tool call should stay valid, got %#v", call)
+	}
+}

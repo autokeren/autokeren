@@ -151,8 +151,8 @@ func parseSSE(reader io.Reader, onChunk ChunkHandler) (model.Response, bool, err
 				if call.Type != "" {
 					calls[call.Index].Type = call.Type
 				}
-				calls[call.Index].Function.Name += call.Function.Name
-				calls[call.Index].Function.Arguments += call.Function.Arguments
+				calls[call.Index].Function.Name = mergeToolName(calls[call.Index].Function.Name, call.Function.Name)
+				calls[call.Index].Function.Arguments = mergeToolArguments(calls[call.Index].Function.Arguments, call.Function.Arguments)
 			}
 		}
 	}
@@ -161,4 +161,35 @@ func parseSSE(reader io.Reader, onChunk ChunkHandler) (model.Response, bool, err
 	}
 	result.ToolCalls = calls
 	return result, streamStarted, nil
+}
+
+func mergeToolName(current, fragment string) string {
+	if fragment == "" || current == fragment || strings.HasSuffix(current, fragment) {
+		return current
+	}
+	if current == "" || strings.HasPrefix(fragment, current) {
+		return fragment
+	}
+	return current + fragment
+}
+
+func mergeToolArguments(current, fragment string) string {
+	if fragment == "" || current == fragment || strings.HasSuffix(current, fragment) {
+		return current
+	}
+	if current == "" || strings.HasPrefix(fragment, current) || strings.HasPrefix(current, fragment) {
+		if len(fragment) > len(current) {
+			return fragment
+		}
+		return current
+	}
+	if isJSONValue(current) && isJSONValue(fragment) {
+		return fragment
+	}
+	return current + fragment
+}
+
+func isJSONValue(value string) bool {
+	var decoded any
+	return json.Unmarshal([]byte(value), &decoded) == nil
 }

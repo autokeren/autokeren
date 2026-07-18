@@ -37,7 +37,8 @@ func TestDirectorWorkerMailboxEndToEnd(t *testing.T) {
 			return
 		}
 		if hasUserText(messages, "DIRECTOR_E2E") {
-			_, _ = writer.Write([]byte("data: {\"model\":\"local-e2e\",\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"spawn-e2e\",\"type\":\"function\",\"function\":{\"name\":\"spawn_agent\",\"arguments\":\"{\\\"task\\\":\\\"subtask e2e\\\",\\\"role\\\":\\\"reviewer\\\",\\\"background\\\":true}\"}}]}}]}\n\ndata: [DONE]\n\n"))
+			event := "data: {\"model\":\"local-e2e\",\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"spawn-e2e\",\"type\":\"function\",\"function\":{\"name\":\"spawn_agent\",\"arguments\":\"{\\\"task\\\":\\\"subtask e2e\\\",\\\"role\\\":\\\"reviewer\\\",\\\"background\\\":true}\"}}]}}]}\n\n"
+			_, _ = writer.Write([]byte(event + event + event + "data: [DONE]\n\n"))
 			return
 		}
 		_, _ = writer.Write([]byte("data: {\"model\":\"local-e2e\",\"choices\":[{\"delta\":{\"content\":\"bukti worker: test lulus\"}}]}\n\ndata: [DONE]\n\n"))

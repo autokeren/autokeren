@@ -155,6 +155,33 @@ func TestLoopRetriesEmptyTerminalTurn(t *testing.T) {
 	}
 }
 
+type invalidToolArgumentsProvider struct {
+	calls     int
+	recovered bool
+}
+
+func (p *invalidToolArgumentsProvider) Complete(_ context.Context, request model.Request, _ provider.ChunkHandler) (model.Response, error) {
+	p.calls++
+	if p.calls == 1 {
+		return model.Response{ToolCalls: []model.ToolCall{{ID: "bad", Type: "function", Function: model.ToolCallFunction{Name: "echo", Arguments: `{"value":"first"}{"value":"second"}`}}}}, nil
+	}
+	for _, message := range request.Messages {
+		if message.Role == "tool" && message.Name == "echo" && strings.Contains(message.Content, "argumen tool tidak valid") {
+			p.recovered = true
+		}
+	}
+	return model.Response{Content: "argumen diperbaiki"}, nil
+}
+
+func TestLoopReturnsToolArgumentErrorsToModelForRecovery(t *testing.T) {
+	p := &invalidToolArgumentsProvider{}
+	loop := &Loop{Runner: Runner{Provider: p}, Tools: tool.NewRegistry().Register(echoTool{}), MaxIterations: 3}
+	response, err := loop.Run(context.Background(), "coba tool", Events{})
+	if err != nil || response.Content != "argumen diperbaiki" || p.calls != 2 || !p.recovered {
+		t.Fatalf("response=%#v err=%v calls=%d recovered=%t", response, err, p.calls, p.recovered)
+	}
+}
+
 type waitingProvider struct{}
 
 func (waitingProvider) Complete(ctx context.Context, _ model.Request, _ provider.ChunkHandler) (model.Response, error) {
