@@ -57,7 +57,11 @@ func (v CFVerify) Run(ctx context.Context, args map[string]any, _ Emitter) Resul
 				if assertErr != nil {
 					errors = append(errors, assertErr.Error())
 				} else {
-					assertions = append(assertions, fmt.Sprint(out))
+					message := fmt.Sprint(out)
+					assertions = append(assertions, message)
+					if passed, ok := out.(map[string]interface{})["ok"].(bool); !ok || !passed {
+						errors = append(errors, "assertion gagal: "+message)
+					}
 				}
 			}
 			if screenshot, screenshotErr := v.Browser.Execute("screenshot", nil); screenshotErr == nil {

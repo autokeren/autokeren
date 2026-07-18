@@ -3,6 +3,7 @@ package browser
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -221,34 +222,37 @@ func (bm *BrowserManager) Execute(action string, args map[string]interface{}) (i
 		assertion, _ := args["assertion"].(map[string]interface{})
 		kind, _ := assertion["kind"].(string)
 		value, _ := assertion["value"].(string)
-
-		if kind == "visible_text" {
-			expr := fmt.Sprintf("document.body.innerText.includes('%s')", value)
-			res, err := page.Eval(expr)
-			if err != nil {
-				return nil, err
-			}
-			ok := false
-			if res != nil {
-				ok = res.Value.Bool()
-			}
-			return map[string]interface{}{"ok": ok, "message": fmt.Sprintf("assert visible_text '%s': %t", value, ok)}, nil
-		} else if kind == "selector" {
-			expr := fmt.Sprintf("!!document.querySelector('%s')", value)
-			res, err := page.Eval(expr)
-			if err != nil {
-				return nil, err
-			}
-			ok := false
-			if res != nil {
-				ok = res.Value.Bool()
-			}
-			return map[string]interface{}{"ok": ok, "message": fmt.Sprintf("assert selector '%s': %t", value, ok)}, nil
+		expr, err := assertionExpression(kind, value)
+		if err != nil {
+			return nil, err
 		}
-		return nil, fmt.Errorf("unknown assertion kind: %s", kind)
+		res, err := page.Eval(expr)
+		if err != nil {
+			return nil, err
+		}
+		ok := false
+		if res != nil {
+			ok = res.Value.Bool()
+		}
+		return map[string]interface{}{"ok": ok, "message": fmt.Sprintf("assert %s '%s': %t", kind, value, ok)}, nil
 
 	default:
 		return nil, fmt.Errorf("unknown action: %s", action)
+	}
+}
+
+func assertionExpression(kind, value string) (string, error) {
+	literal, err := json.Marshal(value)
+	if err != nil {
+		return "", fmt.Errorf("encode assertion value: %w", err)
+	}
+	switch kind {
+	case "visible_text":
+		return fmt.Sprintf("() => Boolean(document.body && document.body.innerText.includes(%s))", literal), nil
+	case "selector":
+		return fmt.Sprintf("() => Boolean(document.querySelector(%s))", literal), nil
+	default:
+		return "", fmt.Errorf("unknown assertion kind: %s", kind)
 	}
 }
 
