@@ -48,8 +48,8 @@ Juri dapat menguji sistem rendering acceptance criteria dan menjalankan pengujia
 ### 🛠️ Kontribusi Hackathon (Yang dibangun selama event)
 
 * **Integrasi Model OpenAI** ([openai.py](autokeren/models/openai.py)): Klien model native yang mendukung completions, streaming, dan tool calling untuk GPT-5.6 dan Codex.
-* **Migrasi Runtime Go Native** ([cmd](cmd), [internal](internal)): Memindahkan loop provider aktif, dispatch tool, session/context, dan CLI proof ke Go. Bootstrap provider tetap kompatibel agar pasangan provider/model yang valid tersimpan sebelum Go dimulai.
-* **Wizard Login Berbasis Provider** ([cli.py](autokeren/cli.py)): Bootstrap kompatibilitas yang memvalidasi provider dan menyimpan model utama/cadangan yang cocok untuk runtime Go native.
+* **Migrasi Runtime Go Native** ([cmd](cmd), [internal](internal)): Memindahkan loop provider aktif, dispatch tool, session/context, CLI proof, dan bootstrap provider ke Go.
+* **Wizard Login Berbasis Provider** ([bootstrap.go](cmd/bootstrap.go)): Setup Go native yang memvalidasi provider dan menyimpan model utama/cadangan yang cocok untuk runtime Go native.
 * **Proof Tool** ([proof.go](internal/tool/proof.go)): Tool Go native untuk merencanakan (plan), merekam bukti (record), membuat laporan (report), replay, dan melihat daftar (list) bukti rilis.
 * **Slash Command `/proof`** ([cli.py](autokeren/cli.py), [tui.py](autokeren/tui.py)): Perintah interaktif di terminal dan TUI untuk menjalankan tugas-tugas bukti rilis.
 * **Aplikasi Demo Deterministik** ([app.py](examples/proof-demo/app.py)): Aplikasi endpoint checkout sederhana yang menunjukkan cacat validasi email dan log verifikasinya.
@@ -536,7 +536,7 @@ pipx upgrade autokeren
 
 ## Runtime Go dan Distribusi pipx
 
-Secara default, `autokeren` menjalankan `autokeren` interaktif, mode prompt/task, `--proof`, session, tools, router provider, dan TUI Bubble Tea lewat runtime Go native. Bootstrap `--login` dan `--init` yang paham pilihan model per provider tetap memakai jalur kompatibilitas agar konfigurasi valid sebelum runtime Go dimulai.
+Secara default, `autokeren` menjalankan `autokeren` interaktif, mode prompt/task, `--login`, `--init`, `--proof`, session, tools, router provider, dan TUI Bubble Tea lewat runtime Go native.
 
 `pipx install autokeren` tetap menjadi cara instalasi dan update yang didukung. Paket Python hanya menyediakan launcher lintas-platform kecil serta binary Go yang sesuai; Python bukan runtime agent aktif. `pipx upgrade autokeren` akan memasang launcher dan binary yang cocok secara bersamaan.
 

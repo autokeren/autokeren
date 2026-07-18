@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -59,6 +60,9 @@ var rootCmd = &cobra.Command{
 		}
 		if loginFlag {
 			if err := runLogin(cmd.InOrStdin(), cmd.OutOrStdout(), configPath, nil); err != nil {
+				if errors.Is(err, errLoginCancelled) {
+					return
+				}
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error login Go: %v\n", err)
 				os.Exit(1)
 			}

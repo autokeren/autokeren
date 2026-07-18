@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -32,7 +33,7 @@ func TestRunLoginPlatformSavesValidatedKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	var output bytes.Buffer
-	if err := runLogin(strings.NewReader("1\nak_test_key\n"), &output, path, server.Client()); err != nil {
+	if err := runLogin(strings.NewReader("1\nak_test_key\n1\n2\n"), &output, path, server.Client()); err != nil {
 		t.Fatal(err)
 	}
 	saved, err := os.ReadFile(path)
@@ -78,7 +79,7 @@ func TestRunLoginOpenAISelectsOpenAIModels(t *testing.T) {
 
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	var output bytes.Buffer
-	if err := runLogin(strings.NewReader("3\nsk-test-key\n"), &output, path, server.Client()); err != nil {
+	if err := runLogin(strings.NewReader("3\nsk-test-key\n1\n2\n"), &output, path, server.Client()); err != nil {
 		t.Fatal(err)
 	}
 	saved, err := os.ReadFile(path)
@@ -88,6 +89,42 @@ func TestRunLoginOpenAISelectsOpenAIModels(t *testing.T) {
 	contents := string(saved)
 	if !strings.Contains(contents, "mode: openai") || !strings.Contains(contents, "primary_model: gpt-5.6") || !strings.Contains(contents, "secondary_model: gpt-5.6-mini") {
 		t.Fatal("login OpenAI menyimpan model provider yang salah")
+	}
+}
+
+func TestRunLoginAIStudioUsesGeminiCatalog(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.URL.Query().Get("key") != "gemini-test-key" {
+			t.Fatal("API key AI Studio tidak diteruskan")
+		}
+		_, _ = w.Write([]byte(`{"models":[{"name":"models/gemini-3.5-flash","supportedGenerationMethods":["generateContent"]},{"name":"models/gemini-3.5-pro","supportedGenerationMethods":["generateContent"]},{"name":"models/embedding-001","supportedGenerationMethods":["embedContent"]}]}`))
+	}))
+	defer server.Close()
+	original := aiStudioModelsEndpoint
+	aiStudioModelsEndpoint = server.URL
+	t.Cleanup(func() { aiStudioModelsEndpoint = original })
+
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	var output bytes.Buffer
+	if err := runLogin(strings.NewReader("4\ngemini-test-key\n1\n2\n"), &output, path, server.Client()); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents := string(saved)
+	if !strings.Contains(contents, "mode: aistudio") || !strings.Contains(contents, "primary_model: gemini-3.5-flash") || !strings.Contains(contents, "secondary_model: gemini-3.5-pro") {
+		t.Fatal("login AI Studio menyimpan model provider yang salah")
+	}
+}
+
+func TestRunLoginCanBeCancelled(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	var output bytes.Buffer
+	err := runLogin(strings.NewReader("q\n"), &output, path, http.DefaultClient)
+	if !errors.Is(err, errLoginCancelled) {
+		t.Fatalf("login cancel harus jelas, mendapat %v", err)
 	}
 }
 

@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -23,6 +24,7 @@ const fallbackVersion = "0.12.0"
 var (
 	openAIModelsEndpoint   = "https://api.openai.com/v1/models"
 	aiStudioModelsEndpoint = "https://generativelanguage.googleapis.com/v1beta/models"
+	errLoginCancelled      = errors.New("login dibatalkan")
 )
 
 func runtimeVersion() string {
@@ -71,13 +73,103 @@ func runInit(in io.Reader, out io.Writer, path string) error {
 	return nil
 }
 
+func chooseModel(reader *bufio.Reader, out io.Writer, title string, models []string, defaultIndex int) (string, error) {
+	if len(models) == 0 {
+		return "", errors.New("daftar model kosong")
+	}
+	if defaultIndex < 0 || defaultIndex >= len(models) {
+		defaultIndex = 0
+	}
+	fmt.Fprintf(out, "\n%s\n", title)
+	for index, modelID := range models {
+		fmt.Fprintf(out, "  %d. %s\n", index+1, modelID)
+	}
+	choice, err := promptLine(reader, out, fmt.Sprintf("Pilih [%d]: ", defaultIndex+1))
+	if err != nil {
+		return "", err
+	}
+	if choice == "" {
+		return models[defaultIndex], nil
+	}
+	if strings.EqualFold(choice, "q") {
+		return "", errLoginCancelled
+	}
+	index, err := strconv.Atoi(choice)
+	if err != nil || index < 1 || index > len(models) {
+		return "", fmt.Errorf("pilihan model %q tidak valid", choice)
+	}
+	return models[index-1], nil
+}
+
+func chooseProviderModels(reader *bufio.Reader, out io.Writer, cfg *config.Config, models []string) error {
+	primary, err := chooseModel(reader, out, "Pilih model utama:", models, 0)
+	if err != nil {
+		return err
+	}
+	secondaryIndex := 0
+	if len(models) > 1 {
+		secondaryIndex = 1
+	}
+	secondary, err := chooseModel(reader, out, "Pilih model cadangan:", models, secondaryIndex)
+	if err != nil {
+		return err
+	}
+	cfg.Cloudflare.PrimaryModel = primary
+	cfg.Cloudflare.SecondaryModel = secondary
+	return nil
+}
+
+func fetchAIStudioModels(client *http.Client, apiKey string) []string {
+	if client == nil {
+		client = http.DefaultClient
+	}
+	request, err := http.NewRequestWithContext(context.Background(), http.MethodGet, aiStudioModelsEndpoint+"?key="+url.QueryEscape(apiKey), nil)
+	if err != nil {
+		return nil
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return nil
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return nil
+	}
+	var envelope struct {
+		Models []struct {
+			Name                       string   `json:"name"`
+			SupportedGenerationMethods []string `json:"supportedGenerationMethods"`
+		} `json:"models"`
+	}
+	if json.NewDecoder(io.LimitReader(response.Body, 2<<20)).Decode(&envelope) != nil {
+		return nil
+	}
+	seen := make(map[string]bool, len(envelope.Models))
+	models := make([]string, 0, len(envelope.Models))
+	for _, item := range envelope.Models {
+		supported := false
+		for _, method := range item.SupportedGenerationMethods {
+			if method == "generateContent" {
+				supported = true
+				break
+			}
+		}
+		modelID := strings.TrimPrefix(strings.TrimSpace(item.Name), "models/")
+		if supported && modelID != "" && !seen[modelID] {
+			seen[modelID] = true
+			models = append(models, modelID)
+		}
+	}
+	return models
+}
+
 func runLogin(in io.Reader, out io.Writer, path string, client *http.Client) error {
 	reader := bufio.NewReader(in)
 	cfg, err := config.Load(path)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(out, "Login Autokeren Go runtime")
+	fmt.Fprintln(out, "AUTOKEREN LOGIN & CONFIGURATION WIZARD")
 	fmt.Fprintln(out, "1. Platform Autokeren")
 	fmt.Fprintln(out, "2. Cloudflare Direct")
 	fmt.Fprintln(out, "3. OpenAI API")
@@ -90,6 +182,10 @@ func runLogin(in io.Reader, out io.Writer, path string, client *http.Client) err
 	if strings.TrimSpace(choice) == "" {
 		choice = "1"
 	}
+	if strings.EqualFold(strings.TrimSpace(choice), "q") {
+		return errLoginCancelled
+	}
+	modelOptions := []string(nil)
 	switch choice {
 	case "1":
 		key, promptErr := promptLine(reader, out, "API key platform: ")
@@ -103,6 +199,7 @@ func runLogin(in io.Reader, out io.Writer, path string, client *http.Client) err
 			return fmt.Errorf("validasi API key platform: %w", err)
 		}
 		cfg.Auth.Mode, cfg.Auth.APIKey = "platform", key
+		modelOptions = provider.DefaultModelsForConfig(cfg)
 	case "2":
 		if cfg.Cloudflare.AccountID, err = promptLine(reader, out, "Cloudflare account ID: "); err != nil {
 			return err
@@ -114,6 +211,7 @@ func runLogin(in io.Reader, out io.Writer, path string, client *http.Client) err
 			return errors.New("account ID dan API token Cloudflare wajib diisi")
 		}
 		cfg.Auth.Mode = "direct"
+		modelOptions = provider.DefaultModelsForConfig(cfg)
 	case "3":
 		key, promptErr := promptLine(reader, out, "OpenAI API key: ")
 		if promptErr != nil {
@@ -126,6 +224,7 @@ func runLogin(in io.Reader, out io.Writer, path string, client *http.Client) err
 			return fmt.Errorf("validasi OpenAI API key: %w", err)
 		}
 		cfg.Auth.Mode, cfg.Auth.OpenAIAPIKey = "openai", key
+		modelOptions = provider.DefaultModelsForConfig(cfg)
 	case "4":
 		key, promptErr := promptLine(reader, out, "Google AI Studio API key: ")
 		if promptErr != nil {
@@ -139,6 +238,10 @@ func runLogin(in io.Reader, out io.Writer, path string, client *http.Client) err
 			return fmt.Errorf("validasi Google AI Studio API key: %w", err)
 		}
 		cfg.Auth.Mode, cfg.Auth.GeminiAPIKey = "aistudio", key
+		modelOptions = fetchAIStudioModels(client, key)
+		if len(modelOptions) == 0 {
+			modelOptions = provider.DefaultModelsForConfig(cfg)
+		}
 	case "5":
 		if cfg.Auth.LocalEndpoint, err = promptLine(reader, out, "Local endpoint [http://localhost:11434]: "); err != nil {
 			return err
@@ -156,7 +259,11 @@ func runLogin(in io.Reader, out io.Writer, path string, client *http.Client) err
 	default:
 		return errors.New("pilihan provider tidak dikenal")
 	}
-	provider.ApplyProviderDefaults(&cfg)
+	if len(modelOptions) > 0 {
+		if err := chooseProviderModels(reader, out, &cfg, modelOptions); err != nil {
+			return err
+		}
+	}
 	if err := config.Save(path, cfg); err != nil {
 		return err
 	}
