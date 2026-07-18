@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -247,6 +248,24 @@ func TestAgentStatusDoesNotErrorWithoutAnActiveProject(t *testing.T) {
 	var status map[string]any
 	if err := c.callLocal("agent.status", map[string]interface{}{}, &status); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestNativeGenomeAndLoopCommands(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "main.go"), []byte("package main\nfunc main() {}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c := &Client{localRoot: root, localConfig: config.Config{Cloudflare: config.Cloudflare{PrimaryModel: "primary", SecondaryModel: "secondary"}}}
+	var reply map[string]any
+	if handled, err := c.localSlash("/genome check", &reply); !handled || err != nil || !strings.Contains(reply["content"].(string), "Tidak ada duplicate") {
+		t.Fatalf("genome command failed: handled=%v err=%v reply=%#v", handled, err, reply)
+	}
+	if handled, err := c.localSlash("/loop reset", &reply); !handled || err != nil || !strings.Contains(reply["content"].(string), "di-reset") {
+		t.Fatalf("loop reset failed: handled=%v err=%v reply=%#v", handled, err, reply)
+	}
+	if handled, err := c.localSlash("/loop break", &reply); !handled || err != nil || c.localConfig.Cloudflare.PrimaryModel != "secondary" {
+		t.Fatalf("loop break failed: handled=%v err=%v config=%#v", handled, err, c.localConfig.Cloudflare)
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -813,7 +814,7 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 	var output string
 	switch parts[0] {
 	case "/help":
-		output = "Perintah: /help, /model, /lang, /permissions, /memory, /copy, /debug, /export, /mcp, /save, /resume, /sessions, /project, /tdd, /spec, /ghost, /research, /deploy, /proof, /review, /security, /rewind, /config, /local, /approval, /reset, /q"
+		output = "Perintah: /help, /model, /lang, /permissions, /memory, /copy, /debug, /export, /mcp, /save, /resume, /sessions, /project, /tdd, /spec, /ghost, /research, /deploy, /proof, /review, /security, /rewind, /genome, /loop, /config, /local, /approval, /reset, /q"
 	case "/permissions":
 		output = "Tool berisiko akan meminta izin di TUI. Gunakan /approval all untuk mengizinkan semua tool selama sesi ini, atau /approval ask untuk kembali bertanya."
 	case "/debug":
@@ -1021,6 +1022,64 @@ func (c *Client) localSlash(input string, reply interface{}) (bool, error) {
 		output = fmt.Sprint(result.Output)
 		if !result.OK {
 			output = result.Error
+		}
+	case "/genome":
+		action := "view"
+		if len(parts) > 1 {
+			action = strings.ToLower(parts[1])
+		}
+		if action != "view" && action != "rescan" && action != "check" {
+			return true, errors.New("format: /genome [rescan|check]")
+		}
+		result := (tool.Genome{Root: c.localRoot}).Run(context.Background(), map[string]any{"action": action}, nil)
+		output = fmt.Sprint(result.Output)
+		if !result.OK {
+			output = result.Error
+		}
+	case "/loop":
+		action := "status"
+		if len(parts) > 1 {
+			action = strings.ToLower(parts[1])
+		}
+		switch action {
+		case "status":
+			if c.localRouterState == nil || len(c.localRouterState.Status()) == 0 {
+				output = "Loop breaker: belum ada error model yang tercatat."
+				break
+			}
+			statuses := c.localRouterState.Status()
+			models := make([]string, 0, len(statuses))
+			for modelID := range statuses {
+				models = append(models, modelID)
+			}
+			sort.Strings(models)
+			lines := []string{"Loop breaker (router circuit):"}
+			for _, modelID := range models {
+				status := statuses[modelID]
+				lines = append(lines, fmt.Sprintf("- %s: %s, gagal beruntun:%d, total gagal:%d", modelID, status.State, status.ConsecutiveFailures, status.TotalFailures))
+			}
+			output = strings.Join(lines, "\n")
+		case "reset":
+			c.localRouterState = provider.NewRouterState()
+			output = "Loop breaker di-reset. Circuit model akan dibangun ulang pada request berikutnya."
+		case "break":
+			primary := strings.TrimSpace(c.localConfig.Cloudflare.PrimaryModel)
+			secondary := strings.TrimSpace(c.localConfig.Cloudflare.SecondaryModel)
+			if secondary == "" || secondary == primary {
+				return true, errors.New("model secondary belum dikonfigurasi untuk /loop break")
+			}
+			c.localConfig.Cloudflare.PrimaryModel = secondary
+			c.localConfig.Cloudflare.SecondaryModel = primary
+			c.localModelID = secondary
+			c.localRouterState = provider.NewRouterState()
+			if c.localConfigPath != "" {
+				if err := config.Save(c.localConfigPath, c.localConfig); err != nil {
+					return true, err
+				}
+			}
+			output = fmt.Sprintf("Loop break: model aktif dipindah ke %s dan circuit di-reset.", secondary)
+		default:
+			return true, errors.New("format: /loop status|reset|break")
 		}
 	case "/proof":
 		action := "list"

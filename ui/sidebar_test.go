@@ -33,3 +33,18 @@ func TestFallbackRetryMessageDoesNotUseZeroAttempt(t *testing.T) {
 		t.Fatalf("unexpected fallback message: %#v", view.Chat.Messages)
 	}
 }
+
+func TestSlashMenuHasNoDuplicateCommands(t *testing.T) {
+	seen := make(map[string]bool, len(slashCommands))
+	for _, command := range slashCommands {
+		if seen[command.Name] {
+			t.Fatalf("duplicate slash command: %s", command.Name)
+		}
+		seen[command.Name] = true
+	}
+	for _, required := range []string{"/genome", "/loop"} {
+		if !seen[required] {
+			t.Fatalf("missing native slash command: %s", required)
+		}
+	}
+}
