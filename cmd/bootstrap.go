@@ -14,10 +14,16 @@ import (
 	"strings"
 
 	"github.com/autokeren/autokeren/internal/config"
+	"github.com/autokeren/autokeren/internal/provider"
 	"github.com/autokeren/autokeren/internal/tool"
 )
 
 const fallbackVersion = "0.12.0"
+
+var (
+	openAIModelsEndpoint   = "https://api.openai.com/v1/models"
+	aiStudioModelsEndpoint = "https://generativelanguage.googleapis.com/v1beta/models"
+)
 
 func runtimeVersion() string {
 	if version := strings.TrimSpace(getenv("AUTOKEREN_VERSION")); version != "" {
@@ -57,6 +63,7 @@ func runInit(in io.Reader, out io.Writer, path string) error {
 			return err
 		}
 	}
+	provider.ApplyProviderDefaults(&cfg)
 	if err := config.Save(path, cfg); err != nil {
 		return err
 	}
@@ -115,7 +122,7 @@ func runLogin(in io.Reader, out io.Writer, path string, client *http.Client) err
 		if !strings.HasPrefix(key, "sk-") {
 			return errors.New("OpenAI API key harus diawali sk-")
 		}
-		if err := validateHTTP(client, "https://api.openai.com/v1/models", "Authorization", "Bearer "+key); err != nil {
+		if err := validateHTTP(client, openAIModelsEndpoint, "Authorization", "Bearer "+key); err != nil {
 			return fmt.Errorf("validasi OpenAI API key: %w", err)
 		}
 		cfg.Auth.Mode, cfg.Auth.OpenAIAPIKey = "openai", key
@@ -127,7 +134,7 @@ func runLogin(in io.Reader, out io.Writer, path string, client *http.Client) err
 		if key == "" {
 			return errors.New("Google AI Studio API key wajib diisi")
 		}
-		endpoint := "https://generativelanguage.googleapis.com/v1beta/models?key=" + url.QueryEscape(key)
+		endpoint := aiStudioModelsEndpoint + "?key=" + url.QueryEscape(key)
 		if err := validateHTTP(client, endpoint, "", ""); err != nil {
 			return fmt.Errorf("validasi Google AI Studio API key: %w", err)
 		}
@@ -149,10 +156,11 @@ func runLogin(in io.Reader, out io.Writer, path string, client *http.Client) err
 	default:
 		return errors.New("pilihan provider tidak dikenal")
 	}
+	provider.ApplyProviderDefaults(&cfg)
 	if err := config.Save(path, cfg); err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Login berhasil. Provider aktif: %s\n", cfg.Auth.Mode)
+	fmt.Fprintf(out, "Login berhasil. Provider aktif: %s\nModel utama: %s\nModel cadangan: %s\n", cfg.Auth.Mode, cfg.Cloudflare.PrimaryModel, cfg.Cloudflare.SecondaryModel)
 	return nil
 }
 

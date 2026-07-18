@@ -49,6 +49,19 @@ func TestLocalModelsSupportsGeminiCatalogShape(t *testing.T) {
 	}
 }
 
+func TestLocalModelsFallbackUsesActiveProvider(t *testing.T) {
+	c := &Client{localConfig: config.Config{Auth: config.Auth{Mode: "openai"}, Cloudflare: config.Cloudflare{PrimaryModel: "kimi-code"}}}
+	models := c.localModels()
+	if len(models) == 0 || models[0]["id"] != "gpt-5.6" {
+		t.Fatalf("unexpected OpenAI fallback models: %#v", models)
+	}
+	for _, item := range models {
+		if item["id"] == "kimi-code" {
+			t.Fatalf("foreign model leaked into OpenAI selector: %#v", models)
+		}
+	}
+}
+
 func TestGoPlanModeRequiresApprovalInLocalSession(t *testing.T) {
 	c := NewClient(nil)
 	if err := c.Start(t.TempDir(), filepath.Join(t.TempDir(), "config.yaml"), map[string]interface{}{"engine": "go", "plan": true}); err != nil {

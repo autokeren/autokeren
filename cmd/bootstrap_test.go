@@ -59,8 +59,35 @@ func TestRunInitDirectSavesCloudflareCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 	contents := string(saved)
-	if !strings.Contains(contents, "mode: direct") || !strings.Contains(contents, "account_id: account-test") || !strings.Contains(contents, "api_token: token-test") {
+	if !strings.Contains(contents, "mode: direct") || !strings.Contains(contents, "account_id: account-test") || !strings.Contains(contents, "api_token: token-test") || !strings.Contains(contents, "primary_model: '@cf/moonshotai/kimi-k2.7-code'") {
 		t.Fatal("config init tidak tersimpan")
+	}
+}
+
+func TestRunLoginOpenAISelectsOpenAIModels(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Authorization") != "Bearer sk-test-key" {
+			t.Fatal("authorization OpenAI tidak diteruskan")
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	original := openAIModelsEndpoint
+	openAIModelsEndpoint = server.URL
+	t.Cleanup(func() { openAIModelsEndpoint = original })
+
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	var output bytes.Buffer
+	if err := runLogin(strings.NewReader("3\nsk-test-key\n"), &output, path, server.Client()); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents := string(saved)
+	if !strings.Contains(contents, "mode: openai") || !strings.Contains(contents, "primary_model: gpt-5.6") || !strings.Contains(contents, "secondary_model: gpt-5.6-mini") {
+		t.Fatal("login OpenAI menyimpan model provider yang salah")
 	}
 }
 

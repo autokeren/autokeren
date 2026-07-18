@@ -20,6 +20,61 @@ type ModelCatalogRequest struct {
 	APIKey     string
 }
 
+func DefaultModelsForConfig(cfg config.Config) []string {
+	switch strings.ToLower(strings.TrimSpace(cfg.Auth.Mode)) {
+	case "direct":
+		return []string{"@cf/moonshotai/kimi-k2.7-code", "@cf/moonshotai/kimi-k2.6", "@cf/zai-org/glm-5.2", "@cf/zai-org/glm-4.7-flash"}
+	case "openai":
+		return []string{"gpt-5.6", "gpt-5.6-mini", "gpt-4o", "gpt-4o-mini"}
+	case "aistudio":
+		return []string{"gemini-3.5-flash", "gemini-3.5-pro"}
+	case "local":
+		return uniqueModelIDs([]string{cfg.Cloudflare.PrimaryModel, cfg.Cloudflare.SecondaryModel})
+	default:
+		return []string{"kimi-code", "kimi-2.6", "glm-5.2", "glm-flash", "llama-4-scout", "gemma-4", "nemotron"}
+	}
+}
+
+func ApplyProviderDefaults(cfg *config.Config) {
+	if cfg == nil || strings.EqualFold(strings.TrimSpace(cfg.Auth.Mode), "local") {
+		return
+	}
+	models := DefaultModelsForConfig(*cfg)
+	if len(models) == 0 {
+		return
+	}
+	cfg.Cloudflare.PrimaryModel = models[0]
+	if len(models) > 1 {
+		cfg.Cloudflare.SecondaryModel = models[1]
+	} else {
+		cfg.Cloudflare.SecondaryModel = ""
+	}
+}
+
+func ValidateModelForConfig(cfg config.Config, modelID string) error {
+	modelID = strings.TrimSpace(modelID)
+	if modelID == "" {
+		return fmt.Errorf("model belum diisi")
+	}
+	mode := strings.ToLower(strings.TrimSpace(cfg.Auth.Mode))
+	lower := strings.ToLower(strings.TrimPrefix(modelID, "models/"))
+	switch mode {
+	case "direct":
+		if !strings.HasPrefix(modelID, "@cf/") {
+			return fmt.Errorf("model %q bukan model Cloudflare Direct; pilih model @cf/...", modelID)
+		}
+	case "openai":
+		if strings.HasPrefix(modelID, "@cf/") || strings.HasPrefix(lower, "kimi") || strings.HasPrefix(lower, "glm") || strings.HasPrefix(lower, "gemini") || strings.HasPrefix(lower, "llama") || strings.HasPrefix(lower, "gemma") || strings.HasPrefix(lower, "nemotron") {
+			return fmt.Errorf("model %q bukan model OpenAI; jalankan autokeren --login untuk memilih model OpenAI", modelID)
+		}
+	case "aistudio":
+		if !strings.HasPrefix(lower, "gemini") {
+			return fmt.Errorf("model %q bukan model Google AI Studio; pilih model Gemini", modelID)
+		}
+	}
+	return nil
+}
+
 func ModelCatalogForConfig(cfg config.Config) (ModelCatalogRequest, bool) {
 	switch strings.ToLower(strings.TrimSpace(cfg.Auth.Mode)) {
 	case "", "platform":
@@ -88,12 +143,34 @@ func TargetsForConfig(cfg config.Config, client *http.Client) ([]Target, error) 
 	default:
 		return nil, fmt.Errorf("mode autentikasi %q tidak didukung oleh runtime Go", cfg.Auth.Mode)
 	}
+	if err := ValidateModelForConfig(cfg, primary); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(secondary) != "" {
+		if err := ValidateModelForConfig(cfg, secondary); err != nil {
+			return nil, err
+		}
+	}
 	base := OpenAICompatible{Endpoint: endpoint, APIKey: apiKey, Client: client}
 	targets := uniqueTargets([]Target{{ModelID: primary, Provider: base}, {ModelID: secondary, Provider: base}})
 	if len(targets) == 0 {
 		return nil, fmt.Errorf("model utama belum diisi")
 	}
 	return targets, nil
+}
+
+func uniqueModelIDs(ids []string) []string {
+	seen := make(map[string]bool, len(ids))
+	output := make([]string, 0, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		output = append(output, id)
+	}
+	return output
 }
 
 func chatCompletionsEndpoint(base string) string {

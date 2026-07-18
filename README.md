@@ -47,8 +47,8 @@ Judges can test the proof-rendering system and run the local verification suite 
 ### 🛠️ Hackathon Contribution (What was built)
 
 * **OpenAI Model Integration** ([openai.py](autokeren/models/openai.py)): Native model client supporting GPT-5.6 and Codex completions, streaming, and tool calls.
-* **Native Go Runtime Migration** ([cmd](cmd), [internal](internal)): Moved the active provider loop, tool dispatch, session/context handling, proof CLI, and login bootstrap to Go. Python remains available only via `--engine python` for compatibility.
-* **Interactive Login Wizard** ([bootstrap.go](cmd/bootstrap.go)): Go-native setup wizard to select and validate providers, including OpenAI API.
+* **Native Go Runtime Migration** ([cmd](cmd), [internal](internal)): Moved the active provider loop, tool dispatch, session/context handling, and proof CLI to Go. The provider-aware bootstrap remains compatible so it can persist valid provider/model pairs before Go starts.
+* **Provider-Aware Login Wizard** ([cli.py](autokeren/cli.py)): Compatibility bootstrap that validates providers and saves a matching primary and fallback model for the native Go runtime.
 * **Proof Tool** ([proof.go](internal/tool/proof.go)): Native Go tool to plan, record, report, replay, and list release evidence runs.
 * **`/proof` Slash Command** ([cli.py](autokeren/cli.py), [tui.py](autokeren/tui.py)): Interactive commands to execute proof tasks.
 * **Deterministic Demo App** ([app.py](examples/proof-demo/app.py)): A mock checkout app showing defect validation and verification logs.
@@ -489,7 +489,7 @@ pipx upgrade autokeren
 
 ## Go Runtime and pipx Distribution
 
-`autokeren` runs the following commands through the native Go runtime by default: interactive `autokeren`, prompt/task mode, `--login`, `--init`, `--proof`, sessions, tools, provider routing, and the Bubble Tea TUI.
+`autokeren` runs interactive `autokeren`, prompt/task mode, `--proof`, sessions, tools, provider routing, and the Bubble Tea TUI through the native Go runtime by default. The provider-aware `--login` and `--init` bootstrap wizard remains on the compatibility path so every provider can choose a valid model before the Go runtime starts.
 
 `pipx install autokeren` remains the supported installer and updater. The Python package supplies the small cross-platform launcher and the matching compiled Go binary; it does not make Python the active agent runtime. `pipx upgrade autokeren` installs the next matching launcher and binary together.
 

@@ -33,10 +33,12 @@ func TestTargetsForConfigModes(t *testing.T) {
 				cfg.Auth.Mode = "direct"
 				cfg.Cloudflare.AccountID = "account"
 				cfg.Cloudflare.APIToken = "cf-token"
+				cfg.Cloudflare.PrimaryModel = "@cf/moonshotai/kimi-k2.7-code"
+				cfg.Cloudflare.SecondaryModel = "@cf/moonshotai/kimi-k2.6"
 			},
 			endpoint: "https://api.cloudflare.com/client/v4/accounts/account/ai/v1/chat/completions",
 			key:      "cf-token",
-			primary:  "kimi-code",
+			primary:  "@cf/moonshotai/kimi-k2.7-code",
 		},
 		{
 			name: "local",
@@ -53,6 +55,7 @@ func TestTargetsForConfigModes(t *testing.T) {
 				cfg.Auth.Mode = "openai"
 				cfg.Auth.OpenAIAPIKey = "openai-key"
 				cfg.Cloudflare.PrimaryModel = "gpt-test"
+				cfg.Cloudflare.SecondaryModel = "gpt-backup"
 			},
 			endpoint: openAIEndpoint,
 			key:      "openai-key",
@@ -86,6 +89,32 @@ func TestTargetsForConfigModes(t *testing.T) {
 				t.Fatalf("provider = %#v", provider)
 			}
 		})
+	}
+}
+
+func TestProviderDefaultsAndModelValidation(t *testing.T) {
+	openAI := config.Defaults()
+	openAI.Auth.Mode = "openai"
+	ApplyProviderDefaults(&openAI)
+	if openAI.Cloudflare.PrimaryModel != "gpt-5.6" || openAI.Cloudflare.SecondaryModel != "gpt-5.6-mini" {
+		t.Fatalf("unexpected OpenAI defaults: %#v", openAI.Cloudflare)
+	}
+	if err := ValidateModelForConfig(openAI, "kimi-code"); err == nil {
+		t.Fatal("OpenAI accepted a Cloudflare model")
+	}
+
+	aistudio := config.Defaults()
+	aistudio.Auth.Mode = "aistudio"
+	ApplyProviderDefaults(&aistudio)
+	if aistudio.Cloudflare.PrimaryModel != "gemini-3.5-flash" || ValidateModelForConfig(aistudio, "gpt-5.6") == nil {
+		t.Fatalf("invalid AI Studio defaults: %#v", aistudio.Cloudflare)
+	}
+
+	direct := config.Defaults()
+	direct.Auth.Mode = "direct"
+	ApplyProviderDefaults(&direct)
+	if direct.Cloudflare.PrimaryModel != "@cf/moonshotai/kimi-k2.7-code" || ValidateModelForConfig(direct, "kimi-code") == nil {
+		t.Fatalf("invalid direct defaults: %#v", direct.Cloudflare)
 	}
 }
 

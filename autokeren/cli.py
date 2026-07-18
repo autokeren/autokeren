@@ -732,8 +732,18 @@ def chat_loop(agent: Agent, cfg, ui: AgentUI):
 
 
 def _try_run_go_runtime(args: argparse.Namespace, sys_argv: list[str]) -> bool:
-    """Menjalankan runtime Go untuk perintah normal; Python hanya untuk kompatibilitas eksplisit."""
-    if args.engine == "python" or args.role or args.agy or args.telegram or args.telegram_token or args.telegram_allow_user:
+    """Menjalankan runtime Go untuk sesi agent; bootstrap provider memakai wizard kompatibel."""
+    if (
+        args.engine == "python"
+        or args.about
+        or args.init
+        or args.login
+        or args.role
+        or args.agy
+        or args.telegram
+        or args.telegram_token
+        or args.telegram_allow_user
+    ):
         return False
 
     import os

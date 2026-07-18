@@ -489,6 +489,9 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 	case "agent.switch_model":
 		args, _ := params.(map[string]interface{})
 		if modelID, ok := args["model_id"].(string); ok && modelID != "" {
+			if err := provider.ValidateModelForConfig(c.localConfig, modelID); err != nil {
+				return err
+			}
 			c.localConfig.Cloudflare.PrimaryModel = modelID
 			c.localModelID = modelID
 			if c.localConfigPath != "" {
@@ -562,10 +565,13 @@ func (c *Client) localModels() []map[string]interface{} {
 			}
 		}
 	}
-	ids := []string{"@cf/moonshotai/kimi-k2.7-code", "@cf/moonshotai/kimi-k2.6", "@cf/zai-org/glm-5.2", "@cf/zai-org/glm-4.7-flash", "@cf/meta/llama-4-scout-17b-16e-instruct", "@cf/google/gemma-4-26b-a4b-it", "kimi-code", "kimi-2.6", "glm-5.2", "gpt-5.6", "gpt-4o", "gemini-2.5-pro", "gemini-2.5-flash"}
+	ids := provider.DefaultModelsForConfig(c.localConfig)
 	models := make([]map[string]interface{}, 0, len(ids)+1)
 	seen := map[string]bool{}
-	for _, id := range append([]string{current}, ids...) {
+	if provider.ValidateModelForConfig(c.localConfig, current) == nil {
+		ids = append([]string{current}, ids...)
+	}
+	for _, id := range ids {
 		if id == "" || seen[id] {
 			continue
 		}
