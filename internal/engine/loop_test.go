@@ -67,6 +67,30 @@ func TestLoopDoesNotStopWhenContentAndToolCallsCoexist(t *testing.T) {
 	}
 }
 
+type autonomousContinuationProvider struct{ calls int }
+
+func (p *autonomousContinuationProvider) Complete(_ context.Context, _ model.Request, _ provider.ChunkHandler) (model.Response, error) {
+	p.calls++
+	switch p.calls {
+	case 1:
+		return model.Response{ToolCalls: []model.ToolCall{{ID: "1", Type: "function", Function: model.ToolCallFunction{Name: "echo", Arguments: `{"value":"ok"}`}}}}, nil
+	case 2:
+		return model.Response{Content: "Selanjutnya akan saya lanjutkan verifikasinya."}, nil
+	default:
+		return model.Response{Content: "Selesai, verifikasi sudah tuntas."}, nil
+	}
+}
+
+func TestLoopContinuesOneAutonomousTurnAfterToolWork(t *testing.T) {
+	p := &autonomousContinuationProvider{}
+	continuations := 0
+	loop := &Loop{Runner: Runner{Provider: p}, Tools: tool.NewRegistry().Register(echoTool{}), MaxIterations: 4}
+	response, err := loop.Run(context.Background(), "selesaikan tugas", Events{OnRetry: func(int, time.Duration, string) { continuations++ }})
+	if err != nil || response.Content != "Selesai, verifikasi sudah tuntas." || p.calls != 3 || continuations != 1 {
+		t.Fatalf("response=%#v err=%v calls=%d continuations=%d", response, err, p.calls, continuations)
+	}
+}
+
 func TestLoopPlanModeBlocksToolDispatch(t *testing.T) {
 	registry := tool.NewRegistry().Register(echoTool{})
 	p := &contentAndToolProvider{}
@@ -92,7 +116,10 @@ func (backgroundSpawnTool) Run(context.Context, map[string]any, tool.Emitter) to
 	return tool.Result{OK: true, Output: "ghost #7 started"}
 }
 
-type awaitAgentsTool struct{ calls int }
+type awaitAgentsTool struct {
+	calls     int
+	monitored []int
+}
 
 func (a *awaitAgentsTool) Definition() tool.Definition {
 	return tool.Definition{Name: "await_agents", Parameters: map[string]any{"type": "object"}}
@@ -107,32 +134,26 @@ func (a *awaitAgentsTool) Run(_ context.Context, args map[string]any, _ tool.Emi
 	return tool.Result{OK: true, Output: `{"entries":[{"agent_id":7,"status":"completed","output":"worker selesai"}]}`}
 }
 
-type directorProvider struct {
-	calls       int
-	mailboxSeen bool
-}
+func (a *awaitAgentsTool) MonitorBackground(ids []int) { a.monitored = append(a.monitored, ids...) }
+
+type directorProvider struct{ calls int }
 
 func (p *directorProvider) Complete(_ context.Context, request model.Request, _ provider.ChunkHandler) (model.Response, error) {
 	p.calls++
 	if p.calls == 1 {
 		return model.Response{ToolCalls: []model.ToolCall{{ID: "spawn", Type: "function", Function: model.ToolCallFunction{Name: "spawn_agent", Arguments: `{"task":"cek","background":true}`}}}}, nil
 	}
-	for _, message := range request.Messages {
-		if message.Role == "tool" && message.Name == "await_agents" && strings.Contains(message.Content, "worker selesai") {
-			p.mailboxSeen = true
-		}
-	}
-	return model.Response{Content: "director menerima hasil worker"}, nil
+	return model.Response{Content: "director lanjut tanpa menunggu worker"}, nil
 }
 
-func TestLoopAutomaticallyReturnsBackgroundWorkerMailboxToDirector(t *testing.T) {
+func TestLoopDoesNotWaitForBackgroundWorkerUnlessRequested(t *testing.T) {
 	awaiting := &awaitAgentsTool{}
 	registry := tool.NewRegistry().Register(backgroundSpawnTool{}).Register(awaiting)
 	p := &directorProvider{}
 	loop := &Loop{Runner: Runner{Provider: p}, Tools: registry, MaxIterations: 3}
 	response, err := loop.Run(context.Background(), "delegasikan", Events{})
-	if err != nil || response.Content != "director menerima hasil worker" || awaiting.calls != 1 || !p.mailboxSeen {
-		t.Fatalf("response=%#v err=%v awaits=%d mailboxSeen=%t", response, err, awaiting.calls, p.mailboxSeen)
+	if err != nil || response.Content != "director lanjut tanpa menunggu worker" || awaiting.calls != 0 || p.calls != 2 || len(awaiting.monitored) != 1 || awaiting.monitored[0] != 7 {
+		t.Fatalf("response=%#v err=%v awaits=%d monitored=%v provider_calls=%d", response, err, awaiting.calls, awaiting.monitored, p.calls)
 	}
 }
 

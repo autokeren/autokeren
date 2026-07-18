@@ -257,6 +257,9 @@ var rootCmd = &cobra.Command{
 		callbacks.OnSessionSaved = func(sessionID string, sessionName string) {
 			p.Send(ui.SessionSavedMsg{SessionID: sessionID, SessionName: sessionName})
 		}
+		callbacks.OnContextUpdated = func(tokens int, window int) {
+			p.Send(ui.ContextUpdateMsg{Tokens: tokens, Window: window})
+		}
 		callbacks.ConfirmPermission = func(name string, desc string, args map[string]interface{}) bool {
 			ch := make(chan bool)
 			p.Send(ui.PermissionConfirmReq{Name: name, Description: desc, Arguments: args, RespChan: ch})

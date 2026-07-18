@@ -19,6 +19,7 @@ type Events struct {
 	OnToolOutput      func(string, string)
 	OnToolEnd         func(string, tool.Result)
 	ConfirmPermission func(string, string, map[string]any) bool
+	OnContextUpdated  func(int, int)
 	OnResponse        func(model.Response)
 	OnSessionSaved    func(string, string)
 }
@@ -48,12 +49,14 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 		l.Tools = tool.NewRegistry()
 	}
 	l.Context.Add(model.Message{Role: "user", Content: userInput})
+	l.emitContext(events)
 	limit := l.MaxIterations
 	if limit <= 0 {
 		limit = 50
 	}
 	var last model.Response
 	contextRecoveryAttempts := 0
+	autonomousContinuationAttempts := 0
 	for iteration := 0; iteration < limit; iteration++ {
 		request := model.Request{Model: l.Model, Messages: mergeRequestMessages(l.Context.Messages(), l.RequestPrelude), Tools: definitions(l.Tools), Temperature: l.Temperature, MaxTokens: l.MaxTokens}
 		var onChunk provider.ChunkHandler
@@ -69,6 +72,7 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 					if events.OnRetry != nil {
 						events.OnRetry(contextRecoveryAttempts, 0, fmt.Sprintf("context penuh; compact otomatis %d → %d token lalu mencoba ulang", before, after))
 					}
+					l.emitContext(events)
 					continue
 				}
 			}
@@ -77,9 +81,19 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 		contextRecoveryAttempts = 0
 		if len(last.ToolCalls) == 0 {
 			l.Context.Add(model.Message{Role: "assistant", Content: last.Content})
+			l.emitContext(events)
 			if strings.TrimSpace(last.Content) == "" {
 				// Providers can occasionally emit an empty terminal SSE turn. Give
 				// the model another turn instead of silently ending the session.
+				continue
+			}
+			if hasToolResults(l.Context.Messages()) && autonomousContinuationAttempts < 1 && iteration < limit-1 && shouldAutonomouslyContinue(last.Content) {
+				autonomousContinuationAttempts++
+				l.Context.Add(model.Message{Role: "system", Content: "KAMU SEDANG DALAM MODE OTONOM. Jangan sekadar menjelaskan langkah selanjutnya atau meminta maaf. Gunakan tool yang sesuai secara langsung untuk melanjutkan tugas sampai selesai sepenuhnya."})
+				l.emitContext(events)
+				if events.OnRetry != nil {
+					events.OnRetry(0, 0, "agen menyatakan akan melanjutkan; meneruskan satu turn otonom")
+				}
 				continue
 			}
 			return last, nil
@@ -95,13 +109,15 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 		// Preserve any streamed reasoning/content alongside tool calls, but always
 		// dispatch the calls before deciding that the turn is complete.
 		l.Context.Add(model.Message{Role: "assistant", Content: last.Content, ToolCalls: last.ToolCalls})
-		spawnedAgentIDs := make([]int, 0)
+		l.emitContext(events)
+		backgroundAgentIDs := make([]int, 0)
 		for _, call := range last.ToolCalls {
 			args := map[string]any{}
 			if call.Function.Arguments != "" {
 				if err := json.Unmarshal([]byte(call.Function.Arguments), &args); err != nil {
 					result := tool.Result{OK: false, Error: "argumen tool tidak valid: " + err.Error()}
 					l.Context.Add(model.Message{Role: "tool", Name: call.Function.Name, ToolCallID: call.ID, Content: result.Error})
+					l.emitContext(events)
 					if events.OnToolEnd != nil {
 						events.OnToolEnd(call.Function.Name, result)
 					}
@@ -112,6 +128,7 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 			if !ok {
 				result := tool.Result{OK: false, Error: "tool not found: " + call.Function.Name}
 				l.Context.Add(model.Message{Role: "tool", Name: call.Function.Name, ToolCallID: call.ID, Content: result.Error})
+				l.emitContext(events)
 				if events.OnToolEnd != nil {
 					events.OnToolEnd(call.Function.Name, result)
 				}
@@ -120,6 +137,7 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 			if allowed, desc := t.NeedsPermission(args); allowed && events.ConfirmPermission != nil && !events.ConfirmPermission(call.Function.Name, desc, args) {
 				result := tool.Result{OK: false, Error: "permission denied"}
 				l.Context.Add(model.Message{Role: "tool", Name: call.Function.Name, ToolCallID: call.ID, Content: result.Error})
+				l.emitContext(events)
 				if events.OnToolEnd != nil {
 					events.OnToolEnd(call.Function.Name, result)
 				}
@@ -138,32 +156,54 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 			}
 			content, _ := json.Marshal(result)
 			l.Context.Add(model.Message{Role: "tool", Name: call.Function.Name, ToolCallID: call.ID, Content: string(content)})
+			l.emitContext(events)
 			if call.Function.Name == "spawn_agent" && isBackgroundSpawn(args) && result.OK {
 				if id, ok := spawnedAgentID(result.Output); ok {
-					spawnedAgentIDs = append(spawnedAgentIDs, id)
+					backgroundAgentIDs = append(backgroundAgentIDs, id)
 				}
 			}
 		}
-		if len(spawnedAgentIDs) > 0 {
+		if len(backgroundAgentIDs) > 0 {
 			if awaiting, ok := l.Tools.Get("await_agents"); ok {
-				awaitArgs := map[string]any{"agent_ids": agentIDArguments(spawnedAgentIDs)}
-				if events.OnToolStart != nil {
-					events.OnToolStart("await_agents", awaitArgs)
+				if monitor, ok := awaiting.(interface{ MonitorBackground([]int) }); ok {
+					monitor.MonitorBackground(uniqueAgentIDs(backgroundAgentIDs))
 				}
-				result := awaiting.Run(ctx, awaitArgs, func(line string) {
-					if events.OnToolOutput != nil {
-						events.OnToolOutput("await_agents", line)
-					}
-				})
-				if events.OnToolEnd != nil {
-					events.OnToolEnd("await_agents", result)
-				}
-				content, _ := json.Marshal(result)
-				l.Context.Add(model.Message{Role: "tool", Name: "await_agents", ToolCallID: fmt.Sprintf("director-await-%d", iteration), Content: string(content)})
 			}
 		}
 	}
 	return last, fmt.Errorf("agent reached max iterations (%d)", limit)
+}
+
+func (l *Loop) emitContext(events Events) {
+	if events.OnContextUpdated != nil && l.Context != nil {
+		events.OnContextUpdated(l.Context.TokenEstimate(), l.Context.MaxTokens())
+	}
+}
+
+func hasToolResults(messages []model.Message) bool {
+	for _, message := range messages {
+		if message.Role == "tool" {
+			return true
+		}
+	}
+	return false
+}
+
+func shouldAutonomouslyContinue(content string) bool {
+	lower := strings.ToLower(content)
+	continueSignals := []string{"selanjutnya", "berikutnya", "mari kita", "akan saya", "sekarang saya"}
+	stopSignals := []string{"selesai", "done", "berhasil", "complete", "sukses", "✅", "dibuat", "terdeploy"}
+	for _, signal := range stopSignals {
+		if strings.Contains(lower, signal) {
+			return false
+		}
+	}
+	for _, signal := range continueSignals {
+		if strings.Contains(lower, signal) {
+			return true
+		}
+	}
+	return false
 }
 
 func isBackgroundSpawn(args map[string]any) bool {
@@ -179,8 +219,8 @@ func spawnedAgentID(output any) (int, bool) {
 	return 0, false
 }
 
-func agentIDArguments(ids []int) []any {
-	arguments := make([]any, 0, len(ids))
+func uniqueAgentIDs(ids []int) []int {
+	unique := make([]int, 0, len(ids))
 	seen := map[int]struct{}{}
 	for _, id := range ids {
 		if id <= 0 {
@@ -190,9 +230,9 @@ func agentIDArguments(ids []int) []any {
 			continue
 		}
 		seen[id] = struct{}{}
-		arguments = append(arguments, float64(id))
+		unique = append(unique, id)
 	}
-	return arguments
+	return unique
 }
 
 func mergeRequestMessages(messages, prelude []model.Message) []model.Message {

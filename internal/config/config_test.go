@@ -33,6 +33,23 @@ func TestLoadYAML(t *testing.T) {
 	}
 }
 
+func TestLoadKeepsConfiguredCredentialsOverEnvironment(t *testing.T) {
+	t.Setenv("AUTOKEREN_API_KEY", "environment-key")
+	t.Setenv("CLOUDFLARE_API_TOKEN", "environment-token")
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	data := []byte("auth:\n  api_key: configured-key\ncloudflare:\n  api_token: configured-token\n")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Auth.APIKey != "configured-key" || cfg.Cloudflare.APIToken != "configured-token" {
+		t.Fatalf("environment unexpectedly overrode config: %#v", cfg)
+	}
+}
+
 func TestSaveRestrictsExistingConfigPermissions(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Windows uses ACLs instead of POSIX file permissions")

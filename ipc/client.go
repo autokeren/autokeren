@@ -59,6 +59,7 @@ type IPCCallbacks struct {
 	OnToolOutput      func(name string, line string)
 	OnRetry           func(attempt int, delay float64, message string)
 	OnSessionSaved    func(sessionID string, sessionName string)
+	OnContextUpdated  func(tokens int, window int)
 	ConfirmPermission func(name string, desc string, args map[string]interface{}) bool
 	OnError           func(message string)
 }
@@ -84,6 +85,9 @@ type Client struct {
 	localNeuronsUsed      int
 	localNeuronsRemaining int
 	localNeuronsQuota     int
+	localContextMu        sync.RWMutex
+	localContextTokens    int
+	localContextWindow    int
 	localRunMu            sync.Mutex
 	localRunCancel        context.CancelFunc
 	localDebug            bool
@@ -273,6 +277,15 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 					c.callbacks.OnRetry(attempt, delay.Seconds(), message)
 				}
 			},
+			OnContextUpdated: func(tokens int, window int) {
+				c.localContextMu.Lock()
+				c.localContextTokens = tokens
+				c.localContextWindow = window
+				c.localContextMu.Unlock()
+				if c.callbacks != nil && c.callbacks.OnContextUpdated != nil {
+					c.callbacks.OnContextUpdated(tokens, window)
+				}
+			},
 			OnToolStart: func(name string, args map[string]any) {
 				if c.callbacks != nil && c.callbacks.OnToolStart != nil {
 					c.callbacks.OnToolStart(name, args)
@@ -370,6 +383,10 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 	case "agent.reset":
 		c.localSession = "default"
 		c.localSessionName = "default"
+		c.localContextMu.Lock()
+		c.localContextTokens = 0
+		c.localContextWindow = c.localConfig.Autokeren.ContextWindow
+		c.localContextMu.Unlock()
 		return nil
 	case "agent.compact":
 		if c.localSession == "default" {
@@ -387,7 +404,7 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 			return err
 		}
 		store := contextstore.New(c.localConfig.Autokeren.ContextWindow, false, c.localConfig.Autokeren.AutoCompactThreshold)
-		store.SetCompactTail(c.localConfig.Autokeren.CompactTailTurns)
+		store.SetCompactTail(compactTailTurns(c.localConfig.Autokeren.CompactTailTurns))
 		store.Replace(data.Messages)
 		before, after, changed := store.Compact()
 		message := "Context sudah cukup singkat, tidak perlu compact."
@@ -453,6 +470,7 @@ func (c *Client) callLocal(method string, params interface{}, reply interface{})
 		}
 		c.localSession = data.ID
 		c.localSessionName = data.Name
+		c.setLocalContextFromMessages(data.Messages)
 		if reply != nil {
 			raw, _ := json.Marshal(map[string]any{"message": "Session " + c.localSessionName + " berhasil di-resume.", "session_id": c.localSession, "session_name": c.localSessionName, "messages": data.Messages})
 			return json.Unmarshal(raw, reply)
@@ -793,6 +811,13 @@ func specProgress(plan string) string {
 }
 
 func (c *Client) localContextInfo() map[string]any {
+	c.localContextMu.RLock()
+	liveTokens := c.localContextTokens
+	liveWindow := c.localContextWindow
+	c.localContextMu.RUnlock()
+	if liveWindow > 0 {
+		return map[string]any{"tokens": liveTokens, "window": liveWindow, "pct": float64(liveTokens) / float64(liveWindow) * 100}
+	}
 	tokens := 0
 	if sessions, err := c.localSessionManager(); err == nil && c.localSession != "default" {
 		data, loadErr := sessions.Load(c.localSession)
@@ -807,6 +832,28 @@ func (c *Client) localContextInfo() map[string]any {
 		window = 262144
 	}
 	return map[string]any{"tokens": tokens, "window": window, "pct": float64(tokens) / float64(window) * 100}
+}
+
+func (c *Client) setLocalContextFromMessages(messages []model.Message) {
+	tokens := 0
+	for _, message := range messages {
+		tokens += len([]rune(message.Role+" "+message.Content+" "+message.Name+" "+message.ToolCallID))/4 + len(message.ToolCalls)*8
+	}
+	window := c.localConfig.Autokeren.ContextWindow
+	if window <= 0 {
+		window = 262144
+	}
+	c.localContextMu.Lock()
+	c.localContextTokens = tokens
+	c.localContextWindow = window
+	c.localContextMu.Unlock()
+}
+
+func compactTailTurns(configured int) int {
+	if configured < 12 {
+		return 12
+	}
+	return configured
 }
 
 func (c *Client) localSlash(input string, reply interface{}) (bool, error) {

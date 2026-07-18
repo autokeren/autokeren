@@ -39,3 +39,12 @@ func TestStartupErrorStillShowsInitializationFailure(t *testing.T) {
 		t.Fatal("startup error must remain an initialization failure")
 	}
 }
+
+func TestContextUpdateUsesLiveEngineValues(t *testing.T) {
+	m := NewMainModel(nil, nil, ".", "", nil)
+	updated, _ := m.Update(ContextUpdateMsg{Tokens: 4096, Window: 8192})
+	view := updated.(MainModel)
+	if view.Sidebar.ContextUsed != 4096 || view.Sidebar.ContextWindow != 8192 || view.Sidebar.ContextPct != 50 {
+		t.Fatalf("unexpected live context sidebar values: %#v", view.Sidebar)
+	}
+}

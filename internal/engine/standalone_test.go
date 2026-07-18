@@ -13,6 +13,7 @@ import (
 	"github.com/autokeren/autokeren/internal/config"
 	"github.com/autokeren/autokeren/internal/memory"
 	"github.com/autokeren/autokeren/internal/model"
+	"github.com/autokeren/autokeren/internal/session"
 )
 
 func TestRunStandaloneFallsBackToSecondaryModel(t *testing.T) {
@@ -104,6 +105,56 @@ func TestRunStandaloneInjectsGuidanceAndRelevantMemory(t *testing.T) {
 		if !strings.Contains(joined, expected) {
 			t.Fatalf("missing %q in system messages: %s", expected, joined)
 		}
+	}
+}
+
+func TestRunStandalonePersistsSessionWhenProviderFails(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("AUTOKEREN_CONFIG_DIR", filepath.Join(root, "config"))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte("sementara tidak tersedia"))
+	}))
+	defer server.Close()
+
+	cfg := config.Defaults()
+	cfg.Auth.BaseURL = server.URL
+	cfg.Auth.APIKey = "test-key"
+	cfg.Cloudflare.SecondaryModel = ""
+	cfg.Retry.MaxRetries = 0
+	var savedID string
+	_, err := RunStandaloneEvents(t.Context(), cfg, root, "jangan hilangkan prompt ini", Events{
+		OnSessionSaved: func(id, _ string) { savedID = id },
+	}, "")
+	if err == nil {
+		t.Fatal("expected provider failure")
+	}
+	if savedID == "" {
+		t.Fatal("failed run must still save a recoverable session")
+	}
+	sessions, err := session.NewManager(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := sessions.Load(savedID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serialized, err := json.Marshal(data.Messages)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(serialized), "jangan hilangkan prompt ini") {
+		t.Fatalf("saved session omitted failed prompt: %s", serialized)
+	}
+}
+
+func TestCompactTailTurnsPreservesPythonMinimum(t *testing.T) {
+	if got := compactTailTurns(6); got != 12 {
+		t.Fatalf("compact tail = %d, want 12", got)
+	}
+	if got := compactTailTurns(18); got != 18 {
+		t.Fatalf("configured compact tail was reduced: %d", got)
 	}
 }
 

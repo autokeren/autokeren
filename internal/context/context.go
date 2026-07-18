@@ -50,6 +50,11 @@ func (s *Store) TokenEstimate() int {
 	defer s.mu.RUnlock()
 	return estimate(s.messages)
 }
+func (s *Store) MaxTokens() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.maxTokens
+}
 func (s *Store) SetCompactTail(turns int) {
 	if turns <= 0 {
 		turns = 6

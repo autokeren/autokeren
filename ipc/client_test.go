@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/autokeren/autokeren/ghost"
@@ -150,6 +151,71 @@ func TestGoRuntimeLocalProviderPersistsAndResumesSession(t *testing.T) {
 	}
 }
 
+func TestGoRuntimeRetainsFailedPromptForNextTurn(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("AUTOKEREN_CONFIG_DIR", filepath.Join(root, "config"))
+	var calls atomic.Int32
+	var recoveredRequest map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/v1/chat/completions" {
+			http.NotFound(w, request)
+			return
+		}
+		if calls.Add(1) == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("sementara gagal"))
+			return
+		}
+		if err := json.NewDecoder(request.Body).Decode(&recoveredRequest); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"pulih\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"))
+	}))
+	defer server.Close()
+
+	configPath := filepath.Join(root, "config.yaml")
+	cfg := config.Defaults()
+	cfg.Auth.Mode = "local"
+	cfg.Auth.LocalEndpoint = server.URL
+	cfg.Cloudflare.PrimaryModel = "local-test"
+	cfg.Cloudflare.SecondaryModel = ""
+	cfg.Retry.MaxRetries = 0
+	if err := config.Save(configPath, cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	client := NewClient(nil)
+	if err := client.Start(root, configPath, map[string]interface{}{"engine": "go"}); err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	var first map[string]any
+	if err := client.Call("agent.run", map[string]interface{}{"user_input": "prompt yang harus tetap ada"}, &first); err == nil {
+		t.Fatal("expected first provider request to fail")
+	}
+	if client.localSession == "default" {
+		t.Fatal("failed request must create a recoverable local session")
+	}
+	var second map[string]any
+	if err := client.Call("agent.run", map[string]interface{}{"user_input": "lanjut sekarang"}, &second); err != nil {
+		t.Fatal(err)
+	}
+	if second["content"] != "pulih" {
+		t.Fatalf("unexpected recovered response: %#v", second)
+	}
+	serialized, err := json.Marshal(recoveredRequest["messages"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"prompt yang harus tetap ada", "lanjut sekarang"} {
+		if !bytes.Contains(serialized, []byte(expected)) {
+			t.Fatalf("recovered request omitted %q: %s", expected, serialized)
+		}
+	}
+}
+
 func TestLocalSessionSaveAndResume(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("AUTOKEREN_CONFIG_DIR", filepath.Join(root, "config"))
@@ -175,6 +241,12 @@ func TestLocalSessionSaveAndResume(t *testing.T) {
 	if resumed["session_id"] != saved["session_id"] || resumed["session_name"] != "demo" {
 		raw, _ := json.Marshal(resumed)
 		t.Fatalf("unexpected resume response: %s", raw)
+	}
+}
+
+func TestCompactTailTurnsMatchesEnginePolicy(t *testing.T) {
+	if got := compactTailTurns(1); got != 12 {
+		t.Fatalf("compact tail = %d, want 12", got)
 	}
 }
 

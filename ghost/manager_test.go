@@ -51,6 +51,25 @@ func TestRefreshDiscoversGhostCreatedByAnotherRuntimeOwner(t *testing.T) {
 	}
 }
 
+func TestManagerDoesNotKillUnverifiedRestoredProcess(t *testing.T) {
+	root := t.TempDir()
+	metadata, err := json.Marshal(GhostAgentInfo{ID: 4, Task: "unsafe", Status: "running", PID: os.Getpid(), LogFile: filepath.Join(root, ".ak-ghost-4.log")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".ak-ghost-4.json"), metadata, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manager := NewGhostManager(root)
+	if manager.Kill(4) {
+		t.Fatal("manager must never kill a restored PID that is not verifiably Autokeren")
+	}
+	info := manager.List()[0]
+	if info.Status == "killed" || info.Error == "" {
+		t.Fatalf("unverified process was not safely marked stale: %#v", info)
+	}
+}
+
 func TestResolveBinaryPathFindsWindowsExecutableExtension(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "autokeren-cli")
 	if err := os.WriteFile(path+".exe", []byte("binary"), 0o600); err != nil {

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/autokeren/autokeren/internal/config"
 )
@@ -33,8 +34,8 @@ func TestDirectorWorkerMailboxEndToEnd(t *testing.T) {
 		mu.Unlock()
 		writer.Header().Set("Content-Type", "text/event-stream")
 		messages, _ := payload["messages"].([]any)
-		if hasToolResult(messages, "await_agents") {
-			_, _ = writer.Write([]byte("data: {\"model\":\"local-e2e\",\"choices\":[{\"delta\":{\"content\":\"director menerima bukti worker\"}}]}\n\ndata: [DONE]\n\n"))
+		if hasToolResult(messages, "spawn_agent") {
+			_, _ = writer.Write([]byte("data: {\"model\":\"local-e2e\",\"choices\":[{\"delta\":{\"content\":\"director lanjut tanpa menunggu worker\"}}]}\n\ndata: [DONE]\n\n"))
 			return
 		}
 		if hasUserText(messages, "DIRECTOR_E2E") {
@@ -73,12 +74,18 @@ func TestDirectorWorkerMailboxEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	content, err := RunStandalone(t.Context(), cfg, root, "DIRECTOR_E2E delegasikan review", nil, "")
-	if err != nil || content != "director menerima bukti worker" {
+	if err != nil || content != "director lanjut tanpa menunggu worker" {
 		t.Fatalf("content=%q err=%v\nartifacts:\n%s", content, err, ghostArtifacts(root))
 	}
-	mailboxData, err := os.ReadFile(filepath.Join(root, ".autokeren", "agent-mailbox.json"))
-	if err != nil {
-		t.Fatal(err)
+	mailboxPath := filepath.Join(root, ".autokeren", "agent-mailbox.json")
+	deadline := time.Now().Add(10 * time.Second)
+	var mailboxData []byte
+	for time.Now().Before(deadline) {
+		mailboxData, _ = os.ReadFile(mailboxPath)
+		if strings.Contains(string(mailboxData), "bukti worker: test lulus") {
+			break
+		}
+		time.Sleep(25 * time.Millisecond)
 	}
 	if !strings.Contains(string(mailboxData), "reviewer") || !strings.Contains(string(mailboxData), "bukti worker: test lulus") || !strings.Contains(string(mailboxData), "completed") {
 		t.Fatalf("unexpected mailbox: %s", mailboxData)

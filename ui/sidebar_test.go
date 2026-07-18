@@ -45,7 +45,7 @@ func TestSlashMenuHasNoDuplicateCommands(t *testing.T) {
 		}
 		seen[command.Name] = true
 	}
-	for _, required := range []string{"/genome", "/loop"} {
+	for _, required := range []string{"/genome", "/loop", "/status", "/plan", "/approve", "/rewind", "/review", "/security", "/proof", "/research"} {
 		if !seen[required] {
 			t.Fatalf("missing native slash command: %s", required)
 		}

@@ -109,20 +109,30 @@ func Load(path string) (Config, error) {
 }
 
 func applyEnv(cfg *Config) {
-	if value := firstEnv("AUTOKEREN_API_KEY", "AK_API_KEY"); value != "" {
-		cfg.Auth.APIKey = value
+	if cfg.Auth.APIKey == "" {
+		if value := firstEnv("AUTOKEREN_API_KEY", "AK_API_KEY"); value != "" {
+			cfg.Auth.APIKey = value
+		}
 	}
-	if value := firstEnv("CLOUDFLARE_ACCOUNT_ID", "CF_ACCOUNT_ID"); value != "" {
-		cfg.Cloudflare.AccountID = value
+	if cfg.Cloudflare.AccountID == "" {
+		if value := firstEnv("CLOUDFLARE_ACCOUNT_ID", "CF_ACCOUNT_ID"); value != "" {
+			cfg.Cloudflare.AccountID = value
+		}
 	}
-	if value := firstEnv("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_API_KEY", "CF_API_TOKEN"); value != "" {
-		cfg.Cloudflare.APIToken = value
+	if cfg.Cloudflare.APIToken == "" {
+		if value := firstEnv("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_API_KEY", "CF_API_TOKEN"); value != "" {
+			cfg.Cloudflare.APIToken = value
+		}
 	}
-	if value := os.Getenv("GEMINI_API_KEY"); value != "" {
-		cfg.Auth.GeminiAPIKey = value
+	if cfg.Auth.GeminiAPIKey == "" {
+		if value := os.Getenv("GEMINI_API_KEY"); value != "" {
+			cfg.Auth.GeminiAPIKey = value
+		}
 	}
-	if value := os.Getenv("OPENAI_API_KEY"); value != "" {
-		cfg.Auth.OpenAIAPIKey = value
+	if cfg.Auth.OpenAIAPIKey == "" {
+		if value := os.Getenv("OPENAI_API_KEY"); value != "" {
+			cfg.Auth.OpenAIAPIKey = value
+		}
 	}
 }
 func firstEnv(keys ...string) string {

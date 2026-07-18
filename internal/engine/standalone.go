@@ -108,7 +108,7 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 		timeout = 120 * time.Second
 	}
 	store := contextstore.New(cfg.Autokeren.ContextWindow, cfg.Autokeren.AutoCompact, cfg.Autokeren.AutoCompactThreshold)
-	store.SetCompactTail(cfg.Autokeren.CompactTailTurns)
+	store.SetCompactTail(compactTailTurns(cfg.Autokeren.CompactTailTurns))
 	store.SetReserveTokens(cfg.Cloudflare.MaxTokens + 8000)
 	sessions, err := session.NewManager(root)
 	if err != nil {
@@ -170,9 +170,29 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 	if events.ConfirmPermission == nil {
 		events.ConfirmPermission = defaultPermission
 	}
+	saveSession := func(usage model.Usage) error {
+		if !cfg.Autokeren.AutoSaveSession {
+			return nil
+		}
+		if sessionName == "" {
+			sessionName = automaticSessionName(prompt)
+		}
+		saved, saveErr := sessions.Save(sessionName, store.Messages(), usage, sessionID)
+		if saveErr != nil {
+			return fmt.Errorf("auto-save session: %w", saveErr)
+		}
+		sessionID = saved.ID
+		if events.OnSessionSaved != nil {
+			events.OnSessionSaved(saved.ID, saved.Name)
+		}
+		return nil
+	}
 	response, err := loop.Run(ctx, prompt, events)
 	if err != nil {
 		_ = writeGhostResult("", workerTools.Evidence())
+		if saveErr := saveSession(model.Usage{}); saveErr != nil {
+			return "", fmt.Errorf("%w; %v", err, saveErr)
+		}
 		return "", err
 	}
 	if report := verification.Report(); report != "" {
@@ -189,20 +209,11 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 	if events.OnResponse != nil {
 		events.OnResponse(response)
 	}
+	if err := saveSession(response.Usage); err != nil {
+		return "", err
+	}
 	if err := writeGhostResult(response.Content, workerTools.Evidence()); err != nil {
 		return "", fmt.Errorf("simpan hasil worker: %w", err)
-	}
-	if cfg.Autokeren.AutoSaveSession {
-		if sessionName == "" {
-			sessionName = automaticSessionName(prompt)
-		}
-		saved, saveErr := sessions.Save(sessionName, store.Messages(), response.Usage, sessionID)
-		if saveErr != nil {
-			return "", fmt.Errorf("auto-save session: %w", saveErr)
-		}
-		if events.OnSessionSaved != nil {
-			events.OnSessionSaved(saved.ID, saved.Name)
-		}
 	}
 	return response.Content, nil
 }
@@ -265,6 +276,13 @@ func testLabel(command string) string {
 
 func writeGhostResult(summary string, evidence []agentresult.ToolEvidence) error {
 	return agentresult.Write(os.Getenv("AUTOKEREN_GHOST_RESULT_PATH"), agentresult.Build(summary, evidence))
+}
+
+func compactTailTurns(configured int) int {
+	if configured < 12 {
+		return 12
+	}
+	return configured
 }
 
 func automaticSessionName(input string) string {

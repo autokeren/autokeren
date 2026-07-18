@@ -11,6 +11,12 @@ import (
 
 type AwaitAgents struct{ Coordinator *director.Coordinator }
 
+func (a AwaitAgents) MonitorBackground(ids []int) {
+	if a.Coordinator != nil {
+		a.Coordinator.MonitorBackground(ids)
+	}
+}
+
 func (a AwaitAgents) Definition() Definition {
 	return Definition{Name: "await_agents", Description: "Wait for delegated Go agents, collect bounded results into the director mailbox, then return their evidence to the director.", Parameters: map[string]any{"type": "object", "properties": map[string]any{"agent_ids": map[string]any{"type": "array", "items": map[string]any{"type": "integer"}}, "timeout_seconds": map[string]any{"type": "integer", "minimum": 1, "maximum": 600}}, "required": []string{"agent_ids"}}}
 }

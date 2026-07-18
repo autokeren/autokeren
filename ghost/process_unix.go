@@ -30,6 +30,21 @@ func processIsAutokeren(pid int) bool {
 	return strings.Contains(cmdline, "--engine") && strings.Contains(cmdline, "--non-interactive")
 }
 
+func readProcessIdentity(pid int) (processIdentity, bool) {
+	if pid <= 0 {
+		return processIdentity{}, false
+	}
+	executable, err := os.Readlink("/proc/" + fmt.Sprint(pid) + "/exe")
+	if err != nil {
+		return processIdentity{}, false
+	}
+	return processIdentity{Executable: executable}, true
+}
+
+func processMatches(info *GhostAgentInfo) bool {
+	return info != nil && processAlive(info.PID) && processIsAutokeren(info.PID)
+}
+
 func terminatePID(pid int) {
 	if pid > 0 {
 		_ = syscall.Kill(-pid, syscall.SIGTERM)

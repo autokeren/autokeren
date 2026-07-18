@@ -24,6 +24,8 @@ type GhostAgentInfo struct {
 	FinishedAt   time.Time `json:"finished_at,omitempty"`
 	ExitCode     int       `json:"exit_code"`
 	PID          int       `json:"pid,omitempty"`
+	BinaryPath   string    `json:"binary_path,omitempty"`
+	ProcessStart int64     `json:"process_start,omitempty"`
 	Error        string    `json:"error,omitempty"`
 	LogFile      string    `json:"log_file"`
 	ResultFile   string    `json:"result_file,omitempty"`
@@ -106,8 +108,10 @@ func (gm *GhostManager) loadExistingLocked() {
 		if info.PID == 0 {
 			continue
 		}
-		if info.Status == "running" && (!processAlive(info.PID) || !processIsAutokeren(info.PID)) {
+		if info.Status == "running" && !processMatches(&info) {
 			info.Status = "completed"
+			info.Error = "ghost lama tidak dapat diverifikasi sebagai proses Autokeren"
+			info.FinishedAt = time.Now()
 		}
 		gm.agents[info.ID] = &info
 	}
@@ -185,6 +189,10 @@ func (gm *GhostManager) SpawnWithOptions(options SpawnOptions) (*GhostAgentInfo,
 	}
 
 	info := &GhostAgentInfo{ID: id, Task: task, Role: options.Role, AllowedTools: allowedTools, Status: "running", StartedAt: time.Now(), LogFile: logFile, ResultFile: resultFile, PID: cmd.Process.Pid}
+	if identity, ok := readProcessIdentity(cmd.Process.Pid); ok {
+		info.BinaryPath = identity.Executable
+		info.ProcessStart = identity.StartedAt
+	}
 	gm.agents[id] = info
 	gm.cancels[id] = cancel
 	gm.procs[id] = cmd
@@ -305,14 +313,22 @@ func (gm *GhostManager) Kill(agentID int) bool {
 		gm.mu.Unlock()
 		return false
 	}
-	info.Status = "killed"
-	if hasCancel {
-		cancel()
-	}
 	if cmd, ok := gm.procs[agentID]; ok {
+		info.Status = "killed"
+		if hasCancel {
+			cancel()
+		}
 		terminateProcessGroup(cmd)
-	} else if info.PID > 0 {
+	} else if info.PID > 0 && processMatches(info) {
+		info.Status = "killed"
 		terminatePID(info.PID)
+	} else {
+		info.Status = "completed"
+		info.Error = "ghost tidak dihentikan karena identitas proses tidak dapat diverifikasi"
+		info.FinishedAt = time.Now()
+		gm.writeMetadataLocked(info)
+		gm.mu.Unlock()
+		return false
 	}
 	gm.writeMetadataLocked(info)
 	gm.mu.Unlock()
@@ -358,13 +374,24 @@ func (gm *GhostManager) Refresh() {
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
 	gm.loadExistingLocked()
-	for _, info := range gm.agents {
-		if info.Status == "running" && (info.PID <= 0 || !processAlive(info.PID) || !processIsAutokeren(info.PID)) {
+	for id, info := range gm.agents {
+		if info.Status == "running" && !gm.ownsRunningProcessLocked(id, info) {
 			info.Status = "completed"
 			info.FinishedAt = time.Now()
+			info.Error = "ghost tidak lagi dapat diverifikasi sebagai proses Autokeren"
 			gm.writeMetadataLocked(info)
 		}
 	}
+}
+
+func (gm *GhostManager) ownsRunningProcessLocked(id int, info *GhostAgentInfo) bool {
+	if info == nil || info.PID <= 0 {
+		return false
+	}
+	if cmd, ok := gm.procs[id]; ok && cmd.Process != nil && cmd.Process.Pid == info.PID && cmd.ProcessState == nil {
+		return processAlive(info.PID)
+	}
+	return processMatches(info)
 }
 
 func (gm *GhostManager) GetOutput(agentID int) string {

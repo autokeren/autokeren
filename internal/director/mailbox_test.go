@@ -44,6 +44,23 @@ func TestAwaitReturnsWhenWorkersFinish(t *testing.T) {
 	}
 }
 
+func TestMonitorBackgroundPersistsWorkerResultWithoutBlockingCaller(t *testing.T) {
+	root := t.TempDir()
+	agents := &fakeAgents{items: []*ghost.GhostAgentInfo{{ID: 1, Status: "running"}}, outputs: map[int]string{1: "selesai"}}
+	coordinator := New(root, agents)
+	coordinator.MonitorBackground([]int{1})
+	agents.items[0].Status = "completed"
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		data, _ := os.ReadFile(filepath.Join(root, ".autokeren", "agent-mailbox.json"))
+		if strings.Contains(string(data), "selesai") && strings.Contains(string(data), "completed") {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("background monitor did not persist completed worker result")
+}
+
 func TestAwaitPersistsTimedOutWorkersWithoutLyingAboutTheirStatus(t *testing.T) {
 	root := t.TempDir()
 	agents := &fakeAgents{items: []*ghost.GhostAgentInfo{{ID: 4, Status: "running"}}, outputs: map[int]string{}}

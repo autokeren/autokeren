@@ -66,6 +66,10 @@ type RetryMsg struct {
 	Delay   float64
 	Message string
 }
+type ContextUpdateMsg struct {
+	Tokens int
+	Window int
+}
 type ErrorMsg struct{ Message string }
 type ModelsLoadedMsg struct {
 	Models []ModelSelectorItem
@@ -119,12 +123,20 @@ var slashCommands = []SlashCommandInfo{
 	{Name: "/copy", Description: "Salin pesan terakhir atau pesan ke-N"},
 	{Name: "/debug", Description: "Aktifkan/nonaktifkan mode debug"},
 	{Name: "/memory", Description: "Tampilkan memory proyek"},
+	{Name: "/status", Description: "Tampilkan status engine, model, dan proyek"},
+	{Name: "/plan", Description: "Aktifkan atau nonaktifkan plan mode"},
+	{Name: "/approve", Description: "Setujui rencana agar agen dapat melanjutkan"},
 	{Name: "/project", Description: "Kelola pekerjaan multi-agent"},
-	{Name: "/tdd", Description: "Jalankan workflow test-driven development"},
+	{Name: "/tdd", Description: "Minta agen menjalankan workflow test-driven development"},
 	{Name: "/spec", Description: "Interview dan rencana implementasi"},
 	{Name: "/genome", Description: "Scan struktur dan duplikasi codebase"},
 	{Name: "/loop", Description: "Lihat atau pulihkan loop breaker model"},
-	{Name: "/deploy", Description: "Bangun dan deploy aplikasi Cloudflare"},
+	{Name: "/deploy", Description: "Minta agen membangun dan deploy aplikasi Cloudflare"},
+	{Name: "/rewind", Description: "Kembalikan perubahan dari checkpoint"},
+	{Name: "/review", Description: "Audit perubahan kode saat ini"},
+	{Name: "/security", Description: "Scan keamanan proyek"},
+	{Name: "/proof", Description: "Kelola bukti verifikasi rilis"},
+	{Name: "/research", Description: "Lakukan riset web untuk tugas"},
 	{Name: "/export", Description: "Ekspor percakapan ke Markdown"},
 	{Name: "/ghost", Description: "Kelola background agent"},
 	{Name: "/board", Description: "Buka/tutup papan Kanban proyek (Shortcut: Ctrl+K)"},
@@ -509,6 +521,13 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Chat.AppendMessage("system", fmt.Sprintf("retry #%d (%.0fs) %s", msg.Attempt, msg.Delay, msg.Message))
 		} else {
 			m.Chat.AppendMessage("system", msg.Message)
+		}
+
+	case ContextUpdateMsg:
+		m.Sidebar.ContextUsed = msg.Tokens
+		if msg.Window > 0 {
+			m.Sidebar.ContextWindow = msg.Window
+			m.Sidebar.ContextPct = float64(msg.Tokens) / float64(msg.Window) * 100
 		}
 
 	case ErrorMsg:

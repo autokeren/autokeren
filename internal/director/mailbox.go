@@ -99,6 +99,25 @@ func (c *Coordinator) Collect(ids []int) (Mailbox, error) {
 	return mailbox, err
 }
 
+func (c *Coordinator) MonitorBackground(ids []int) {
+	if c == nil || c.agents == nil || len(ids) == 0 {
+		return
+	}
+	tracked := append([]int(nil), ids...)
+	go func() {
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			c.agents.Refresh()
+			_, pending, err := c.collect(tracked)
+			if err != nil || !pending {
+				return
+			}
+			<-ticker.C
+		}
+	}()
+}
+
 func (c *Coordinator) collect(ids []int) (Mailbox, bool, error) {
 	requested := map[int]struct{}{}
 	for _, id := range ids {
