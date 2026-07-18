@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/autokeren/autokeren/ghost"
+	"github.com/autokeren/autokeren/internal/agentresult"
 )
 
 type fakeAgents struct {
@@ -48,6 +49,19 @@ func TestAwaitPersistsTimedOutWorkersWithoutLyingAboutTheirStatus(t *testing.T) 
 	agents := &fakeAgents{items: []*ghost.GhostAgentInfo{{ID: 4, Status: "running"}}, outputs: map[int]string{}}
 	mailbox, err := New(root, agents).Await(context.Background(), []int{4}, time.Millisecond)
 	if err == nil || mailbox.WaitStatus != "timed_out" || len(mailbox.PendingAgentIDs) != 1 || mailbox.PendingAgentIDs[0] != 4 || mailbox.Entries[0].Status != "running" {
+		t.Fatalf("mailbox=%#v err=%v", mailbox, err)
+	}
+}
+
+func TestCollectPrefersStructuredWorkerResult(t *testing.T) {
+	root := t.TempDir()
+	resultPath := filepath.Join(root, "worker.result.json")
+	if err := agentresult.Write(resultPath, agentresult.Build("ringkasan worker", []agentresult.ToolEvidence{{Name: "write_file", OK: true, Path: "main.go"}})); err != nil {
+		t.Fatal(err)
+	}
+	agents := &fakeAgents{items: []*ghost.GhostAgentInfo{{ID: 9, Status: "completed", ResultFile: resultPath}}, outputs: map[int]string{9: "log lama"}}
+	mailbox, err := New(root, agents).Collect([]int{9})
+	if err != nil || mailbox.Entries[0].Summary != "ringkasan worker" || len(mailbox.Entries[0].FilesChanged) != 1 || mailbox.Entries[0].Output != "" {
 		t.Fatalf("mailbox=%#v err=%v", mailbox, err)
 	}
 }

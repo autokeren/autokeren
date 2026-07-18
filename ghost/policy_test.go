@@ -13,8 +13,8 @@ func TestAllowedToolsOnlyIncludesKnownMutableCapabilities(t *testing.T) {
 }
 
 func TestChildEnvironmentStripsUnrelatedSecrets(t *testing.T) {
-	environment := strings.Join(ChildEnvironment([]string{"PATH=/bin", "HOME=/tmp/home", "AUTOKEREN_API_KEY=key", "DATABASE_URL=secret", "GITHUB_TOKEN=secret"}, []string{"patch_file"}), "\n")
-	for _, expected := range []string{"PATH=/bin", "HOME=/tmp/home", "AUTOKEREN_API_KEY=key", "AUTOKEREN_GHOST_CHILD=1", "AUTOKEREN_GHOST_ALLOWED_TOOLS=patch_file"} {
+	environment := strings.Join(ChildEnvironment([]string{"PATH=/bin", "HOME=/tmp/home", "AUTOKEREN_API_KEY=key", "DATABASE_URL=secret", "GITHUB_TOKEN=secret"}, []string{"patch_file"}, "/tmp/result.json"), "\n")
+	for _, expected := range []string{"PATH=/bin", "HOME=/tmp/home", "AUTOKEREN_API_KEY=key", "AUTOKEREN_GHOST_CHILD=1", "AUTOKEREN_GHOST_ALLOWED_TOOLS=patch_file", "AUTOKEREN_GHOST_RESULT_PATH=/tmp/result.json"} {
 		if !strings.Contains(environment, expected) {
 			t.Fatalf("environment missing %q: %s", expected, environment)
 		}

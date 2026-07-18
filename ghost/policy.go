@@ -36,7 +36,7 @@ func AllowedTools(values []string) []string {
 	return output
 }
 
-func ChildEnvironment(parent []string, allowedTools []string) []string {
+func ChildEnvironment(parent []string, allowedTools []string, resultPath string) []string {
 	permitted := map[string]struct{}{
 		"AUTOKEREN_API_KEY":     {},
 		"AK_API_KEY":            {},
@@ -69,5 +69,8 @@ func ChildEnvironment(parent []string, allowedTools []string) []string {
 	}
 	environment = append(environment, "AUTOKEREN_GHOST_CHILD=1")
 	environment = append(environment, "AUTOKEREN_GHOST_ALLOWED_TOOLS="+strings.Join(AllowedTools(allowedTools), ","))
+	if resultPath != "" {
+		environment = append(environment, "AUTOKEREN_GHOST_RESULT_PATH="+resultPath)
+	}
 	return environment
 }

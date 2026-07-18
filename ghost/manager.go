@@ -25,6 +25,7 @@ type GhostAgentInfo struct {
 	PID          int       `json:"pid,omitempty"`
 	Error        string    `json:"error,omitempty"`
 	LogFile      string    `json:"log_file"`
+	ResultFile   string    `json:"result_file,omitempty"`
 }
 
 func (info GhostAgentInfo) Runtime() float64 {
@@ -109,7 +110,7 @@ func ghostFileID(name string) (int, bool) {
 	if !strings.HasPrefix(name, ".ak-ghost-") {
 		return 0, false
 	}
-	for _, extension := range []string{".json", ".log"} {
+	for _, extension := range []string{".result.json", ".json", ".log"} {
 		if strings.HasSuffix(name, extension) {
 			value := strings.TrimSuffix(strings.TrimPrefix(name, ".ak-ghost-"), extension)
 			id, err := strconv.Atoi(value)
@@ -155,6 +156,7 @@ func (gm *GhostManager) SpawnWithOptions(options SpawnOptions) (*GhostAgentInfo,
 		break
 	}
 	gm.nextID = id + 1
+	resultFile := filepath.Join(gm.ProjectRoot, fmt.Sprintf(".ak-ghost-%d.result.json", id))
 
 	binary := gm.binaryPath()
 	ctx, cancel := context.WithTimeout(context.Background(), gm.Timeout)
@@ -164,7 +166,7 @@ func (gm *GhostManager) SpawnWithOptions(options SpawnOptions) (*GhostAgentInfo,
 	}
 	cmd := exec.CommandContext(ctx, binary, args...)
 	cmd.Dir = gm.ProjectRoot
-	cmd.Env = ChildEnvironment(os.Environ(), allowedTools)
+	cmd.Env = ChildEnvironment(os.Environ(), allowedTools, resultFile)
 	configureProcessGroup(cmd)
 	cmd.Stdout = log
 	cmd.Stderr = log
@@ -175,7 +177,7 @@ func (gm *GhostManager) SpawnWithOptions(options SpawnOptions) (*GhostAgentInfo,
 		return nil, fmt.Errorf("gagal memulai ghost: %w", err)
 	}
 
-	info := &GhostAgentInfo{ID: id, Task: task, Role: options.Role, AllowedTools: allowedTools, Status: "running", StartedAt: time.Now(), LogFile: logFile, PID: cmd.Process.Pid}
+	info := &GhostAgentInfo{ID: id, Task: task, Role: options.Role, AllowedTools: allowedTools, Status: "running", StartedAt: time.Now(), LogFile: logFile, ResultFile: resultFile, PID: cmd.Process.Pid}
 	gm.agents[id] = info
 	gm.cancels[id] = cancel
 	gm.procs[id] = cmd
@@ -200,7 +202,7 @@ func (gm *GhostManager) SpawnSync(ctx context.Context, options SpawnOptions) (st
 	defer cancel()
 	cmd := exec.CommandContext(childCtx, gm.binaryPath(), args...)
 	cmd.Dir = gm.ProjectRoot
-	cmd.Env = ChildEnvironment(os.Environ(), options.AllowedTools)
+	cmd.Env = ChildEnvironment(os.Environ(), options.AllowedTools, "")
 	configureProcessGroup(cmd)
 	out, err := cmd.CombinedOutput()
 	if childCtx.Err() != nil {

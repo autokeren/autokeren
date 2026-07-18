@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/autokeren/autokeren/ghost"
+	"github.com/autokeren/autokeren/internal/agentresult"
 	"github.com/autokeren/autokeren/internal/browser"
 	"github.com/autokeren/autokeren/internal/config"
 	contextstore "github.com/autokeren/autokeren/internal/context"
@@ -63,6 +64,21 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 			if onToolEnd != nil {
 				onToolEnd(name, result)
 			}
+		}
+	}
+	workerTools := newWorkerToolTracker()
+	onToolStart := events.OnToolStart
+	events.OnToolStart = func(name string, args map[string]any) {
+		workerTools.Start(name, args)
+		if onToolStart != nil {
+			onToolStart(name, args)
+		}
+	}
+	onToolEnd := events.OnToolEnd
+	events.OnToolEnd = func(name string, result tool.Result) {
+		workerTools.End(name, result)
+		if onToolEnd != nil {
+			onToolEnd(name, result)
 		}
 	}
 	ghostManager := ghost.NewGhostManager(root)
@@ -155,6 +171,7 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 	}
 	response, err := loop.Run(ctx, prompt, events)
 	if err != nil {
+		_ = writeGhostResult("", workerTools.Evidence())
 		return "", err
 	}
 	if report := verification.Report(); report != "" {
@@ -171,6 +188,9 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 	if events.OnResponse != nil {
 		events.OnResponse(response)
 	}
+	if err := writeGhostResult(response.Content, workerTools.Evidence()); err != nil {
+		return "", fmt.Errorf("simpan hasil worker: %w", err)
+	}
 	if cfg.Autokeren.AutoSaveSession {
 		if sessionName == "" {
 			sessionName = automaticSessionName(prompt)
@@ -184,6 +204,66 @@ func RunStandaloneEventsWithRouterState(ctx context.Context, cfg config.Config, 
 		}
 	}
 	return response.Content, nil
+}
+
+type workerToolTracker struct {
+	arguments map[string]map[string]any
+	evidence  []agentresult.ToolEvidence
+}
+
+func newWorkerToolTracker() *workerToolTracker {
+	return &workerToolTracker{arguments: make(map[string]map[string]any)}
+}
+
+func (t *workerToolTracker) Start(name string, args map[string]any) {
+	if t == nil {
+		return
+	}
+	t.arguments[name] = args
+}
+
+func (t *workerToolTracker) End(name string, result tool.Result) {
+	if t == nil {
+		return
+	}
+	args := t.arguments[name]
+	evidence := agentresult.ToolEvidence{Name: name, OK: result.OK, Error: result.Error}
+	if path, ok := args["path"].(string); ok {
+		evidence.Path = path
+	}
+	if command, ok := args["command"].(string); ok {
+		evidence.Test = testLabel(command)
+	}
+	t.evidence = append(t.evidence, evidence)
+}
+
+func (t *workerToolTracker) Evidence() []agentresult.ToolEvidence {
+	if t == nil {
+		return nil
+	}
+	return append([]agentresult.ToolEvidence(nil), t.evidence...)
+}
+
+func testLabel(command string) string {
+	lower := strings.ToLower(command)
+	switch {
+	case strings.Contains(lower, "pytest"):
+		return "pytest"
+	case strings.Contains(lower, "go test"):
+		return "go test"
+	case strings.Contains(lower, "npm test"):
+		return "npm test"
+	case strings.Contains(lower, "pnpm test"):
+		return "pnpm test"
+	case strings.Contains(lower, "yarn test"):
+		return "yarn test"
+	default:
+		return ""
+	}
+}
+
+func writeGhostResult(summary string, evidence []agentresult.ToolEvidence) error {
+	return agentresult.Write(os.Getenv("AUTOKEREN_GHOST_RESULT_PATH"), agentresult.Build(summary, evidence))
 }
 
 func automaticSessionName(input string) string {

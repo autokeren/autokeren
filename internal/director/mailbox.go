@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/autokeren/autokeren/ghost"
+	"github.com/autokeren/autokeren/internal/agentresult"
 )
 
 const maxResultRunes = 4000
@@ -22,12 +23,17 @@ type AgentSource interface {
 }
 
 type MailboxEntry struct {
-	AgentID    int       `json:"agent_id"`
-	Role       string    `json:"role,omitempty"`
-	Status     string    `json:"status"`
-	Output     string    `json:"output,omitempty"`
-	Error      string    `json:"error,omitempty"`
-	FinishedAt time.Time `json:"finished_at,omitempty"`
+	AgentID      int                        `json:"agent_id"`
+	Role         string                     `json:"role,omitempty"`
+	Status       string                     `json:"status"`
+	Output       string                     `json:"output,omitempty"`
+	Summary      string                     `json:"summary,omitempty"`
+	FilesChanged []string                   `json:"files_changed,omitempty"`
+	Tests        []agentresult.ToolEvidence `json:"tests,omitempty"`
+	Tools        []agentresult.ToolEvidence `json:"tools,omitempty"`
+	Blockers     []string                   `json:"blockers,omitempty"`
+	Error        string                     `json:"error,omitempty"`
+	FinishedAt   time.Time                  `json:"finished_at,omitempty"`
 }
 
 type Mailbox struct {
@@ -113,7 +119,15 @@ func (c *Coordinator) collect(ids []int) (Mailbox, bool, error) {
 			pending = true
 		}
 		if info.Status != "running" && info.Status != "unknown" {
-			entry.Output = limitRunes(strings.TrimSpace(c.agents.GetOutput(info.ID)), maxResultRunes)
+			if result, resultErr := agentresult.Read(info.ResultFile); resultErr == nil {
+				entry.Summary = limitRunes(result.Summary, maxResultRunes)
+				entry.FilesChanged = result.FilesChanged
+				entry.Tests = result.Tests
+				entry.Tools = result.Tools
+				entry.Blockers = result.Blockers
+			} else {
+				entry.Output = limitRunes(strings.TrimSpace(c.agents.GetOutput(info.ID)), maxResultRunes)
+			}
 		}
 		entries = append(entries, entry)
 	}
