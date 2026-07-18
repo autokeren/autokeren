@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -123,7 +122,7 @@ func TestStoreSeedsPythonMetadataAfterLegacyMigration(t *testing.T) {
 	if err != nil || metadata["project_name"] == "" || metadata["tech_stack"] == "" {
 		t.Fatalf("metadata Python tidak terseed: %#v err=%v", metadata, err)
 	}
-	if !strings.Contains(metadata["project_path"], root) {
+	if metadata["project_path"] != resolveRoot(root) {
 		t.Fatalf("metadata project_path tidak kompatibel: %#v", metadata)
 	}
 }
