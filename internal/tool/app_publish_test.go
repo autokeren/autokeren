@@ -128,3 +128,21 @@ func TestLoadAppArtifactRejectsUndeclaredSensitivePath(t *testing.T) {
 		t.Fatal("expected sensitive path rejection")
 	}
 }
+
+func TestAppReleaseStatusWaitsForReadyRelease(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requests++
+		writer.Header().Set("Content-Type", "application/json")
+		if requests == 1 {
+			_, _ = writer.Write([]byte(`{"release_id":"rel_123","status":"deploying"}`))
+			return
+		}
+		_, _ = writer.Write([]byte(`{"release_id":"rel_123","status":"ready","url":"https://app.example"}`))
+	}))
+	defer server.Close()
+	result := (AppReleaseStatus{Config: config.Config{Auth: config.Auth{BaseURL: server.URL, APIKey: "ak_test"}}}).Run(context.Background(), map[string]any{"release_id": "rel_123", "wait_seconds": 1}, nil)
+	if !result.OK || !releaseFinished(result.Output) || requests != 2 {
+		t.Fatalf("unexpected release polling result: %#v requests=%d", result, requests)
+	}
+}

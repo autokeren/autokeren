@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/autokeren/autokeren/internal/config"
 	"github.com/autokeren/autokeren/internal/safety"
@@ -55,11 +56,14 @@ type appSourceFile struct {
 }
 
 func (t PublishApp) Definition() Definition {
-	return Definition{Name: "publish_app", Description: "Publish a modular app through Autokeren Apps V2. Reads autokeren.app.json and its declared project files; users never need Cloudflare or Wrangler.", RequiresPermission: true, Parameters: map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "app_id": map[string]any{"type": "string"}, "manifest_path": map[string]any{"type": "string"}}, "required": []string{"name"}}}
+	return Definition{Name: "publish_app", Description: "Publish a modular app through Autokeren Apps V2. Reads autokeren.app.json and its declared project files; users never need Cloudflare or Wrangler.", RequiresPermission: true, Parameters: map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "app_id": map[string]any{"type": "string"}, "manifest_path": map[string]any{"type": "string"}}}}
 }
 
 func (t PublishApp) NeedsPermission(args map[string]any) (bool, string) {
 	name, _ := args["name"].(string)
+	if strings.TrimSpace(name) == "" {
+		name, _ = args["app_id"].(string)
+	}
 	return true, "publish aplikasi " + name + " melalui Autokeren"
 }
 
@@ -70,8 +74,8 @@ func (t PublishApp) Run(ctx context.Context, args map[string]any, _ Emitter) Res
 	if manifestPath == "" {
 		manifestPath = appManifestDefaultPath
 	}
-	if strings.TrimSpace(name) == "" {
-		return Result{OK: false, Error: "name wajib"}
+	if strings.TrimSpace(name) == "" && strings.TrimSpace(appID) == "" {
+		return Result{OK: false, Error: "name wajib untuk aplikasi baru"}
 	}
 	manifest, files, err := loadAppArtifact(t.Root, manifestPath)
 	if err != nil {
@@ -82,7 +86,6 @@ func (t PublishApp) Run(ctx context.Context, args map[string]any, _ Emitter) Res
 		return Result{OK: false, Error: err.Error()}
 	}
 	payload := map[string]any{
-		"name":            name,
 		"idempotency_key": key,
 		"manifest": platformAppManifest{
 			SchemaVersion: manifest.SchemaVersion,
@@ -93,6 +96,9 @@ func (t PublishApp) Run(ctx context.Context, args map[string]any, _ Emitter) Res
 		},
 		"files": files,
 	}
+	if strings.TrimSpace(name) != "" {
+		payload["name"] = name
+	}
 	if appID != "" {
 		payload["app_id"] = appID
 	}
@@ -100,7 +106,7 @@ func (t PublishApp) Run(ctx context.Context, args map[string]any, _ Emitter) Res
 }
 
 func (t AppReleaseStatus) Definition() Definition {
-	return Definition{Name: "app_release_status", Description: "Read the current status and verification events of an Autokeren Apps V2 release.", Parameters: map[string]any{"type": "object", "properties": map[string]any{"release_id": map[string]any{"type": "string"}}, "required": []string{"release_id"}}}
+	return Definition{Name: "app_release_status", Description: "Read the current status and verification events of an Autokeren Apps V2 release. Can wait briefly for a queued release to finish.", Parameters: map[string]any{"type": "object", "properties": map[string]any{"release_id": map[string]any{"type": "string"}, "wait_seconds": map[string]any{"type": "integer", "minimum": 0, "maximum": 50}}, "required": []string{"release_id"}}}
 }
 
 func (t AppReleaseStatus) NeedsPermission(map[string]any) (bool, string) { return false, "" }
@@ -110,7 +116,46 @@ func (t AppReleaseStatus) Run(ctx context.Context, args map[string]any, _ Emitte
 	if !strings.HasPrefix(releaseID, "rel_") {
 		return Result{OK: false, Error: "release_id tidak valid"}
 	}
-	return platformRequest(ctx, t.Config, "GET", "/v2/releases/"+releaseID, nil)
+	waitSeconds := appWaitSeconds(args["wait_seconds"])
+	deadline := time.Now().Add(time.Duration(waitSeconds) * time.Second)
+	for {
+		result := platformRequest(ctx, t.Config, "GET", "/v2/releases/"+releaseID, nil)
+		if !result.OK || releaseFinished(result.Output) || waitSeconds == 0 || !time.Now().Before(deadline) {
+			return result
+		}
+		pause := time.Second * 2
+		if remaining := time.Until(deadline); remaining < pause {
+			pause = remaining
+		}
+		select {
+		case <-ctx.Done():
+			return Result{OK: false, Error: ctx.Err().Error()}
+		case <-time.After(pause):
+		}
+	}
+}
+
+func appWaitSeconds(value any) int {
+	switch number := value.(type) {
+	case float64:
+		if number >= 1 && number <= 50 {
+			return int(number)
+		}
+	case int:
+		if number >= 1 && number <= 50 {
+			return number
+		}
+	}
+	return 0
+}
+
+func releaseFinished(output any) bool {
+	data, ok := output.(map[string]any)
+	if !ok {
+		return false
+	}
+	status, _ := data["status"].(string)
+	return status == "ready" || status == "failed" || status == "blocked"
 }
 
 func (t ScaffoldApp) Definition() Definition {
