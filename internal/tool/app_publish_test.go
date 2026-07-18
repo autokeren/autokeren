@@ -146,3 +146,48 @@ func TestAppReleaseStatusWaitsForReadyRelease(t *testing.T) {
 		t.Fatalf("unexpected release polling result: %#v requests=%d", result, requests)
 	}
 }
+
+func TestManagedAppToolFlow(t *testing.T) {
+	root := t.TempDir()
+	if result := (ScaffoldApp{Root: root}).Run(context.Background(), map[string]any{"name": "Toko Sepatu", "capabilities": []any{"ai"}}, nil); !result.OK {
+		t.Fatalf("scaffold failed: %#v", result)
+	}
+	if err := os.WriteFile(filepath.Join(root, "src", "routes", "home.js"), []byte(`export function home() { return new Response("Toko sepatu siap."); }`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	calls := []string{}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		calls = append(calls, request.Method+" "+request.URL.Path)
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/v2/apps/publish":
+			var payload struct {
+				Files []appSourceFile `json:"files"`
+			}
+			if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+				t.Fatal(err)
+			}
+			if len(payload.Files) != 2 {
+				t.Fatalf("unexpected source files: %#v", payload.Files)
+			}
+			_, _ = writer.Write([]byte(`{"app_id":"app_123","release_id":"rel_123","status":"queued"}`))
+		case "/v2/releases/rel_123":
+			_, _ = writer.Write([]byte(`{"app_id":"app_123","release_id":"rel_123","status":"ready","url":"https://app.example"}`))
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+	config := config.Config{Auth: config.Auth{BaseURL: server.URL, APIKey: "ak_test"}}
+	publish := (PublishApp{Config: config, Root: root}).Run(context.Background(), map[string]any{"name": "Toko Sepatu"}, nil)
+	if !publish.OK {
+		t.Fatalf("publish failed: %#v", publish)
+	}
+	status := (AppReleaseStatus{Config: config}).Run(context.Background(), map[string]any{"release_id": "rel_123"}, nil)
+	if !status.OK || !releaseFinished(status.Output) {
+		t.Fatalf("status failed: %#v", status)
+	}
+	if got, want := calls, []string{"POST /v2/apps/publish", "GET /v2/releases/rel_123"}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("unexpected tool flow: %#v", calls)
+	}
+}
