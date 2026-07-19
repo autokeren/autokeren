@@ -111,14 +111,24 @@ fi
 echo "✅ CHANGELOG.md diupdate"
 
 # ── Lint & test cepat ─────────────────────────────────────────────────
+if [ -x .venv/bin/python ]; then
+  PYTHON_BIN=.venv/bin/python
+  RUFF_BIN=.venv/bin/ruff
+  MYPY_BIN=.venv/bin/mypy
+else
+  PYTHON_BIN=python3
+  RUFF_BIN=ruff
+  MYPY_BIN=mypy
+fi
+
 echo "🔍 Cek ruff..."
-ruff check . --quiet || { echo "❌ ruff gagal"; exit 1; }
+"$RUFF_BIN" check . --quiet || { echo "❌ ruff gagal"; exit 1; }
 
 echo "🔍 Cek mypy..."
-mypy autokeren || { echo "❌ mypy gagal"; exit 1; }
+"$MYPY_BIN" autokeren || { echo "❌ mypy gagal"; exit 1; }
 
 echo "🔍 Jalankan pytest..."
-python3 -m pytest -q || { echo "❌ pytest gagal"; exit 1; }
+"$PYTHON_BIN" -m pytest -q || { echo "❌ pytest gagal"; exit 1; }
 
 echo "🔍 Jalankan Go test..."
 go test ./... || { echo "❌ Go test gagal"; exit 1; }
