@@ -2,6 +2,9 @@ package browser
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 )
@@ -56,5 +59,35 @@ func TestWindowsBrowserUnavailableErrorMentionsOverride(t *testing.T) {
 	err := browserUnavailableError("windows", errors.New("not found"))
 	if !strings.Contains(err.Error(), "AUTOKEREN_BROWSER_PATH") || !strings.Contains(err.Error(), "Chrome atau Edge") {
 		t.Fatalf("unexpected Windows guidance: %v", err)
+	}
+}
+
+func TestBrowserAutomationSmoke(t *testing.T) {
+	if os.Getenv("AUTOKEREN_BROWSER_SMOKE") != "1" {
+		t.Skip("set AUTOKEREN_BROWSER_SMOKE=1 to run a real browser automation smoke test")
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = writer.Write([]byte(`<!doctype html><html><head><title>KerenKicks</title></head><body><h1>KerenKicks</h1><button id="buy" onclick="this.textContent='Added'">Buy</button></body></html>`))
+	}))
+	defer server.Close()
+	manager := &BrowserManager{}
+	defer manager.Close()
+	if _, err := manager.Execute("navigate", map[string]interface{}{"url": server.URL}); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := manager.Execute("snapshot", map[string]interface{}{})
+	if err != nil || !strings.Contains(strings.ToLower(snapshot.(map[string]interface{})["dom_tree"].(string)), "buy") {
+		t.Fatalf("snapshot=%#v err=%v", snapshot, err)
+	}
+	if _, err := manager.Execute("click", map[string]interface{}{"selector": "#buy"}); err != nil {
+		t.Fatal(err)
+	}
+	assertion, err := manager.Execute("assert", map[string]interface{}{"assertion": map[string]interface{}{"kind": "visible_text", "value": "Added"}})
+	if err != nil || !assertion.(map[string]interface{})["ok"].(bool) {
+		t.Fatalf("assertion=%#v err=%v", assertion, err)
+	}
+	screenshot, err := manager.Execute("screenshot", map[string]interface{}{})
+	if err != nil || screenshot.(map[string]interface{})["bytes"].(int) == 0 {
+		t.Fatalf("screenshot=%#v err=%v", screenshot, err)
 	}
 }
