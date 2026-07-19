@@ -75,7 +75,7 @@ Autokeren must create a proof plan, record real verification evidence, produce `
 
 ### 🎥 Demo Video & Devpost Submission
 
-* **Demo Video**: [Watch the 3-minute video on YouTube](https://youtu.be/DEMO_VIDEO_PLACEHOLDER)
+* **Demo Video**: [Watch the 3-minute video on YouTube](https://youtu.be/AGYnj50MdAc)
 * **Codex Session ID**: `019f6df7-0978-7b71-aaa1-8c9b152e5ead` (Paste this ID directly into the Devpost form.)
 
 ---

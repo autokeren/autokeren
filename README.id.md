@@ -76,7 +76,7 @@ Autokeren wajib membuat proof plan, mencatat bukti verifikasi nyata, menghasilka
 
 ### 🎥 Video Demo & Submisi Devpost
 
-* **Video Demo**: [Tonton Video Demo 3 Menit di YouTube](https://youtu.be/DEMO_VIDEO_PLACEHOLDER)
+* **Video Demo**: [Tonton Video Demo 3 Menit di YouTube](https://youtu.be/AGYnj50MdAc)
 * **Codex Session ID**: `019f6df7-0978-7b71-aaa1-8c9b152e5ead` (Tempelkan ID ini langsung ke formulir Devpost.)
 
 ---
