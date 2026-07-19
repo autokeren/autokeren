@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -23,8 +25,10 @@ type BrowserManager struct {
 }
 
 var (
-	globalBM     *BrowserManager
-	globalBMLock sync.Mutex
+	globalBM       *BrowserManager
+	globalBMLock   sync.Mutex
+	launchBrowser  = launchNativeBrowser
+	connectBrowser = connectNativeBrowser
 )
 
 func GetBrowserManager() *BrowserManager {
@@ -39,17 +43,30 @@ func GetBrowserManager() *BrowserManager {
 func (bm *BrowserManager) Close() {
 	bm.lock.Lock()
 	defer bm.lock.Unlock()
-	if bm.browser != nil {
-		bm.browser.MustClose()
-		bm.browser = nil
+	bm.closeLocked()
+}
+
+func (bm *BrowserManager) closeLocked() {
+	if bm.page != nil {
+		_ = bm.page.Close()
 		bm.page = nil
+	}
+	if bm.browser != nil {
+		_ = bm.browser.Close()
+		bm.browser = nil
 	}
 }
 
 func (bm *BrowserManager) getPage() (*rod.Page, error) {
 	if bm.browser == nil {
-		u := launcher.New().NoSandbox(true).MustLaunch()
-		browser := rod.New().ControlURL(u).MustConnect()
+		u, err := launchBrowser()
+		if err != nil {
+			return nil, browserUnavailableError(runtime.GOOS, err)
+		}
+		browser, err := connectBrowser(u)
+		if err != nil {
+			return nil, browserUnavailableError(runtime.GOOS, err)
+		}
 		bm.browser = browser
 	}
 	if bm.page == nil {
@@ -66,6 +83,10 @@ func (bm *BrowserManager) getPage() (*rod.Page, error) {
 func (bm *BrowserManager) Execute(action string, args map[string]interface{}) (interface{}, error) {
 	bm.lock.Lock()
 	defer bm.lock.Unlock()
+	if action == "close" {
+		bm.closeLocked()
+		return map[string]interface{}{"status": "closed"}, nil
+	}
 
 	page, err := bm.getPage()
 	if err != nil {
@@ -86,7 +107,9 @@ func (bm *BrowserManager) Execute(action string, args map[string]interface{}) (i
 			return nil, err
 		}
 		// Wait for page load
-		page.MustWaitLoad()
+		if err := page.WaitLoad(); err != nil {
+			return nil, fmt.Errorf("wait page load: %w", err)
+		}
 		time.Sleep(2 * time.Second) // Jedah halus agar JS render
 		return map[string]interface{}{"status": "navigated", "url": url}, nil
 
@@ -239,6 +262,40 @@ func (bm *BrowserManager) Execute(action string, args map[string]interface{}) (i
 	default:
 		return nil, fmt.Errorf("unknown action: %s", action)
 	}
+}
+
+func launchNativeBrowser() (string, error) {
+	launcherConfig := launcher.New()
+	if runtime.GOOS == "linux" {
+		launcherConfig.NoSandbox(true)
+	}
+	if browserPath := strings.TrimSpace(os.Getenv("AUTOKEREN_BROWSER_PATH")); browserPath != "" {
+		info, err := os.Stat(browserPath)
+		if err != nil {
+			return "", fmt.Errorf("browser path tidak dapat diakses: %w", err)
+		}
+		if info.IsDir() {
+			return "", errors.New("AUTOKEREN_BROWSER_PATH harus menunjuk ke file executable browser")
+		}
+		launcherConfig.Bin(browserPath)
+	}
+	return launcherConfig.Launch()
+}
+
+func connectNativeBrowser(controlURL string) (*rod.Browser, error) {
+	browser := rod.New().ControlURL(controlURL)
+	if err := browser.Connect(); err != nil {
+		return nil, err
+	}
+	return browser, nil
+}
+
+func browserUnavailableError(goos string, err error) error {
+	prefix := "browser automation tidak tersedia"
+	if strings.EqualFold(goos, "windows") {
+		return fmt.Errorf("%s: install Chrome atau Edge, atau set AUTOKEREN_BROWSER_PATH ke chrome.exe/msedge.exe: %w", prefix, err)
+	}
+	return fmt.Errorf("%s: install browser Chromium-compatible atau set AUTOKEREN_BROWSER_PATH: %w", prefix, err)
 }
 
 func assertionExpression(kind, value string) (string, error) {
