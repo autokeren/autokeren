@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -219,11 +220,14 @@ type invalidToolArgumentsProvider struct {
 	toolRetried    bool
 }
 
-func (p *invalidToolArgumentsProvider) Complete(_ context.Context, request model.Request, _ provider.ChunkHandler) (model.Response, error) {
+func (p *invalidToolArgumentsProvider) Complete(_ context.Context, request model.Request, onChunk provider.ChunkHandler) (model.Response, error) {
 	p.calls++
 	switch p.calls {
 	case 1:
-		return model.Response{ToolCalls: []model.ToolCall{{ID: "bad", Type: "function", Function: model.ToolCallFunction{Name: "echo", Arguments: `{"value":"first"}{"value":"second"}`}}}}, nil
+		if onChunk != nil {
+			_ = onChunk("Landing page berhasil dimuat di browser.")
+		}
+		return model.Response{Content: "Landing page berhasil dimuat di browser.", Model: "primary", ToolCalls: []model.ToolCall{{ID: "bad", Type: "function", Function: model.ToolCallFunction{Name: "echo", Arguments: `{"value":"first"}{"value":"second"}`}}}}, nil
 	case 2:
 		for _, message := range request.Messages {
 			if message.Role == "assistant" && len(message.ToolCalls) > 0 {
@@ -240,6 +244,9 @@ func (p *invalidToolArgumentsProvider) Complete(_ context.Context, request model
 				p.toolRetried = true
 			}
 		}
+		if onChunk != nil {
+			_ = onChunk("argumen diperbaiki")
+		}
 		return model.Response{Content: "argumen diperbaiki"}, nil
 	}
 }
@@ -247,9 +254,34 @@ func (p *invalidToolArgumentsProvider) Complete(_ context.Context, request model
 func TestLoopRecoversMalformedToolArgumentsWithoutForwardingInvalidJSON(t *testing.T) {
 	p := &invalidToolArgumentsProvider{}
 	loop := &Loop{Runner: Runner{Provider: p}, Tools: tool.NewRegistry().Register(echoTool{}), MaxIterations: 4}
+	var streamed strings.Builder
+	response, err := loop.Run(context.Background(), "coba tool", Events{OnChunk: func(text string) { streamed.WriteString(text) }})
+	if err != nil || response.Content != "argumen diperbaiki" || p.calls != 3 || !p.recoveryPrompt || p.invalidLeaked || !p.toolRetried || streamed.String() != "argumen diperbaiki" {
+		t.Fatalf("response=%#v err=%v calls=%d recovery=%t leaked=%t retried=%t streamed=%q", response, err, p.calls, p.recoveryPrompt, p.invalidLeaked, p.toolRetried, streamed.String())
+	}
+}
+
+type repeatedlyMalformedProvider struct {
+	calls         int
+	fallbackAfter string
+}
+
+func (p *repeatedlyMalformedProvider) Complete(_ context.Context, _ model.Request, _ provider.ChunkHandler) (model.Response, error) {
+	p.calls++
+	if p.calls < 3 {
+		return model.Response{Model: "primary", ToolCalls: []model.ToolCall{{ID: fmt.Sprintf("broken-%d", p.calls), Type: "function", Function: model.ToolCallFunction{Name: "echo", Arguments: `{"value":"unterminated`}}}}, nil
+	}
+	return model.Response{Content: "pulih lewat fallback"}, nil
+}
+
+func (p *repeatedlyMalformedProvider) PreferFallbackAfter(modelID string) { p.fallbackAfter = modelID }
+
+func TestLoopPrefersFallbackAfterRepeatedMalformedToolCalls(t *testing.T) {
+	p := &repeatedlyMalformedProvider{}
+	loop := &Loop{Runner: Runner{Provider: p}, Tools: tool.NewRegistry().Register(echoTool{}), MaxIterations: 4}
 	response, err := loop.Run(context.Background(), "coba tool", Events{})
-	if err != nil || response.Content != "argumen diperbaiki" || p.calls != 3 || !p.recoveryPrompt || p.invalidLeaked || !p.toolRetried {
-		t.Fatalf("response=%#v err=%v calls=%d recovery=%t leaked=%t retried=%t", response, err, p.calls, p.recoveryPrompt, p.invalidLeaked, p.toolRetried)
+	if err != nil || response.Content != "pulih lewat fallback" || p.calls != 3 || p.fallbackAfter != "primary" {
+		t.Fatalf("response=%#v err=%v calls=%d fallback=%q", response, err, p.calls, p.fallbackAfter)
 	}
 }
 

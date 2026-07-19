@@ -180,6 +180,22 @@ func TestRouterFallsBackAfterPrimaryFailure(t *testing.T) {
 	}
 }
 
+func TestRouterPrefersFallbackAfterMalformedToolCall(t *testing.T) {
+	primary := &scriptedProvider{results: []scriptedResult{{response: model.Response{Content: "primary should not run"}}}}
+	secondary := &scriptedProvider{results: []scriptedResult{{response: model.Response{Content: "secondary repair"}}}}
+	events := []RetryEvent{}
+	router := newTestRouter(t, []Target{{ModelID: "primary", Provider: primary}, {ModelID: "secondary", Provider: secondary}}, RetryPolicy{}, nil, &events)
+	router.PreferFallbackAfter("primary")
+
+	response, err := router.Complete(context.Background(), model.Request{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Content != "secondary repair" || response.Model != "secondary" || primary.calls != 0 || secondary.calls != 1 {
+		t.Fatalf("response=%#v primary=%d secondary=%d", response, primary.calls, secondary.calls)
+	}
+}
+
 func TestRouterSharesCircuitStateAcrossTurns(t *testing.T) {
 	primary := &scriptedProvider{results: []scriptedResult{{err: &Error{Status: 503, Cause: errors.New("primary unavailable")}}}}
 	secondary := &scriptedProvider{results: []scriptedResult{{response: model.Response{Content: "fallback one"}}, {response: model.Response{Content: "fallback two"}}}}

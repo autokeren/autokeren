@@ -124,6 +124,8 @@ type Router struct {
 	onRetry             func(RetryEvent)
 	sleep               func(context.Context, time.Duration) error
 	random              func() float64
+	preferenceMu        sync.Mutex
+	preferFallbackAfter string
 }
 
 func NewRouter(cfg RouterConfig) (*Router, error) {
@@ -174,7 +176,8 @@ func (r *Router) Complete(ctx context.Context, request model.Request, onChunk Ch
 		return model.Response{}, errors.New("router has no model targets")
 	}
 	var lastErr error
-	for index, target := range r.targets {
+	targets := r.nextTargets()
+	for index, target := range targets {
 		breaker := r.state.breaker(target.ModelID, r.circuitThreshold, r.circuitOpenDuration)
 		response, err := breaker.Execute(func() (model.Response, error) {
 			return r.completeTarget(ctx, target, request, onChunk)
@@ -187,8 +190,8 @@ func (r *Router) Complete(ctx context.Context, request model.Request, onChunk Ch
 		if ctx.Err() != nil || IsContextLimit(err) || StreamStarted(err) {
 			return model.Response{}, err
 		}
-		if index < len(r.targets)-1 {
-			next := r.targets[index+1].ModelID
+		if index < len(targets)-1 {
+			next := targets[index+1].ModelID
 			if errors.Is(err, gobreaker.ErrOpenState) || errors.Is(err, gobreaker.ErrTooManyRequests) {
 				r.emit(RetryEvent{Message: fmt.Sprintf("circuit %s sedang terbuka; fallback ke %s", target.ModelID, next)})
 			} else {
@@ -197,6 +200,39 @@ func (r *Router) Complete(ctx context.Context, request model.Request, onChunk Ch
 		}
 	}
 	return model.Response{}, lastErr
+}
+
+func (r *Router) PreferFallbackAfter(modelID string) {
+	if r == nil || strings.TrimSpace(modelID) == "" {
+		return
+	}
+	r.preferenceMu.Lock()
+	r.preferFallbackAfter = modelID
+	r.preferenceMu.Unlock()
+}
+
+func (r *Router) nextTargets() []Target {
+	r.preferenceMu.Lock()
+	preferred := r.preferFallbackAfter
+	r.preferFallbackAfter = ""
+	r.preferenceMu.Unlock()
+	if preferred == "" || len(r.targets) < 2 {
+		return r.targets
+	}
+	start := -1
+	for index, target := range r.targets {
+		if target.ModelID == preferred {
+			start = index
+			break
+		}
+	}
+	if start < 0 {
+		return r.targets
+	}
+	ordered := make([]Target, 0, len(r.targets))
+	ordered = append(ordered, r.targets[start+1:]...)
+	ordered = append(ordered, r.targets[:start+1]...)
+	return ordered
 }
 
 func (r *Router) completeTarget(ctx context.Context, target Target, request model.Request, onChunk ChunkHandler) (model.Response, error) {

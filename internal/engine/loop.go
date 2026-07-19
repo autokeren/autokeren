@@ -38,7 +38,14 @@ type Loop struct {
 	Checkpoints    *checkpoint.Manager
 }
 
-const maxContextRecoveryAttempts = 3
+const (
+	maxContextRecoveryAttempts     = 3
+	maxMalformedToolCallRecoveries = 3
+)
+
+type fallbackPreferenceSetter interface {
+	PreferFallbackAfter(string)
+}
 
 func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.Response, error) {
 	if l.Runner.Provider == nil {
@@ -59,6 +66,7 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 	var last model.Response
 	contextRecoveryAttempts := 0
 	autonomousContinuationAttempts := 0
+	malformedToolCallRecoveries := 0
 	for iteration := 0; iteration < limit; iteration++ {
 		if sanitized, removed := sanitizeToolHistory(l.Context.Messages()); removed > 0 {
 			l.Context.Replace(sanitized)
@@ -66,9 +74,13 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 			l.emitContext(events)
 		}
 		request := model.Request{Model: l.Model, Messages: mergeRequestMessages(l.Context.Messages(), l.RequestPrelude), Tools: definitions(l.Tools), Temperature: l.Temperature, MaxTokens: l.MaxTokens}
+		var streamed strings.Builder
 		var onChunk provider.ChunkHandler
 		if events.OnChunk != nil {
-			onChunk = func(chunk string) error { events.OnChunk(chunk); return nil }
+			onChunk = func(chunk string) error {
+				streamed.WriteString(chunk)
+				return nil
+			}
 		}
 		last, err := l.Runner.RunTurn(ctx, request, onChunk)
 		if err != nil {
@@ -87,6 +99,9 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 		}
 		contextRecoveryAttempts = 0
 		if len(last.ToolCalls) == 0 {
+			if events.OnChunk != nil && streamed.Len() > 0 {
+				events.OnChunk(streamed.String())
+			}
 			l.Context.Add(model.Message{Role: "assistant", Content: last.Content})
 			l.emitContext(events)
 			if strings.TrimSpace(last.Content) == "" {
@@ -115,13 +130,36 @@ func (l *Loop) Run(ctx context.Context, userInput string, events Events) (model.
 		}
 		preparedCalls := prepareToolCalls(last.ToolCalls)
 		validCalls := make([]model.ToolCall, 0, len(preparedCalls))
+		hasMalformedToolCall := false
 		for _, prepared := range preparedCalls {
 			if prepared.err == nil {
 				validCalls = append(validCalls, prepared.call)
+			} else {
+				hasMalformedToolCall = true
 			}
 		}
-		l.Context.Add(model.Message{Role: "assistant", Content: last.Content, ToolCalls: validCalls})
+		if len(validCalls) > 0 {
+			l.Context.Add(model.Message{Role: "assistant", ToolCalls: validCalls})
+		}
 		l.emitContext(events)
+		if hasMalformedToolCall {
+			malformedToolCallRecoveries++
+			if malformedToolCallRecoveries >= maxMalformedToolCallRecoveries {
+				return model.Response{}, fmt.Errorf("provider berulang kali mengirim argumen tool tidak valid; ganti model atau coba lagi")
+			}
+			message := "tool call rusak dibuang dengan aman; meminta ulang argumen JSON yang lengkap"
+			if malformedToolCallRecoveries > 1 && strings.TrimSpace(last.Model) != "" {
+				if fallback, ok := l.Runner.Provider.(fallbackPreferenceSetter); ok {
+					fallback.PreferFallbackAfter(last.Model)
+					message = "tool call rusak berulang; mencoba model cadangan dengan riwayat yang sudah dibersihkan"
+				}
+			}
+			if events.OnRetry != nil {
+				events.OnRetry(malformedToolCallRecoveries, 0, message)
+			}
+		} else {
+			malformedToolCallRecoveries = 0
+		}
 		backgroundAgentIDs := make([]int, 0)
 		for _, prepared := range preparedCalls {
 			call := prepared.call

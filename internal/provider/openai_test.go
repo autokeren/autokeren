@@ -75,3 +75,15 @@ func TestParseSSEDeduplicatesRepeatedToolCallSnapshots(t *testing.T) {
 		t.Fatalf("tool call should stay valid, got %#v", call)
 	}
 }
+
+func TestParseSSEMergesOverlappingToolArgumentFragments(t *testing.T) {
+	first := `{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"run_shell","arguments":"{\"command\":\"git "}}]}}]}`
+	second := `{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"git init\"}"}}]}}]}`
+	response, _, err := parseSSE(strings.NewReader("data: "+first+"\n\ndata: "+second+"\n\ndata: [DONE]\n"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response.ToolCalls) != 1 || response.ToolCalls[0].Function.Arguments != `{"command":"git init"}` {
+		t.Fatalf("unexpected tool calls: %#v", response.ToolCalls)
+	}
+}

@@ -168,6 +168,44 @@ func TestRunStandaloneRecoversMalformedToolCallBeforeStrictProviderRejectsHistor
 	}
 }
 
+func TestRunStandaloneFallsBackAfterRepeatedMalformedToolCalls(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("AUTOKEREN_CONFIG_DIR", filepath.Join(root, "config"))
+	models := []string{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		var payload model.Request
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		models = append(models, payload.Model)
+		w.Header().Set("Content-Type", "text/event-stream")
+		if payload.Model == "primary" {
+			_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"Landing page berhasil dimuat.\",\"tool_calls\":[{\"index\":0,\"id\":\"broken\",\"type\":\"function\",\"function\":{\"name\":\"run_shell\",\"arguments\":\"{\\\"command\\\":\\\"git commit\"}}]}}]}\n\ndata: [DONE]\n\n"))
+			return
+		}
+		_, _ = w.Write([]byte("data: {\"model\":\"secondary\",\"choices\":[{\"delta\":{\"content\":\"pulih lewat model cadangan\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"))
+	}))
+	defer server.Close()
+	cfg := config.Defaults()
+	cfg.Auth.BaseURL = server.URL
+	cfg.Auth.APIKey = "test-key"
+	cfg.Cloudflare.PrimaryModel = "primary"
+	cfg.Cloudflare.SecondaryModel = "secondary"
+	cfg.Retry.MaxRetries = 0
+	var streamed strings.Builder
+	content, err := RunStandalone(t.Context(), cfg, root, "buat project", func(chunk string) { streamed.WriteString(chunk) }, "")
+	if err != nil || content != "pulih lewat model cadangan" {
+		t.Fatalf("content=%q err=%v models=%v", content, err, models)
+	}
+	if got := strings.Join(models, ","); got != "primary,primary,secondary" {
+		t.Fatalf("model order=%q", got)
+	}
+	if streamed.String() != "pulih lewat model cadangan" {
+		t.Fatalf("unsafe pre-tool text leaked to UI: %q", streamed.String())
+	}
+}
+
 func TestRunStandaloneWritesCheckpointAndRewindsFile(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("AUTOKEREN_CONFIG_DIR", filepath.Join(root, "config"))
