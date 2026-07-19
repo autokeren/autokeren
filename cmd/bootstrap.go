@@ -19,7 +19,7 @@ import (
 	"github.com/autokeren/autokeren/internal/tool"
 )
 
-const fallbackVersion = "0.14.0"
+const fallbackVersion = "0.14.1"
 
 var (
 	openAIModelsEndpoint   = "https://api.openai.com/v1/models"

@@ -1868,7 +1868,7 @@ func parseStatusReply(statusReply map[string]interface{}, projectRoot string) St
 		version = "v" + version
 	}
 	if version == "" {
-		version = "v0.14.0"
+		version = "v0.14.1"
 	}
 	modelName := "?"
 	if value, ok := statusReply["model_name"].(string); ok && value != "" {
