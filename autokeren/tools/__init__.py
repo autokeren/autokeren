@@ -3,6 +3,7 @@ from autokeren.tools.base import Tool, ToolRegistry, ToolResult
 from autokeren.tools.camofox import CamofoxTool
 from autokeren.tools.cf_infra import CloudflareD1Tool, CloudflareKVTool
 from autokeren.tools.cloudflare import CloudflareBuildTool, CloudflareDeployTool
+from autokeren.tools.coord import ClaimFilesTool, MergeQueueTool, ReleaseClaimTool
 from autokeren.tools.file import ListFilesTool, PatchFileTool, ReadFileTool, WriteFileTool
 from autokeren.tools.git import GitAutoCommitTool, GitBranchTool, GitCommitTool, GitDiffTool, GitLogTool, GitStatusTool
 from autokeren.tools.project import CreateProjectTool, DeployProjectTool, ListProjectsTool
@@ -30,6 +31,9 @@ __all__ = [
     "ToolRegistry",
     "ToolResult",
     "RepoMapTool",
+    "ClaimFilesTool",
+    "ReleaseClaimTool",
+    "MergeQueueTool",
     "CollaborateTool",
     "ReadFileTool",
     "WriteFileTool",

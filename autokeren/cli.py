@@ -29,6 +29,7 @@ from autokeren.tools import (
     CloudflareD1Tool,
     CloudflareDeployTool,
     CloudflareKVTool,
+    ClaimFilesTool,
     CollaborateTool,
     CreateProjectTool,
     DeployProjectTool,
@@ -42,8 +43,10 @@ from autokeren.tools import (
     GitStatusTool,
     ListFilesTool,
     ListProjectsTool,
+    MergeQueueTool,
     PatchFileTool,
     ReadFileTool,
+    ReleaseClaimTool,
     RememberTool,
     RepoMapTool,
     ResearchTool,
@@ -89,6 +92,9 @@ def build_registry(cfg, project_root: Path, memory: MemoryManager) -> ToolRegist
     reg.register(TmuxTool(project_root))
     reg.register(TodoTool())
     reg.register(KanbanTool(project_root))
+    reg.register(ClaimFilesTool(project_root))
+    reg.register(ReleaseClaimTool(project_root))
+    reg.register(MergeQueueTool(project_root))
     reg.register(ProofTool(project_root))
     reg.register(RememberTool(memory))
     reg.register(SpawnAgentTool(cfg, str(project_root), memory))

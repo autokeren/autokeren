@@ -3,10 +3,12 @@ from __future__ import annotations
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from autokeren.coord.store import CoordStore
+from autokeren.tools.coord import ClaimFilesTool, MergeQueueTool, ReleaseClaimTool
 
 
 def make_store(tmp_path: Path) -> CoordStore:
@@ -331,3 +333,88 @@ class TestMergeQueue:
         kinds = [e["kind"] for e in store.events()["events"]]
         assert "queue_enqueued" in kinds
         assert "queue_dequeued" in kinds
+
+
+def text(res: Any) -> str:
+    return "" if res.output is None else str(res.output)
+
+
+class TestCoordTools:
+    def test_claim_files_granted(self, tmp_path: Path) -> None:
+        tool = ClaimFilesTool(tmp_path)
+        res = tool.run(paths=["a.py"], agent_id="agent-1", ttl_seconds=60)
+        assert res.ok is True
+        assert "granted" in text(res)
+        assert "claim_id" in text(res)
+
+    def test_claim_files_conflict_response(self, tmp_path: Path) -> None:
+        tool = ClaimFilesTool(tmp_path)
+        tool.run(paths=["a.py"], agent_id="agent-1", ttl_seconds=60)
+        res = tool.run(paths=["a.py"], agent_id="agent-2")
+        assert res.ok is True
+        assert "KONFLIK" in text(res)
+        assert "agent-1" in text(res)
+
+    def test_claim_files_paths_string_dibungkus(self, tmp_path: Path) -> None:
+        tool = ClaimFilesTool(tmp_path)
+        res = tool.run(paths="a.py", agent_id="agent-1", ttl_seconds=60)
+        assert res.ok is True
+        assert CoordStore(tmp_path).status()["claims"] != []
+
+    def test_claim_files_error_paths_kosong(self, tmp_path: Path) -> None:
+        res = ClaimFilesTool(tmp_path).run(paths=[], agent_id="agent-1")
+        assert res.ok is False
+
+    def test_agent_id_default_dari_env(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("AUTOKEREN_AGENT_ID", "ghost-7")
+        res = ClaimFilesTool(tmp_path).run(paths=["a.py"], ttl_seconds=60)
+        assert res.ok is True
+        assert CoordStore(tmp_path).status()["claims"][0]["agent_id"] == "ghost-7"
+
+    def test_agent_id_default_main_tanpa_env(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("AUTOKEREN_AGENT_ID", raising=False)
+        res = ClaimFilesTool(tmp_path).run(paths=["a.py"], ttl_seconds=60)
+        assert res.ok is True
+        assert CoordStore(tmp_path).status()["claims"][0]["agent_id"] == "main"
+
+    def test_release_claim_tool(self, tmp_path: Path) -> None:
+        ClaimFilesTool(tmp_path).run(paths=["a.py"], agent_id="agent-1", ttl_seconds=60)
+        res = ReleaseClaimTool(tmp_path).run(agent_id="agent-1")
+        assert res.ok is True
+        assert '"a.py"' in text(res)
+        assert CoordStore(tmp_path).status()["claims"] == []
+
+    def test_release_claim_mempromosikan_waiter(self, tmp_path: Path) -> None:
+        ClaimFilesTool(tmp_path).run(paths=["a.py"], agent_id="agent-1", ttl_seconds=60)
+        ClaimFilesTool(tmp_path).run(paths=["a.py"], agent_id="agent-2", ttl_seconds=60, wait=True)
+        res = ReleaseClaimTool(tmp_path).run(agent_id="agent-1")
+        assert res.ok is True
+        assert "dipromosikan: ['agent-2']" in text(res)
+
+    def test_merge_queue_tool_flow(self, tmp_path: Path) -> None:
+        tool = MergeQueueTool(tmp_path)
+        r = tool.run(action="enqueue", branch="main", paths=["a.py"], agent_id="agent-1", change_id="c1")
+        assert r.ok is True and "PASS" in text(r)
+        r = tool.run(action="enqueue", branch="main", paths=["a.py", "b.py"], agent_id="agent-2", change_id="c2")
+        assert r.ok is True and "CONFLICT" in text(r)
+        r = tool.run(action="status", branch="main")
+        assert r.ok is True and "c1" in text(r) and "c2" in text(r)
+        r = tool.run(action="dequeue", branch="main", change_id="c1")
+        assert r.ok is True
+        r = tool.run(action="status", branch="main", change_id="c2")
+        assert r.ok is True and "PASS" in text(r)
+
+    def test_merge_queue_tool_error(self, tmp_path: Path) -> None:
+        tool = MergeQueueTool(tmp_path)
+        assert tool.run(action="enqueue", branch="main").ok is False
+        assert tool.run(action="dequeue", branch="main").ok is False
+        assert tool.run(action="invalid", branch="main").ok is False
+
+    def test_tools_terdaftar_di_registry(self, tmp_path: Path) -> None:
+        from autokeren.tools import ToolRegistry
+
+        reg = ToolRegistry()
+        reg.register(ClaimFilesTool(tmp_path))
+        reg.register(ReleaseClaimTool(tmp_path))
+        reg.register(MergeQueueTool(tmp_path))
+        assert set(["claim_files", "release_claim", "merge_queue"]) <= set(reg.names())
