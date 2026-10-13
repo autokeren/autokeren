@@ -13,12 +13,54 @@
 
 ![autokeren TUI Screenshot](docs/assets/autogen-ui-preview.jpg)
 
-## Build Week 2026 Extension — Autokeren Proof
+## For Cloudflare Judges — Change Coordination Layer ("Build the next GitHub")
 
-Autokeren existed before OpenAI Build Week (began on 2026-07-04) and is distributed under the MIT license.
-**Autokeren Proof** was built during the submission period with Codex and GPT-5.6. It adds an evidence-led release workflow: acceptance criteria, recorded verification, and a SHIP/BLOCKED/NEEDS_HUMAN_REVIEW release verdict.
+Our entry for the Cloudflare challenge: a coordination layer that lets many AI agents work on the
+same changes in parallel without silent collisions. Git detects conflicts too late — at merge time,
+after work is already wasted. This layer detects them **before the first edit**: agents claim files
+(lease + TTL), conflicting claims get a structured conflict response (owner, remaining TTL, queue
+option), and changesets enter a per-branch merge queue tested for path overlap with everything ahead
+of them (`pass` / `queued` / `conflict`). Every transition is recorded in an auditable event log.
 
-### 🚀 Quickstart for Judges (No API Key Required)
+### Run the demo (< 60 seconds, no API key, no dependencies)
+
+```bash
+git clone https://github.com/autokeren/autokeren && cd autokeren
+python3 examples/coord-demo/demo.py
+```
+
+The demo runs 5 agents racing for the same file, twice — deterministic, ~5 seconds:
+
+- **Without the layer**: 5 concurrent read-modify-write agents → last-write-wins, **4 of 5 edits are
+  silently lost**, no error, no trace.
+- **With the layer**: 1 agent gets the lease, 4 queue; the lease holder crashes, its lease is
+  auto-reclaimed by TTL, the FIFO queue keeps flowing → **5/5 edits survive**, every grant, conflict,
+  queue, promotion, release, and expiry recorded in the event log. Each agent uses its own store
+  instance — coordination is 100% via the file layer, equivalent to separate OS processes.
+
+Also try the tests: `PYTHONPATH=. pytest tests/test_coord.py` (48 unit tests: claims, TTL expiry,
+conflicts, FIFO promotion, merge queue, persistence, thread races).
+
+The tools are live for agents in the Python runtime: `claim_files`, `release_claim`, `merge_queue`
+(see [autokeren/tools/coord.py](autokeren/tools/coord.py)).
+
+### Architecture in 30 seconds
+
+- **Local mode (this MVP)**: single JSON state file per project (`.autokeren/coord.json`), protected
+  by an exclusive `flock` held across each operation, with the file reloaded under lock — so separate
+  agent processes coordinate through it. Lazy TTL sweep + FIFO waiter promotion on every operation.
+- **Production target: Cloudflare Worker + Durable Objects + D1** — a Worker exposes the same API;
+  a `ClaimShard` Durable Object per project gives race-free single-writer claims and wait queues;
+  a `BranchQueue` Durable Object per branch serializes merge-queue order; **DO alarms drive TTL
+  auto-expiry push-based** (no cron, no polling); **D1 stores the append-only audit log** and merge
+  history.
+- **Why Durable Objects + D1**: coordination needs linearizability — KV's eventual consistency would
+  let two agents both "win" a claim. DOs provide single-writer state plus alarms natively; D1 gives
+  durable, queryable history with zero ops.
+
+Full design and trade-offs: [docs/COORD_DESIGN.md](docs/COORD_DESIGN.md).
+
+### 🚀 Try It: Safe-Deploy Workflow (No API Key Required)
 
 Judges can test the proof-rendering system and run the local verification suite without any external API keys or configuration:
 
@@ -54,6 +96,10 @@ For a real application, use the interactive native-Go workflow instead of publis
 
 Autokeren must create a proof plan, record real verification evidence, produce `SHIP`, request human approval, and match the approved proof to the current Git commit before it can publish. A later code change makes the proof stale and blocks the safe publish until it is re-verified.
 
+## History
+
+autokeren predates OpenAI Build Week (which began 2026-07-04) and is MIT-licensed. During that submission window we built **Autokeren Proof** with Codex and GPT-5.6: an evidence-led release workflow — acceptance criteria, recorded verification, and a SHIP/BLOCKED/NEEDS_HUMAN_REVIEW release verdict. The subsections below record what was built and how the work was split between humans and AI.
+
 ### 🛠️ Hackathon Contribution (What was built)
 
 * **OpenAI Model Integration** ([openai.py](autokeren/models/openai.py)): Native model client supporting GPT-5.6 and Codex completions, streaming, and tool calls.
@@ -72,11 +118,6 @@ Autokeren must create a proof plan, record real verification evidence, produce `
   * *Architectural Choice*: Moving the IPC channel to a local TCP socket rather than standard output (`stdout`) to avoid parser crashes caused by dependency prints/warnings.
   * *Product Design*: The linear state transitions (PLAN -> RECORD -> REPORT -> REPLAY) for Release Cards.
   * *Antigravity Decision*: The Google Antigravity option was hidden from the interactive wizard to keep the interface clean for public users, while preserving CLI flags (`--agy`) and configuration support so existing installations do not regress.
-
-### 🎥 Demo Video & Devpost Submission
-
-* **Demo Video**: [Watch the 3-minute video on YouTube](https://youtu.be/AGYnj50MdAc)
-* **Codex Session ID**: `019f6df7-0978-7b71-aaa1-8c9b152e5ead` (Paste this ID directly into the Devpost form.)
 
 ---
 

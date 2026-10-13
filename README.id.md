@@ -14,12 +14,7 @@ autokeren adalah CLI agentic coding untuk stack Cloudflare-first. Runtime aktif 
 ![autokeren TUI Screenshot](docs/assets/autogen-ui-preview.jpg)
 
 
-## Ekstensi Build Week 2026 — Autokeren Proof
-
-autokeren sudah ada sebelum OpenAI Build Week (dimulai sejak 2026-07-04) dan didistribusikan di bawah lisensi MIT.
-**Autokeren Proof** dibangun selama periode submisi menggunakan Codex dan GPT-5.6. Fitur ini menambahkan alur kerja rilis berbasis bukti: kriteria penerimaan, verifikasi terrekam, dan hasil keputusan SHIP/BLOCKED/NEEDS_HUMAN_REVIEW.
-
-### 🚀 Panduan Cepat untuk Juri (Tanpa Memerlukan API Key)
+### 🚀 Coba: Alur Safe-Deploy (Tanpa API Key)
 
 Juri dapat menguji sistem rendering acceptance criteria dan menjalankan pengujian lokal secara langsung tanpa konfigurasi API key eksternal:
 
@@ -55,6 +50,10 @@ Untuk aplikasi nyata, gunakan alur interaktif Go native ini, bukan langsung publ
 
 Autokeren wajib membuat proof plan, mencatat bukti verifikasi nyata, menghasilkan `SHIP`, meminta persetujuan manusia, lalu mencocokkan proof yang sudah disetujui dengan Git commit saat ini sebelum boleh publish. Perubahan kode setelah approval membuat proof lama `stale` dan Safe Deploy akan memblokir publish sampai verifikasi dilakukan ulang.
 
+## Riwayat
+
+autokeren sudah ada sebelum OpenAI Build Week (dimulai 2026-07-04) dan berlisensi MIT. Selama periode submisi tersebut kami membangun **Autokeren Proof** dengan Codex dan GPT-5.6: alur kerja rilis berbasis bukti — kriteria penerimaan, verifikasi terrekam, dan hasil keputusan SHIP/BLOCKED/NEEDS_HUMAN_REVIEW. Sub-bagian di bawah mencatat apa saja yang dibangun dan bagaimana pembagian kerja antara manusia dan AI.
+
 ### 🛠️ Kontribusi Hackathon (Yang dibangun selama event)
 
 * **Integrasi Model OpenAI** ([openai.py](autokeren/models/openai.py)): Klien model native yang mendukung completions, streaming, dan tool calling untuk GPT-5.6 dan Codex.
@@ -73,11 +72,6 @@ Autokeren wajib membuat proof plan, mencatat bukti verifikasi nyata, menghasilka
   * *Pilihan Komunikasi*: Menggunakan Local TCP Socket untuk JSON-RPC guna mengisolasi stdout Python dari print/warning pihak ketiga yang dapat merusak parsing TUI Go.
   * *Desain Produk*: Alur status linier (PLAN -> RECORD -> REPORT -> REPLAY) pada Release Cards.
   * *Keputusan Antigravity*: Menyembunyikan opsi Google Antigravity dari menu login wizard interaktif untuk kenyamanan pengguna publik, namun tetap mempertahankan fungsionalitas CLI (`--agy`) agar instalasi lama tidak mengalami regresi.
-
-### 🎥 Video Demo & Submisi Devpost
-
-* **Video Demo**: [Tonton Video Demo 3 Menit di YouTube](https://youtu.be/AGYnj50MdAc)
-* **Codex Session ID**: `019f6df7-0978-7b71-aaa1-8c9b152e5ead` (Tempelkan ID ini langsung ke formulir Devpost.)
 
 ---
 
