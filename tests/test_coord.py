@@ -352,7 +352,7 @@ class TestCoordTools:
         tool.run(paths=["a.py"], agent_id="agent-1", ttl_seconds=60)
         res = tool.run(paths=["a.py"], agent_id="agent-2")
         assert res.ok is True
-        assert "KONFLIK" in text(res)
+        assert "CONFLICT" in text(res)
         assert "agent-1" in text(res)
 
     def test_claim_files_paths_string_dibungkus(self, tmp_path: Path) -> None:
@@ -389,7 +389,7 @@ class TestCoordTools:
         ClaimFilesTool(tmp_path).run(paths=["a.py"], agent_id="agent-2", ttl_seconds=60, wait=True)
         res = ReleaseClaimTool(tmp_path).run(agent_id="agent-1")
         assert res.ok is True
-        assert "dipromosikan: ['agent-2']" in text(res)
+        assert "promoted: ['agent-2']" in text(res)
 
     def test_merge_queue_tool_flow(self, tmp_path: Path) -> None:
         tool = MergeQueueTool(tmp_path)

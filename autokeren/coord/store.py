@@ -1,9 +1,9 @@
-"""Change Coordination Layer — claim/lease, deteksi konflik, dan merge queue.
+"""Change Coordination Layer — claim/lease, conflict detection, and merge queue.
 
-Mode local: seluruh state disimpan dalam satu file JSON (`.autokeren/coord.json`)
-yang diamankan flock lintas-proses; file adalah single source of truth sehingga
-agent berupa proses OS terpisah tetap terkoordinasi. Lihat docs/COORD_DESIGN.md
-untuk semantik lengkap dan target produksi (Worker + Durable Objects + D1).
+Local mode: all state lives in a single JSON file (`.autokeren/coord.json`)
+guarded by a cross-process flock; the file is the single source of truth, so
+agents running as separate OS processes stay coordinated. See docs/COORD_DESIGN.md
+for full semantics and the production target (Worker + Durable Objects + D1).
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ LOCK_TIMEOUT_SECONDS = 10.0
 
 
 class CoordLockTimeout(RuntimeError):
-    """Gagal mengambil lock koordinasi dalam batas waktu."""
+    """Failed to acquire the coordination lock within the timeout."""
 
 
 def _acquire_flock(fd: int, timeout_seconds: float) -> None:
@@ -39,7 +39,7 @@ def _acquire_flock(fd: int, timeout_seconds: float) -> None:
             return
         except BlockingIOError:
             if time.monotonic() >= deadline:
-                raise CoordLockTimeout(f"lock koordinasi tidak lepas dalam {timeout_seconds:g}s")
+                raise CoordLockTimeout(f"coordination lock not released within {timeout_seconds:g}s")
             time.sleep(0.02)
 
 
@@ -62,11 +62,11 @@ def _normalize_paths(paths: list[str]) -> list[str]:
         while p.startswith("./"):
             p = p[2:]
         if p.startswith("/") or ".." in p.split("/"):
-            raise ValueError(f"path harus relatif terhadap project root: {raw!r}")
+            raise ValueError(f"path must be relative to the project root: {raw!r}")
         if p and p not in unique:
             unique.append(p)
     if not unique:
-        raise ValueError("daftar path kosong")
+        raise ValueError("path list is empty")
     return unique
 
 
@@ -74,7 +74,7 @@ def _sweep(state: dict[str, Any], now: float) -> None:
     expired = [p for p, c in state["claims"].items() if float(c["expires_at"]) <= now]
     for p in expired:
         claim = state["claims"].pop(p)
-        _emit(state, "lease_expired", claim["agent_id"], [p], f"claim_id={claim['claim_id']} TTL habis")
+        _emit(state, "lease_expired", claim["agent_id"], [p], f"claim_id={claim['claim_id']} TTL expired")
     if expired:
         _promote_waiters(state, now)
 
@@ -139,7 +139,7 @@ def _promote_waiters(state: dict[str, Any], now: float) -> list[dict[str, Any]]:
 
 
 class CoordStore:
-    """Fasad stateless di atas file koordinasi; satu instance per proses aman."""
+    """Stateless facade over the coordination file; one instance per process is safe."""
 
     def __init__(self, root: str | Path, state_relpath: str = ".autokeren/coord.json") -> None:
         self.root = Path(root)
@@ -198,7 +198,7 @@ class CoordStore:
         agent = str(agent_id).strip() or "main"
         ttl = float(ttl_seconds)
         if ttl <= 0:
-            raise ValueError("ttl_seconds harus > 0")
+            raise ValueError("ttl_seconds must be > 0")
         with self._transaction() as state:
             now = time.time()
             _sweep(state, now)
@@ -215,7 +215,7 @@ class CoordStore:
             if not held:
                 claim_id = _grant(state, now, norm, agent, branch, ttl, from_queue=False)
                 if renewed:
-                    _emit(state, "lease_renewed", agent, renewed, f"TTL di-refresh ke {ttl:g}s")
+                    _emit(state, "lease_renewed", agent, renewed, f"TTL refreshed to {ttl:g}s")
                 return {
                     "status": "granted",
                     "acquired": True,
@@ -243,7 +243,9 @@ class CoordStore:
                     "claim_conflict",
                     agent,
                     norm,
-                    "; ".join(f"{c['path']} dipegang {c['owner']} (sisa {c['remaining_seconds']}s)" for c in conflicts),
+                    "; ".join(
+                        f"{c['path']} held by {c['owner']} ({c['remaining_seconds']}s left)" for c in conflicts
+                    ),
                 )
                 return {
                     "status": "conflict",
@@ -253,7 +255,7 @@ class CoordStore:
                     "conflicts": conflicts,
                     "waiters_ahead": waiters_ahead,
                     "options": {
-                        "wait": "ulangi dengan wait=true untuk masuk antrian FIFO",
+                        "wait": "retry with wait=true to join the FIFO queue",
                         "retry_after_seconds": retry_after,
                     },
                 }
@@ -274,7 +276,7 @@ class CoordStore:
                 "claim_queued",
                 agent,
                 norm,
-                f"request_id={request_id} di belakang {waiters_ahead} waiter",
+                f"request_id={request_id} behind {waiters_ahead} waiter(s)",
             )
             return {
                 "status": "queued",
@@ -315,7 +317,7 @@ class CoordStore:
                     cancelled.append(w["request_id"])
                     _emit(state, "claim_cancelled", agent, w["paths"], f"request_id={w['request_id']}")
             if released:
-                _emit(state, "lease_released", agent, sorted(released), "lease dilepas eksplisit")
+                _emit(state, "lease_released", agent, sorted(released), "lease released explicitly")
             promoted = _promote_waiters(state, now) if (released or cancelled) else []
             return {"released": sorted(released), "cancelled": cancelled, "promoted": promoted}
 
@@ -363,7 +365,7 @@ class CoordStore:
             entry["blocked_by"] = blocked_ids
             entry["conflicts"] = blocked
             if entry.get("status") != new_status:
-                old = str(entry.get("status") or "baru")
+                old = str(entry.get("status") or "new")
                 entry["status"] = new_status
                 _emit(
                     state,
@@ -395,7 +397,7 @@ class CoordStore:
     ) -> dict[str, Any]:
         b = str(branch).strip()
         if not b:
-            raise ValueError("branch wajib diisi")
+            raise ValueError("branch is required")
         norm = _normalize_paths(paths)
         agent = str(agent_id).strip() or "main"
         with self._transaction() as state:
@@ -405,7 +407,7 @@ class CoordStore:
             cid = str(change_id).strip() if change_id else f"mq-{state['next_id']}"
             state["next_id"] = int(state["next_id"]) + 1
             if any(e["change_id"] == cid for e in q):
-                raise ValueError(f"change_id sudah dipakai di queue branch {b}: {cid}")
+                raise ValueError(f"change_id already used in branch queue {b}: {cid}")
             entry: dict[str, Any] = {
                 "change_id": cid,
                 "agent_id": agent,
@@ -436,12 +438,12 @@ class CoordStore:
             out: dict[str, list[dict[str, Any]]] = {}
             for b in branches:
                 if b not in state["queues"]:
-                    raise ValueError(f"branch tidak punya queue: {b}")
+                    raise ValueError(f"branch has no queue: {b}")
                 entries = self._evaluate_queue(state, b)
                 if change_id:
                     entries = [e for e in entries if e["change_id"] == change_id]
                     if not entries:
-                        raise ValueError(f"change_id tidak ditemukan di queue branch {b}: {change_id}")
+                        raise ValueError(f"change_id not found in branch queue {b}: {change_id}")
                 out[b] = entries
             return out
 
@@ -449,21 +451,21 @@ class CoordStore:
         b = str(branch).strip()
         cid = str(change_id).strip()
         if not b or not cid:
-            raise ValueError("branch dan change_id wajib diisi")
+            raise ValueError("branch and change_id are required")
         with self._transaction() as state:
             now = time.time()
             _sweep(state, now)
             q = state["queues"].get(b, [])
             entry = next((e for e in q if e["change_id"] == cid), None)
             if entry is None:
-                raise ValueError(f"change_id tidak ditemukan di queue branch {b}: {cid}")
+                raise ValueError(f"change_id not found in branch queue {b}: {cid}")
             q.remove(entry)
             _emit(
                 state,
                 "queue_dequeued",
                 entry["agent_id"],
                 entry["paths"],
-                f"branch={b} change_id={cid} (status saat keluar: {entry['status']})",
+                f"branch={b} change_id={cid} (status when leaving: {entry['status']})",
             )
             remaining = self._evaluate_queue(state, b)
             return {
